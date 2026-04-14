@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  # 1. Next.js Front-End
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=https://pijak-capstone-api.aryadanabaraja.my.id
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - backend
+
+  # 2. Flask Back-End
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/pijak_capstone_db
+      - ML_SERVICE_URL=http://ml_services:8000
+      - GEMINI_API_KEY=AIzaSyD9o4f4Q38OGk_vpB7-m4pheapoUMM8NVo
+      - GEMINI_MODEL=gemini-2.5-flash-lite
+    depends_on:
+      - db
+      - ml_services
+
+  # 3. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pijak_capstone_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # 4. ML Services (Time-Series Forecasting)
+  ml_services:
+    build: ./ml_services
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml_services:/app
+      - ./backend/models_bin:/app/models_bin
+    command: python app/model_api.py
+
+  # 5. Adminer (Database Admin Tool)
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+volumes:
+  postgres_data:
