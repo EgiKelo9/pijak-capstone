@@ -6,6 +6,7 @@
 .vscode/
 .idea/
 *.log
+actions-runner
 
 # Node.js (Frontend)
 frontend/node_modules/
