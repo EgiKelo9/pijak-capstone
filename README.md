@@ -1,103 +1,221 @@
 # Pijak Capstone
 
-This repository contains the complete application stack for the Pijak Capstone project. The platform is built using a microservices-like architecture orchestrated via Docker Compose.
+Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next.js, FastAPI, dan ML service mandiri yang terintegrasi dengan Google Gemini untuk insight bisnis.
+
+---
 
 ## 🏗️ Project Structure
 
-- `frontend/`: Next.js application (React, TypeScript) serving as the user interface.
-- `backend/`: Core Python API handling business logic and application state.
-- `ml_services/`: Dedicated Python API for serving machine learning models.
-- `database/`: SQL initialization scripts and database configurations.
-- `docker-compose.yml`: Orchestrates the containers for the entire stack.
+```
+pijak_capstone/
+├── frontend/                   # Next.js (React + TypeScript) — UI utama
+│   ├── app/
+│   ├── components/
+│   ├── public/
+│   ├── .env                    # NEXT_PUBLIC_API_URL
+│   ├── Dockerfile
+│   └── package.json
+│
+├── backend/                    # FastAPI — business logic & proxy ke ML service
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── health.py       # Health check endpoints
+│   │   │   └── predict.py      # Proxy predict ke ml_services
+│   │   ├── schemas/
+│   │   │   ├── health.py
+│   │   │   └── predict.py
+│   │   └── main.py
+│   ├── models_bin/             # Binary model files (tidak di-commit ke git)
+│   ├── .env
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── ml_services/                # FastAPI — ML inference & Gemini integration
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── gemini.py       # Gemini health check & insight generation
+│   │   │   └── model.py        # Forecast endpoint (dummy moving average)
+│   │   ├── schemas/
+│   │   │   ├── gemini.py
+│   │   │   └── model.py
+│   │   └── main.py
+│   ├── models_bin/             # Binary model files (tidak di-commit ke git)
+│   ├── .env
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── database/
+│   └── init.sql                # Inisialisasi schema PostgreSQL
+│
+├── .env                        # Environment variables untuk docker-compose
+└── docker-compose.yml          # Orkestrasi seluruh stack
+```
+
+### Service & Port
+
+| Service      | Teknologi            | Port |
+|--------------|----------------------|------|
+| `frontend`   | Next.js              | 3000 |
+| `backend`    | FastAPI + Uvicorn    | 5000 |
+| `ml_services`| FastAPI + Uvicorn    | 8000 |
+| `db`         | PostgreSQL 15        | 5432 |
+| `adminer`    | Adminer              | 8080 |
+
+---
 
 ## 🚀 Prerequisites
 
-To run this project easily, ensure you have the following installed on your system:
-- [Docker](https://www.docker.com/get-started)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Docker](https://www.docker.com/get-started) & [Docker Compose](https://docs.docker.com/compose/install/)
 
-*(Optional for local non-Docker development)*
-- Node.js & npm/yarn (for frontend)
-- Python 3.8+ (for backend & ml_services)
+*(Opsional, untuk development lokal tanpa Docker)*
+- Node.js 20+ & npm (untuk frontend)
+- Python 3.12+ (untuk backend & ml_services)
 
-## � Development Workflows
+---
 
-We provide two distinct workflows for our development team. Choose the one that best fits your task.
+## ⚙️ Environment Variables
 
-### Option 1: Full Local Environment (Docker Recommended)
-Run the entire stack (Frontend, Backend, ML Services, and Database) on your own machine. This is highly recommended for full-stack features, altering the database schema, or offline development.
+Buat file `.env` di root project sebelum menjalankan docker-compose:
 
-1. Clone the repository and navigate into the project directory:
-   ```bash
-   git clone <your-repo-url>
-   cd pijak_capstone
-   ```
-
-2. Build and start all containers:
-   ```bash
-   docker compose up --build -d
-   ```
-
-3. To view logs or stop the services:
-   ```bash
-   docker compose logs -f
-   docker compose down
-   ```
-
-### Option 2: Hybrid Local Development (Using Public Server via .env)
-If you are only working on a specific portion of the app (e.g., UI/Frontend) and want a lightweight setup, you can run just that module locally and point it to our public development server infrastructure.
-
-**1. Setup Environment Variables**
-Create a `.env` file inside the specific folder you are working on (`frontend/`, `backend/`, etc.) to route connections to the public server.
-
-*Example `.env` for Frontend:*
 ```env
-# Point this to the Public Backend API URL
-NEXT_PUBLIC_API_URL=https://api.your-public-server.com
+# PostgreSQL
+POSTGRES_USER=pijak_user
+POSTGRES_PASSWORD=your_password
+POSTGRES_DB=pijak_db
+
+# Backend
+DATABASE_URL=postgresql://pijak_user:your_password@db:5432/pijak_db
+
+# ML Services
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash-lite
+
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
 
-*Example `.env` for Backend:*
-```env
-# Connect to the Public Database and ML Service
-DATABASE_URL=postgresql://user:password@db.your-public-server.com:5432/pijak_db
-ML_SERVICE_URL=https://ml.your-public-server.com
+> **Catatan:** File `.env` tidak boleh di-commit ke git. Pastikan sudah ada di `.gitignore`.
+
+---
+
+## 🐳 Development Workflows
+
+### Option 1: Full Stack dengan Docker (Recommended)
+
+Jalankan seluruh stack sekaligus — Frontend, Backend, ML Services, dan Database.
+
+```bash
+# 1. Clone repository
+git clone <your-repo-url>
+cd pijak_capstone
+
+# 2. Buat file .env (lihat bagian Environment Variables di atas)
+
+# 3. Build dan jalankan semua container
+docker compose up --build -d
+
+# 4. Cek status container
+docker compose ps
+
+# 5. Lihat logs
+docker compose logs -f
+docker compose logs -f backend      # logs spesifik service
+docker compose logs -f ml_services
+
+# 6. Stop semua container
+docker compose down
 ```
 
-*Example `.env` for ML Services:*
-```env
-FLASK_APP=app/main.py
-FLASK_ENV=development
-PORT=5000
-MODEL_PATH=models_bin/model.h5
-```
+Setelah berjalan, akses:
+- Frontend: http://localhost:3000
+- Backend API docs: http://localhost:5000/docs
+- ML Service docs: http://localhost:8000/docs
+- Adminer (DB): http://localhost:8080
 
-**2. Run the specific service locally:**
+---
 
-*Frontend:*
+### Option 2: Hybrid — Hanya Satu Service Secara Lokal
+
+Cocok jika hanya mengerjakan satu bagian (misal frontend saja) dan ingin menghubungkannya ke server publik yang sudah berjalan.
+
+#### Frontend
+
 ```bash
 cd frontend
+
+# Buat .env
+echo "NEXT_PUBLIC_API_URL=http://localhost:5000" > .env
+
 npm install
 npm run dev
 ```
 
-*Backend & ML Services:*
-```bash
-cd backend # or cd ml_services
-python -m venv .venv
+#### Backend
 
-# Activate virtual environment
-source .venv/bin/activate    # On Linux/macOS
-.venv\Scripts\activate       # On Windows
+```bash
+cd backend
+
+# Buat .env
+cat > .env << EOF
+DATABASE_URL=postgresql://user:password@db.your-server.com:5432/pijak_db
+ML_SERVICE_URL=https://ml.your-server.com
+EOF
+
+python -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
 
 pip install -r requirements.txt
-
-# Run the API using Flask
-flask run --host=0.0.0.0 --port=5000
+uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 ```
 
+#### ML Services
+
+```bash
+cd ml_services
+
+# Buat .env
+cat > .env << EOF
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash-lite
+EOF
+
+python -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
+
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+---
+
 ## 🤖 Machine Learning Models
-Large binary files (e.g., model weights like `.h5`, `.pt`, `.pkl`) are excluded from version control via `.gitignore`. 
-Please place your trained models inside the respective `models_bin/` directories (`backend/models_bin/` or `ml_services/models_bin/`) before setting up the application.
+
+File binary model (`.h5`, `.pt`, `.pkl`, dll.) tidak di-include dalam repository karena ukurannya besar. Letakkan file model yang sudah dilatih ke dalam direktori berikut sebelum menjalankan aplikasi:
+
+```
+backend/models_bin/
+ml_services/models_bin/
+```
+
+---
+
+## 🏥 Health Check Endpoints
+
+| Endpoint               | Service   | Deskripsi                                      |
+|------------------------|-----------|------------------------------------------------|
+| `GET /health`          | Backend   | Status backend saja (ringan, untuk probe)      |
+| `GET /health/full`     | Backend   | Status backend + ml_services + Gemini          |
+| `GET /health/ml`       | Backend   | Status koneksi ke ml_services                  |
+| `GET /health/gemini`   | Backend   | Status koneksi ke Gemini via ml_services        |
+| `GET /health`          | ML Service| Status ml_services                             |
+| `GET /health/gemini`   | ML Service| Status Gemini API langsung                     |
+
+**Response codes:** `200 OK` jika healthy, `503 Service Unavailable` jika ada dependency yang tidak bisa dijangkau.
+
+---
 
 ## 📄 License
+
 [Insert License Here]

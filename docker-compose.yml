@@ -10,7 +10,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - NEXT_PUBLIC_API_URL=https://pijak-capstone-api.aryadanabaraja.my.id
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - WATCHPACK_POLLING=true
     depends_on:
       - backend
@@ -23,10 +23,8 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/pijak_capstone_db
+      - DATABASE_URL=${DATABASE_URL}
       - ML_SERVICE_URL=http://ml_services:8000
-      - GEMINI_API_KEY=AIzaSyD9o4f4Q38OGk_vpB7-m4pheapoUMM8NVo
-      - GEMINI_MODEL=gemini-2.5-flash-lite
     depends_on:
       - db
       - ml_services
@@ -37,9 +35,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: pijak_capstone_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -52,7 +50,9 @@ services:
     volumes:
       - ./ml_services:/app
       - ./backend/models_bin:/app/models_bin
-    command: python app/model_api.py
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=gemini-2.5-flash-lite
 
   # 5. Adminer (Database Admin Tool)
   adminer:
