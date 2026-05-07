@@ -23,11 +23,11 @@ export function HeroBackground() {
   );
 }
 
-export function AboutBackground() {
+export function HomeBackground() {
   return (
     <>
       <style>{`
-        .about-bg {
+        .home-bg {
           /* 📱 MOBILE: Removed min-height so it defers to the parent section */
           background: linear-gradient(180deg, #ffffff 40%, #90FDF2 80%, #2BBAEE 100%);
           border-radius: 0px;
@@ -35,7 +35,7 @@ export function AboutBackground() {
 
         /* 💻 DESKTOP */
         @media (min-width: 768px) {
-          .about-bg {
+          .home-bg {
             /* Removed min-height here as well */
             border-bottom-left-radius: 120px;
             border-bottom-right-radius: 120px;
@@ -48,7 +48,7 @@ export function AboutBackground() {
       `}</style>
 
       {/* Changed absolute positioning to stretch fully: inset-0 h-full */}
-      <div className="about-bg absolute inset-0 w-full h-full z-0 pointer-events-none" />
+      <div className="home-bg absolute inset-0 w-full h-full z-0 pointer-events-none" />
     </>
   );
 }
