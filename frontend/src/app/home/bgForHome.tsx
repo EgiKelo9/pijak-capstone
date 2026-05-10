@@ -42,7 +42,7 @@ export function HomeBackground() {
             background: 
               radial-gradient(84.85% 100% at 50% 0%, #ffffff 0%, #ffffff 57.37%, rgba(243, 243, 243, 0) 100%), 
               linear-gradient(180deg, #90FDF2 0%, #2BBAEE 100%);
-            box-shadow: 0px 33px 250px rgba(255, 255, 255, 0.01);
+            box-shadow: 0px 33px 250px rgba(255, 255, 255, 0.067);
           }
         }
       `}</style>
