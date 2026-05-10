@@ -83,8 +83,7 @@ export default function TeamSection() {
         {TEAM_MEMBERS.map((member, index) => (
           <div
             key={member.id}
-            // Pointer events none prevents accidental image dragging from interfering with the container drag
-            className={`shrink-0 pointer-events-none transition-transform duration-500 ${
+            className={`shrink-0 transition-transform duration-500 ${
               index % 2 === 0 ? "-translate-y-8 lg:-translate-y-12" : "translate-y-8 lg:translate-y-12"
             }`}
           >

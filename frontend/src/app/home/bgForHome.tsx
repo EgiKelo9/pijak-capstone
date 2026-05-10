@@ -52,3 +52,32 @@ export function HomeBackground() {
     </>
   );
 }
+
+export function CtaBackground() {
+  return (
+    <>
+      <style>{`
+        .cta-bg {
+          /* 📱 MOBILE: Simple gradient, deferring radius to desktop */
+          background: linear-gradient(180deg, #90FDF2 0%, #2BBAEE 100%);
+          border-radius: 0px;
+        }
+
+        /* 💻 DESKTOP */
+        @media (min-width: 768px) {
+          .cta-bg {
+            border-top-left-radius: 120px;
+            border-top-right-radius: 120px;
+            background: linear-gradient(180deg, #90FDF2 0%, #2BBAEE 100%);
+            box-shadow: 
+              0px -33px 250px rgba(255, 255, 255, 0.06), 
+              inset -180px 0px 250px rgba(255, 255, 255, 0.63), 
+              inset 180px 0px 250px rgba(255, 255, 255, 0.63);
+          }
+        }
+      `}</style>
+
+      <div className="cta-bg absolute inset-0 w-full h-full z-0 pointer-events-none" />
+    </>
+  );
+}

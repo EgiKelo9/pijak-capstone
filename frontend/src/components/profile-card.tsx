@@ -45,6 +45,7 @@ export function ProfileCard({ name, badge, image }: ProfileCardProps) {
           {/* Profile Image (Transparent PNG) */}
           <img
             loading="lazy"
+            draggable={false}
             alt={`Formal Photo of ${name}`}
             src={image}
             className="absolute bottom-0 z-10 h-full w-full object-cover object-bottom"
