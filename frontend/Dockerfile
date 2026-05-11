@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# Next.js requires libc6-compat for its SWC compiler on Alpine Linux
+RUN apk add --no-cache libc6-compat
+
 # Enable pnpm natively
 RUN corepack enable pnpm
 
@@ -8,11 +11,11 @@ WORKDIR /app
 # Copy the pnpm lockfile alongside the package.json
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies using pnpm
-RUN pnpm install
+# Install dependencies using pnpm strictly from the lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
 
-# Start the development server (for the VPS)
+# Start the development server
 CMD ["pnpm", "run", "dev"]

@@ -16,7 +16,7 @@ CREATE TABLE users (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(100) NOT NULL,
     email       VARCHAR(150) UNIQUE NOT NULL,
-    store_name  VARCHAR(150),
+    password    VARCHAR(150) NOT NULL,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -87,9 +87,9 @@ CREATE INDEX idx_prediction_risk     ON ml_prediction_results(risk_flag);
 -- ============================================================
 -- Dummy seed data untuk development & testing
 -- ============================================================
-INSERT INTO users (name, email, store_name) VALUES
-    ('Budi Santoso', 'budi@example.com', 'Toko Berkah Jaya'),
-    ('Ani Rahayu',   'ani@example.com',  'Lapak Online Ani');
+INSERT INTO users (name, email, password) VALUES
+    ('Budi Santoso', 'budi@example.com', HASHBYTES('SHA2_256', 'BudiPass123')),
+    ('Ani Rahayu',   'ani@example.com',  HASHBYTES('SHA2_256', 'AniPass123'));
 
 INSERT INTO stores (user_id, name, city) VALUES
     (1, 'Toko Berkah Jaya - Pusat', 'Jakarta'),

@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import predict, health
+from app.api import predict, health, auth
 
 # Environment variables untuk konfigurasi service
 ML_SERVICE_URL  = os.getenv("ML_SERVICE_URL",  "http://ml_services:8000")
@@ -31,6 +31,7 @@ app.add_middleware(
 )
 
 # Include API routers
+app.include_router(auth.router, prefix="/api", tags=["Authentication"])
 app.include_router(predict.router, prefix="/api", tags=["Prediction"])
 app.include_router(health.router, prefix="/api", tags=["System Check"])
 
