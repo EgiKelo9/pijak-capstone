@@ -2,7 +2,7 @@ import Image from "next/image"
 
 export default function TextHome() {
     return (
-        <div className="w-full max-w-[95vw] md:max-w-[85vw] px-2 md:px-4 flex flex-col gap-0 md:gap-0 text-center text-3xl sm:text-5xl md:text-7xl font-semibold tracking-tight">
+        <div className="w-full max-w-[95vw] md:max-w-[85vw] px-2 md:px-4 flex flex-col gap-0 md:gap-0 text-center text-3xl sm:text-5xl md:text-6xl 2xl:text-7xl font-semibold tracking-tight">
             <div className="-mt-2">
                 <span>Bawa </span>
                 <span className="inline-flex items-center translate-y-1.5 md:translate-y-3 -mx-1">
