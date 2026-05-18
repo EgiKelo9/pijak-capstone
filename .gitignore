@@ -59,10 +59,7 @@ venv.bak/
 *.onnx
 *.weights
 *.bin
-backend/models_bin/*
-!backend/models_bin/.gitkeep
-ml_services/models_bin/*
-!ml_services/models_bin/.gitkeep
+ml_services/artifacts/*
 
 # OS generated files
 Thumbs.db

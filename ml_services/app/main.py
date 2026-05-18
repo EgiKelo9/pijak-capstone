@@ -1,30 +1,38 @@
 import os
-from typing import Any, Dict
-from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from app.api import gemini, model
+from fastapi.responses import JSONResponse
+from app.schemas.base import StandardResponse
+from app.middleware import cors, static
+from app.router import gemma, model, health
 
 app = FastAPI(
-    title="Pijak Capstone ML Service",
-    description="Machine Learning & Generative AI Service (Port 8000)",
+    title="Beez - Pijak Capstone ML Service",
+    description="API Capstone Project untuk Machine Learning & Generative AI Service (Port 8000)",
     version="1.0.0"
 )
 
-# CORS setup
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if not os.getenv("ENV"):
+    os.environ["ENV"] = "dev"
 
+cors.add(app)
+static.add(app)
 
-# Include API routers
-app.include_router(gemini.router, tags=["Gemini Endpoints"])
-app.include_router(model.router, tags=["Model Endpoints"])
+app.include_router(gemma.router, prefix="/ml/v1", tags=["Gemma Endpoints"])
+app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
+app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=StandardResponse(
+            code=exc.status_code,
+            error=True,
+            message=exc.detail,
+            data=None
+        ).model_dump()
+    )
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Pijak Capstone ML Service. Akses /docs untuk melihat dokumentasi interaktif."}
+    return {"message": "Welcome to Beez - Pijak Capstone ML Service. Akses /docs untuk melihat dokumentasi interaktif."}

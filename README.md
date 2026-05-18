@@ -1,6 +1,6 @@
 # Pijak Capstone
 
-Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next.js, FastAPI, dan ML service mandiri yang terintegrasi dengan Google Gemini untuk insight bisnis.
+Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next.js, FastAPI, dan ML service mandiri yang terintegrasi dengan Google Gemma (via Ollama) untuk insight bisnis.
 
 ---
 
@@ -9,43 +9,38 @@ Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next
 ```
 pijak_capstone/
 ├── frontend/                   # Next.js (React + TypeScript) — UI utama
-│   ├── app/
-│   ├── components/
 │   ├── public/
-│   ├── .env                    # NEXT_PUBLIC_API_URL
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   └── hooks/
 │   ├── Dockerfile
 │   └── package.json
 │
 ├── backend/                    # FastAPI — business logic & proxy ke ML service
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── health.py       # Health check endpoints
-│   │   │   └── predict.py      # Proxy predict ke ml_services
-│   │   ├── schemas/
-│   │   │   ├── health.py
-│   │   │   └── predict.py
-│   │   └── main.py
-│   ├── models_bin/             # Binary model files (tidak di-commit ke git)
+│   │   ├── controller/         # Logic untuk setiap endpoint
+│   │   ├── core/               # Konfigurasi aplikasi (environment configs)
+│   │   ├── database/           # Koneksi dan setup database
+│   │   ├── middleware/         # Custom middlewares (CORS, dsb.)
+│   │   ├── models/             # Schema/ORM Models (User, Dataset, etc.)
+│   │   ├── router/             # Definisi API routes
+│   │   ├── schemas/            # Pydantic schemas untuk validasi IO
+│   │   └── shared/             # Dependencies dan utilities (mis. dependencies.py)
 │   ├── .env
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── ml_services/                # FastAPI — ML inference & Gemini integration
+├── ml_services/                # FastAPI — ML inference & Gemma integration
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── gemini.py       # Gemini health check & insight generation
-│   │   │   └── model.py        # Forecast endpoint (dummy moving average)
-│   │   ├── schemas/
-│   │   │   ├── gemini.py
-│   │   │   └── model.py
-│   │   └── main.py
-│   ├── models_bin/             # Binary model files (tidak di-commit ke git)
+│   │   ├── controller/         # Logic untuk model ML dan Gemma
+│   │   ├── core/               # Konfigurasi ML settings (Ollama URL, model path)
+│   │   ├── router/             # Definisi API routes (gemma.py, model.py)
+│   │   └── schemas/            # Pydantic schemas
+│   ├── artifacts/              # File binary / saved model (h5, pkl, dsb.)
 │   ├── .env
 │   ├── Dockerfile
 │   └── requirements.txt
-│
-├── database/
-│   └── init.sql                # Inisialisasi schema PostgreSQL
 │
 ├── .env                        # Environment variables untuk docker-compose
 └── docker-compose.yml          # Orkestrasi seluruh stack
@@ -53,13 +48,14 @@ pijak_capstone/
 
 ### Service & Port
 
-| Service      | Teknologi            | Port |
-|--------------|----------------------|------|
-| `frontend`   | Next.js              | 3000 |
-| `backend`    | FastAPI + Uvicorn    | 5000 |
-| `ml_services`| FastAPI + Uvicorn    | 8000 |
-| `db`         | PostgreSQL 15        | 5432 |
-| `adminer`    | Adminer              | 8080 |
+| Service      | Teknologi             | Port |
+|--------------|-----------------------|------|
+| `frontend`   | Next.js               | 3000 |
+| `backend`    | FastAPI + Uvicorn     | 5000 |
+| `ml_services`| FastAPI + Uvicorn     | 8000 |
+| `db`         | PostgreSQL 15         | 5432 |
+| `adminer`    | Adminer               | 8080 |
+| `gemma-llm`  | Ollama + Google Gemma | 8080 |
 
 ---
 
@@ -86,9 +82,9 @@ POSTGRES_DB=pijak_db
 # Backend
 DATABASE_URL=postgresql://pijak_user:your_password@db:5432/pijak_db
 
-# ML Services
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash-lite
+# ML Services (Ollama & Gemma Local Server)
+OLLAMA_BASE_URL=http://host.docker.internal:11434/api/generate
+LLM_MODEL=gemma:2b
 
 # Frontend
 NEXT_PUBLIC_API_URL=http://localhost:5000
@@ -176,8 +172,8 @@ cd ml_services
 
 # Buat .env
 cat > .env << EOF
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash-lite
+OLLAMA_BASE_URL=http://localhost:11434/api/generate
+LLM_MODEL=gemma:2b
 EOF
 
 python -m venv .venv
@@ -195,8 +191,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 File binary model (`.h5`, `.pt`, `.pkl`, dll.) tidak di-include dalam repository karena ukurannya besar. Letakkan file model yang sudah dilatih ke dalam direktori berikut sebelum menjalankan aplikasi:
 
 ```
-backend/models_bin/
-ml_services/models_bin/
+ml_services/artifacts/
 ```
 
 ---
@@ -206,11 +201,11 @@ ml_services/models_bin/
 | Endpoint               | Service   | Deskripsi                                      |
 |------------------------|-----------|------------------------------------------------|
 | `GET /health`          | Backend   | Status backend saja (ringan, untuk probe)      |
-| `GET /health/full`     | Backend   | Status backend + ml_services + Gemini          |
+| `GET /health/full`     | Backend   | Status backend + ml_services + Gemma           |
 | `GET /health/ml`       | Backend   | Status koneksi ke ml_services                  |
-| `GET /health/gemini`   | Backend   | Status koneksi ke Gemini via ml_services        |
+| `GET /health/gemma`    | Backend   | Status koneksi ke Gemma via ml_services        |
 | `GET /health`          | ML Service| Status ml_services                             |
-| `GET /health/gemini`   | ML Service| Status Gemini API langsung                     |
+| `GET /health/gemma`    | ML Service| Status Gemma API / Ollama langsung             |
 
 **Response codes:** `200 OK` jika healthy, `503 Service Unavailable` jika ada dependency yang tidak bisa dijangkau.
 
