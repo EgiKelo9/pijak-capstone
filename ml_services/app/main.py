@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from app.schemas.base import StandardResponse
-from app.middleware import cors, static
+from app.middleware import cors
 from app.router import gemma, model, health
 
 app = FastAPI(
@@ -15,7 +15,6 @@ if not os.getenv("ENV"):
     os.environ["ENV"] = "dev"
 
 cors.add(app)
-static.add(app)
 
 app.include_router(gemma.router, prefix="/ml/v1", tags=["Gemma Endpoints"])
 app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
