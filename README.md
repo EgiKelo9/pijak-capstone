@@ -36,6 +36,7 @@ pijak_capstone/
 │   │   ├── controller/         # Logic untuk model ML dan Gemma
 │   │   ├── core/               # Konfigurasi ML settings (Ollama URL, model path)
 │   │   ├── router/             # Definisi API routes (gemma.py, model.py)
+│   │   ├── pipeline/           # Fungsi dan Class untuk pipeline machine learning
 │   │   └── schemas/            # Pydantic schemas
 │   ├── artifacts/              # File binary / saved model (h5, pkl, dsb.)
 │   ├── .env
