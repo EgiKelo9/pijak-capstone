@@ -60,6 +60,7 @@ venv.bak/
 *.weights
 *.bin
 ml_services/artifacts/*
+!ml_services/artifacts/__init__.py
 
 # OS generated files
 Thumbs.db
