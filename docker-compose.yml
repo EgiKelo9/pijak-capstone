@@ -15,7 +15,7 @@ services:
     depends_on:
       - backend
 
-  # 2. Flask Back-End
+  # 2. FastAPI Back-End
   backend:
     build: ./backend
     ports:
@@ -24,10 +24,14 @@ services:
       - ./backend:/app
     environment:
       - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_NAME=${DATABASE_NAME}
       - ML_SERVICE_URL=http://ml_services:8000
+      - ENV=dev
     depends_on:
-      - db
-      - ml_services
+      db:
+        condition: service_healthy
+      ml_services:
+        condition: service_started
 
   # 3. PostgreSQL Database
   db:
@@ -40,19 +44,24 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # 4. ML Services (Time-Series Forecasting)
+  # 4. ML Services (Time-Series Forecasting & LLM)
   ml_services:
     build: ./ml_services
     ports:
       - "8000:8000"
     volumes:
       - ./ml_services:/app
-      - ./backend/models_bin:/app/models_bin
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=gemini-2.5-flash-lite
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/api/generate
+      - LLM_MODEL=${LLM_MODEL:-gemma:2b}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # 5. Adminer (Database Admin Tool)
   adminer:

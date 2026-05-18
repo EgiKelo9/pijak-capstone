@@ -4,7 +4,7 @@ FROM node:20-alpine
 RUN apk add --no-cache libc6-compat
 
 # Enable pnpm natively
-RUN corepack enable pnpm
+RUN npm install -g pnpm
 
 WORKDIR /app
 

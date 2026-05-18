@@ -1,13 +1,13 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class GeminiHealthResponse(BaseModel):
+class GemmaHealthResponse(BaseModel):
     status: str
     model: str
     detail: Optional[str] = None
 
-class GeminiInsightRequest(BaseModel):
+class GemmaInsightRequest(BaseModel):
     forecast_data: str
 
-class GeminiInsightResponse(BaseModel):
+class GemmaInsightResponse(BaseModel):
     insight: str

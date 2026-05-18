@@ -31,7 +31,7 @@ class PredictResponseForecast(BaseModel):
     store_id: str
     horizon_days: int
     results: List[ForecastResult]
-    model_used: str
+    used_model: str
     note: str
 
 class FullPredictResponse(BaseModel):
