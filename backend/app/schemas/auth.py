@@ -1,19 +1,22 @@
 from pydantic import BaseModel, EmailStr
-from uuid import UUID
 
 class UserRegisterRequest(BaseModel):
-    username: str
+    name: str
     email: EmailStr
     password: str
 
 class UserRegisterResponse(BaseModel):
-    id: UUID
-    username: str
+    id: int
+    name: str
     email: EmailStr
 
     class Config:
         from_attributes = True
+        
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
-class TokenResponse(BaseModel):
+class UserLoginResponse(BaseModel):
     access_token: str
     token_type: str

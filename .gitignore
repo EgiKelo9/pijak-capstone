@@ -32,7 +32,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -60,10 +59,8 @@ venv.bak/
 *.onnx
 *.weights
 *.bin
-backend/models_bin/*
-!backend/models_bin/.gitkeep
-ml_services/models_bin/*
-!ml_services/models_bin/.gitkeep
+ml_services/artifacts/*
+!ml_services/artifacts/__init__.py
 
 # OS generated files
 Thumbs.db
