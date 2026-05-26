@@ -22,7 +22,7 @@ def get_db():
 def create_db():
     setting = get_settings()
     
-    default_db_url = setting.DATABASE_URL + "postgres"
+    default_db_url = setting.DATABASE_URL
     db_engine_default = create_engine(default_db_url, isolation_level="AUTOCOMMIT")
     
     try:
