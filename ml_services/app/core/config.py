@@ -10,8 +10,10 @@ class Settings:
     PORT = int(os.getenv("PORT", 8000))
     FORECASTING_MODEL_PATH = os.getenv("FORECASTING_MODEL_PATH", "artifacts/model_forecasting.h5")
     CLUSTERING_MODEL_PATH = os.getenv("CLUSTERING_MODEL_PATH", "artifacts/model_clustering.h5")
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/api/generate")
     LLM_MODEL = os.getenv("LLM_MODEL", "gemma:2b")
+    OPEN_ROUTER_BASE_URL = os.getenv("OPEN_ROUTER_BASE_URL", "https://openrouter.ai/api/v1/chat/completions")
+    OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY", "")
+    APP_BASE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
     
 class DevSettings(Settings):
     """Development settings class"""
@@ -19,8 +21,10 @@ class DevSettings(Settings):
     PORT = int(os.getenv("PORT", 8000))
     FORECASTING_MODEL_PATH = os.getenv("FORECASTING_MODEL_PATH", "artifacts/model_forecasting.h5")
     CLUSTERING_MODEL_PATH = os.getenv("CLUSTERING_MODEL_PATH", "artifacts/model_clustering.h5")
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/api/generate")
     LLM_MODEL = os.getenv("LLM_MODEL", "gemma:2b")
+    OPEN_ROUTER_BASE_URL = os.getenv("OPEN_ROUTER_BASE_URL", "https://openrouter.ai/api/v1/chat/completions")
+    OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY", "")
+    APP_BASE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
 
 class TestSettings(Settings):
     """Test settings class"""
@@ -28,8 +32,10 @@ class TestSettings(Settings):
     PORT = int(os.getenv("PORT", 8000))
     FORECASTING_MODEL_PATH = os.getenv("FORECASTING_MODEL_PATH", "artifacts/model_forecasting.h5")
     CLUSTERING_MODEL_PATH = os.getenv("CLUSTERING_MODEL_PATH", "artifacts/model_clustering.h5")
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434/api/generate")
     LLM_MODEL = os.getenv("LLM_MODEL", "gemma:2b")
+    OPEN_ROUTER_BASE_URL = os.getenv("OPEN_ROUTER_BASE_URL", "https://openrouter.ai/api/v1/chat/completions")
+    OPEN_ROUTER_API_KEY = os.getenv("OPEN_ROUTER_API_KEY", "")
+    APP_BASE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
 
 @lru_cache
 def get_settings():
