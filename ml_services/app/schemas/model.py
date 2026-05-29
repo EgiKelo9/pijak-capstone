@@ -43,3 +43,7 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     model: Optional[str] = None
+
+# class TestRun(BaseModel):
+#     dataset_id: int
+#     model: str

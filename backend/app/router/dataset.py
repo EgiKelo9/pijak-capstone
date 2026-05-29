@@ -1,5 +1,5 @@
-from typing import Any, Dict
-from fastapi import APIRouter, Depends, UploadFile, File
+from typing import Any, Dict, Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
@@ -21,7 +21,10 @@ router = APIRouter(prefix="/datasets")
 )
 
 async def upload_dataset(
-    file: UploadFile = File(...), 
+    file: UploadFile = File(..., description="Pilih file dataset berformat .csv"), 
+    is_cleaned: bool = Form(False),
+    ori_data_id: Optional[int] = Form(None),
+    model: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -42,7 +45,7 @@ async def upload_dataset(
         HTTPException: 500 if the file cannot be saved or dataset metadata fails to persist.
         HTTPException: 422 if request validation fails.
     """
-    return await upload_bin(file, current_user, db)
+    return await upload_bin(file, current_user, db, is_cleaned, ori_data_id, model)
 
 @router.get(
     "/{dataset_id}",

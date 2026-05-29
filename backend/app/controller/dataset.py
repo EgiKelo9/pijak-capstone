@@ -1,7 +1,8 @@
 import os
 import time
 import shutil
-from fastapi import HTTPException, UploadFile
+from typing import Optional
+from fastapi import HTTPException, UploadFile, Form
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset, Dataset_Bin
 from app.models.user import User
@@ -69,7 +70,20 @@ async def upload(file: UploadFile, current_user: User, db: Session):
         )
     )
 
-async def upload_bin(file: UploadFile, current_user: User, db: Session):
+async def upload_bin(
+    file: UploadFile, 
+    current_user: User, 
+    db: Session,
+    is_cleaned: bool = False,
+    ori_data_id: Optional[int] = None,
+    model: Optional[str] = None
+):
+    # Workaround for Swagger UI automatically filling '0' and 'string'
+    if ori_data_id == 0:
+        ori_data_id = None
+    if model == "string":
+        model = None
+
     """Mengunggah file dataset baru."""
     if not file.filename.endswith('.csv'):
         raise HTTPException(
@@ -108,7 +122,10 @@ async def upload_bin(file: UploadFile, current_user: User, db: Session):
                 user_id=current_user.id,
                 dataset_name=file.filename,
                 dataset_file=utf8_bytes,
-                original_encoding=detected_encoding
+                original_encoding=detected_encoding,
+                is_cleaned=is_cleaned,
+                ori_data_id=ori_data_id,
+                model=model
             )
             session.add(new_dataset)
             session.flush()

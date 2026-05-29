@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, LargeBinary
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, LargeBinary, Boolean
 from sqlalchemy.orm import relationship
 from app.database.main import Base
 
@@ -25,6 +25,9 @@ class Dataset_Bin(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ori_data_id = Column(Integer, ForeignKey("datasets_bin.id", ondelete="SET NULL"), nullable=True)
+    is_cleaned = Column(Boolean, default=False)
+    model = Column(String(50), nullable=True)
     dataset_name = Column(String(255), nullable=False)
     dataset_file = Column(LargeBinary, nullable=False)
     original_encoding= Column(String(55), nullable=False)

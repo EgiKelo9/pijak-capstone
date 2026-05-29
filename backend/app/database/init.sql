@@ -56,12 +56,15 @@ CREATE TABLE datasets (
 CREATE TABLE datasets_bin (
     id              SERIAL PRIMARY KEY,
     user_id         INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ori_data_id     INT REFERENCES datasets_bin(id) ON DELETE SET NULL,
+    is_cleaned      BOOLEAN DEFAULT FALSE,
+    model           VARCHAR(50) DEFAULT NULL,
     dataset_name    VARCHAR(255) NOT NULL,
     dataset_file    BYTEA NOT NULL,
     original_encoding VARCHAR(50),
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at   TIMESTAMP NULL
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at      TIMESTAMP NULL
 );
 
 -- ============================================================
