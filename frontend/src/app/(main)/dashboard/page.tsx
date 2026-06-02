@@ -17,6 +17,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/animate-ui/components/animate/tabs';
+import { FileUploadDemo } from '@/components/file-upload-demo';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -215,20 +216,49 @@ export default function AnalysisEmptyState() {
   const [date, setDate] = React.useState<DateRange | undefined>();
   const [isOpen, setIsOpen] = React.useState(false);
   const [mode, setMode] = React.useState<AnalysisMode>('both');
+  const [isFileUploadOpen, setIsFileUploadOpen] = React.useState(false);
+  const [activeDatasetId, setActiveDatasetId] = React.useState<number | null>(null);
 
   // Memoize the config for stable references if passed to useEffects later
   const analysisConfig = React.useMemo<AnalysisConfig>(() => ({
     mode,
-    dateRange: date
-  }), [mode, date]);
+    dateRange: date,
+    datasetId: activeDatasetId
+  }), [mode, date, activeDatasetId]);
 
   const handleUpload = React.useCallback(() => {
     console.info('=== [DUMMY PAYLOAD] UNGGAH CSV ===');
     console.info('Current Config Context:', analysisConfig);
     console.info('-> Ready to trigger file upload dialog or API...');
     console.info('========================================');
-    // Add your upload logic here
+    setIsFileUploadOpen(true);
   }, [analysisConfig]);
+
+  const handleUploadConfirm = React.useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // TODO: Retrieve token dynamically from your auth provider (e.g. NextAuth or cookies)
+    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo0LCJleHAiOjE3ODA1MDMyMjh9.gV4t4FejMZeJrDjyf8aCxJGMHWi5x2pYUOPCOpVySX4'; 
+    
+    // TODO: Use environment variables instead of hardcoded localhost
+    const response = await fetch("http://localhost:5000/api/v1/datasets/upload", {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to upload dataset");
+    }
+
+    console.log("[Dashboard] Upload Success. Dataset ID:", result.data.dataset_id);
+    setActiveDatasetId(result.data.dataset_id);
+  }, []);
 
   const handleRunAnalysis = React.useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
@@ -238,6 +268,7 @@ export default function AnalysisEmptyState() {
 
     // EXTRACT AND FORMAT VALUES
     const payload = {
+      datasetId: analysisConfig.datasetId,
       mode: analysisConfig.mode,
       startDate: format(analysisConfig.dateRange.from, 'yyyy-MM-dd'),
       endDate: format(analysisConfig.dateRange.to, 'yyyy-MM-dd'),
@@ -289,6 +320,11 @@ export default function AnalysisEmptyState() {
           onRunAnalysis={handleRunAnalysis}
         />
       </div>
+      <FileUploadDemo 
+        isOpen={isFileUploadOpen} 
+        onClose={() => setIsFileUploadOpen(false)} 
+        onUploadConfirm={handleUploadConfirm}
+      />
     </div>
   );
 }
@@ -311,6 +347,7 @@ function EmptyStateView({ modeLabel, isReady, dateRange, onUpload, onRunAnalysis
   ];
 
   return (
+
     <div className="flex h-full flex-1 w-full flex-col items-center justify-center rounded-2xl border border-neutral-800/20 bg-white p-6 md:p-8">
       <div className="flex w-full max-w-xl flex-col items-center gap-6 text-center">
 
