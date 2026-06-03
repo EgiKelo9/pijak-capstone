@@ -76,13 +76,11 @@ export const CometCard = ({
           z: 50,
           transition: { duration: 0.2 },
         }}
-        // FIX 1: Changed from "rounded-2xl" to "rounded-[2rem]" to match the 32px profile card radius
-        className="relative rounded-[2rem]"
+        className="relative w-full rounded-[1.5rem] 2xl:rounded-[2rem]"
       >
         {children}
         <motion.div
-          // FIX 2: Changed from "rounded-[16px]" to "rounded-[2rem]" to match the 32px profile card radius
-          className="pointer-events-none absolute inset-0 z-50 h-full w-full rounded-[2rem] mix-blend-overlay"
+          className="pointer-events-none absolute inset-0 z-50 h-full w-full rounded-[1.5rem] 2xl:rounded-[2rem] mix-blend-overlay"
           style={{
             background: glareBackground,
             opacity: 0.6,

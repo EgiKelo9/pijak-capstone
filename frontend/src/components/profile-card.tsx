@@ -8,11 +8,10 @@ interface ProfileCardProps {
 
 export function ProfileCard({ name, badge, image }: ProfileCardProps) {
   return (
-    <CometCard>
+    <CometCard className="w-[13rem] md:w-full">
       <div
-        // FIXED: Added min-h-[22rem] and min-w-[14rem] to prevent flex-shrinking from crushing the card.
-        // It will now maintain a healthy minimum size while still scaling up to max-w-[16.5rem].
-        className="relative flex w-full min-w-56 max-w-66 min-h-96 sm:min-h-108 aspect-265/433 cursor-pointer flex-col items-center overflow-hidden rounded-4xl border-[0.4px] border-[#5D5D5D] shadow-2xl"
+        // Fully modular on desktop! Card naturally fills the CSS Grid column it sits in
+        className="relative flex w-full aspect-[265/433] cursor-pointer flex-col items-center overflow-hidden rounded-[1.5rem] 2xl:rounded-[2rem] border-[0.4px] border-[#5D5D5D] shadow-2xl shrink-0"
         style={{
           background: "linear-gradient(90deg, #333333 0%, #272727 100%)",
           transformStyle: "preserve-3d",
@@ -20,7 +19,7 @@ export function ProfileCard({ name, badge, image }: ProfileCardProps) {
       >
         {/* Top Image Section */}
         <div
-          className="relative flex w-full flex-1 flex-col items-center rounded-b-[2rem] overflow-hidden"
+          className="relative flex w-full flex-1 flex-col items-center rounded-b-[1.5rem] 2xl:rounded-b-[2rem] overflow-hidden"
           style={{
             background: `
               radial-gradient(84.85% 100% at 50% 0%, #F3F3F3 0%, #F3F3F3 57.37%, rgba(243, 243, 243, 0) 100%), 
@@ -37,7 +36,7 @@ export function ProfileCard({ name, badge, image }: ProfileCardProps) {
               transform: "translateZ(30px)", 
             }}
           >
-            <span className="font-sans text-[0.65rem] sm:text-xs font-[510] text-black leading-none whitespace-nowrap">
+          <span className="font-sans text-[0.6rem] md:text-xs 2xl:text-sm font-[510] text-black leading-none whitespace-nowrap">
               {badge}
             </span>
           </div>
@@ -63,7 +62,7 @@ export function ProfileCard({ name, badge, image }: ProfileCardProps) {
           }}
         >
           <h2
-            className="font-sans text-2xl sm:text-3xl font-bold leading-none text-white tracking-tight text-center"
+          className="font-sans text-xl md:text-xl 2xl:text-3xl font-bold leading-none text-white tracking-tight text-center"
             style={{
               transform: "translateZ(25px)", 
             }}

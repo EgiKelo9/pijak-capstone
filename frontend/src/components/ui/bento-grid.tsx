@@ -23,8 +23,8 @@ const BentoGrid = ({ children, className, ...props }: BentoGridProps) => {
   return (
     <div
       className={cn(
-        // Updated gap to 32px (gap-8) and row height to 338px to match Figma
-        "grid w-full auto-rows-[338px] grid-cols-3 gap-8",
+        // Responsive gap and row height
+        "grid w-full auto-rows-[220px] md:auto-rows-[280px] 2xl:auto-rows-[338px] grid-cols-3 gap-4 md:gap-6 2xl:gap-8",
         className
       )}
       {...props}
@@ -48,7 +48,7 @@ const BentoCard = ({
     key={name}
     className={cn(
       // Added text-left to explicitly override any inherited text-center
-      "group relative col-span-3 flex flex-col justify-end text-left overflow-hidden rounded-[32px]",
+      "group relative col-span-3 flex flex-col justify-end text-left overflow-hidden rounded-[1.5rem] 2xl:rounded-[32px]",
       "bg-neutral-900 border-[0.4px] border-[#5D5D5D]",
       className
     )}
@@ -58,22 +58,22 @@ const BentoCard = ({
     <div className="absolute inset-0 z-0">{background}</div>
     
     {/* Content Wrapper */}
-    <div className="relative z-10 p-6 flex flex-col w-full">
+    <div className="relative z-10 p-4 md:p-6 2xl:p-8 flex flex-col w-full">
       {/* Added items-start to force left alignment of flex children */}
-      <div className="pointer-events-none flex transform-gpu flex-col items-start gap-4 transition-all duration-300 lg:group-hover:-translate-y-10">
+      <div className="pointer-events-none flex transform-gpu flex-col items-start gap-3 md:gap-4 transition-all duration-300 lg:group-hover:-translate-y-10">
         
         {/* Icon/Logo */}
-        <Icon className="h-10 w-10 origin-left transform-gpu text-[#F3F3F3] transition-all duration-300 ease-in-out group-hover:scale-75" />
+        <Icon className="h-8 w-8 md:h-10 md:w-10 2xl:h-12 2xl:w-12 origin-left transform-gpu text-[#F3F3F3] transition-all duration-300 ease-in-out group-hover:scale-75" />
         
         <div className="flex flex-col gap-2 items-start w-full">
           {/* Title: Solid primary-foreground (off-white) and larger size */}
-          <h3 className="text-2xl font-bold text-[#F3F3F3] sm:text-3xl">
+          <h3 className="text-xl md:text-2xl 2xl:text-3xl font-bold text-[#F3F3F3]">
             {name}
           </h3>
           
           {/* Caption Wrapper: animates max-height for smooth text expansion without layout jumping */}
           <div className="w-full overflow-hidden transition-all duration-300 ease-in-out max-h-[2.5rem] group-hover:max-h-[10rem]">
-            <p className="w-full text-sm text-[#F3F3F3]/40 line-clamp-2 group-hover:line-clamp-none m-0">
+            <p className="w-full text-xs md:text-sm 2xl:text-base text-[#F3F3F3]/40 line-clamp-2 group-hover:line-clamp-none m-0">
               {description}
             </p>
           </div>
