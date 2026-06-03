@@ -1,9 +1,11 @@
 // components/FilledStateView.tsx
 'use client';
+import { useMemo } from 'react';
 
 import { DynamicDataTable } from '@/components/dynamic-data-table';
 import { AnalysisCard } from '@/components/main-card';
 import { ClusteringPreference } from './clustering-preference';
+import { DataConfigState, DataConfiguration } from './column-preference';
 import { ForecastingPreference } from './forecasting-preference';
 
 interface FilledStateViewProps {
@@ -12,6 +14,8 @@ interface FilledStateViewProps {
   setForecastAggressiveness: (val: number) => void;
   clusteringConfig: { mode: 'auto' | 'manual'; clusterCount: number };
   setClusteringConfig: (config: { mode: 'auto' | 'manual'; clusterCount: number }) => void;
+  dataConfig: DataConfigState;
+  setDataConfig: (config: DataConfigState) => void;
 }
 
 export function FilledStateView({ 
@@ -19,8 +23,33 @@ export function FilledStateView({
   forecastAggressiveness, 
   setForecastAggressiveness, 
   clusteringConfig, 
-  setClusteringConfig 
+  setClusteringConfig,
+  dataConfig,
+  setDataConfig
 }: FilledStateViewProps) {
+
+  // Memoize data tabel yang sudah difilter berdasarkan kolom yang dipilih
+  const filteredTableData = useMemo(() => {
+    if (!tableData || tableData.length === 0) return [];
+
+    // Kumpulkan semua kolom yang aktif
+    const activeColumns = new Set([
+      dataConfig.dateColumn,
+      dataConfig.targetColumn,
+      ...(dataConfig.includedColumns || [])
+    ].filter(Boolean));
+
+    return tableData.map((row: any) => {
+      const filteredRow: any = {};
+      for (const col of activeColumns) {
+        if (row.hasOwnProperty(col)) {
+          filteredRow[col] = row[col];
+        }
+      }
+      return filteredRow;
+    });
+  }, [tableData, dataConfig]);
+
   return (
     // Mengubah dari flex menjadi grid untuk memaksa rasio (3:2) dan mencegah tabel mendobrak batas lebar
     <div className="grid grid-cols-1 lg:grid-cols-5 w-full gap-3 flex-1 min-h-0 min-w-0 overflow-hidden h-full">
@@ -28,7 +57,7 @@ export function FilledStateView({
       {/* Left Column: Data Table */}
       <div className="lg:col-span-3 flex flex-col rounded-3xl border border-neutral-800/20 bg-white overflow-hidden min-w-0 min-h-0">
         <div className="flex flex-col flex-1 min-h-0 min-w-0 w-full bg-neutral-50/50 p-2 sm:p-1.5">
-          <DynamicDataTable data={tableData}/>
+          <DynamicDataTable data={filteredTableData}/>
         </div>
       </div>
 
@@ -48,11 +77,15 @@ export function FilledStateView({
         </AnalysisCard>
 
         {/* Data Configuration Card */}
-        <AnalysisCard title="Konfigurasi Data" status="berhasil" className="shrink-0">
-           <div className="min-h-32 text-neutral-400 flex items-center justify-center">
-             Form Config Placeholder
-           </div>
+        <AnalysisCard
+            title="Konfigurasi Data"
+            status="berhasil"
+            className="shrink-0"
+            innerClassName="max-h-52.5 p-3" 
+        >
+            <DataConfiguration config={dataConfig} onChange={setDataConfig} />
         </AnalysisCard>
+
 
         {/* Data Quality Card */}
         <AnalysisCard title="Cek Kualitas Data" status="menunggu" className="min-h-40 shrink-0">
@@ -73,7 +106,7 @@ export function FilledStateView({
           </AnalysisCard>
           
           <AnalysisCard title="Preferensi Clustering" status="kosong" className="flex-1 truncate justify-center">
-             <div className=" flex w-full p-2 justify-center">
+             <div className=" flex w-full p-2 justify-center items-center pt-5">
                 <ClusteringPreference 
                     config={clusteringConfig} 
                     onChange={setClusteringConfig} 

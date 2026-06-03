@@ -9,22 +9,22 @@ interface ForecastingPreferenceProps {
 
 const SEGMENTS = [
   {
-    label: 'Konservatif',
+    label: 'Consv',
     feedback: 'Stabil, hindari lonjakan ekstrem.',
-    trackColor: 'bg-blue-400',
-    textColor: 'text-blue-600',
+    trackColor: 'bg-[#c4c4c4]',
+    textColor: 'text-[#c4c4c4]',
   },
   {
-    label: 'Seimbang',
+    label: 'Balnc',
     feedback: 'Titik tengah stabilitas & respons.',
-    trackColor: 'bg-violet-400',
-    textColor: 'text-violet-600',
+    trackColor: 'bg-[#c5e1f3]',
+    textColor: 'text-[#c5e1f3]',
   },
   {
-    label: 'Agresif',
+    label: 'Agrsv',
     feedback: 'Sensitif terhadap perubahan tren.',
-    trackColor: 'bg-rose-400',
-    textColor: 'text-rose-600',
+    trackColor: 'bg-[#90d6f0]',
+    textColor: 'text-[#90d6f0]',
   },
 ] as const;
 

@@ -1,77 +1,30 @@
-import { Box, Text } from "ink";
-import React, { useState } from "react";
+"use client"
 
-import { useTheme } from "@/components/ui/theme-provider";
-import { useFocus } from "@/hooks/use-focus";
-import { useInput } from "@/hooks/use-input";
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
+import { CheckIcon } from "lucide-react"
+import * as React from "react"
 
-export interface CheckboxProps {
-  checked?: boolean;
-  onChange?: (checked: boolean) => void;
-  label?: string;
-  indeterminate?: boolean;
-  disabled?: boolean;
-  id?: string;
-  checkedIcon?: string;
-  uncheckedIcon?: string;
-  indeterminateIcon?: string;
-}
+import { cn } from "@/lib/utils"
 
-export const Checkbox = ({
-  checked: controlledChecked,
-  onChange,
-  label,
-  indeterminate = false,
-  disabled = false,
-  id,
-  checkedIcon = "■",
-  uncheckedIcon = "□",
-  indeterminateIcon = "▪",
-}: CheckboxProps) => {
-  const [internalChecked, setInternalChecked] = useState(false);
-  const theme = useTheme();
-  const { isFocused } = useFocus({ id });
+const Checkbox = React.forwardRef<
+  React.ElementRef<typeof CheckboxPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <CheckboxPrimitive.Root
+    ref={ref}
+    className={cn(
+      "peer h-4 w-4 shrink-0 rounded-sm border border-neutral-300 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[#2BBAEE] data-[state=checked]:border-[#2BBAEE] data-[state=checked]:text-white transition-all",
+      className
+    )}
+    {...props}
+  >
+    <CheckboxPrimitive.Indicator
+      className={cn("flex items-center justify-center text-current")}
+    >
+      <CheckIcon className="h-3 w-3" strokeWidth={3} />
+    </CheckboxPrimitive.Indicator>
+  </CheckboxPrimitive.Root>
+))
+Checkbox.displayName = CheckboxPrimitive.Root.displayName
 
-  const checked = controlledChecked ?? internalChecked;
-
-  useInput((input) => {
-    if (!isFocused || disabled) {
-      return;
-    }
-    if (input === " ") {
-      const next = !checked;
-      if (onChange) {
-        onChange(next);
-      } else {
-        setInternalChecked(next);
-      }
-    }
-  });
-
-  const checkedIcon_ = checked ? checkedIcon : uncheckedIcon;
-  const icon = indeterminate ? indeterminateIcon : checkedIcon_;
-  const activeColor =
-    checked || indeterminate ? theme.colors.primary : theme.colors.border;
-  const iconColor = disabled ? theme.colors.mutedForeground : activeColor;
-
-  return (
-    <Box gap={1}>
-      <Text
-        color={isFocused ? theme.colors.focusRing : iconColor}
-        bold={isFocused}
-      >
-        {icon}
-      </Text>
-      {label && (
-        <Text
-          color={
-            disabled ? theme.colors.mutedForeground : theme.colors.foreground
-          }
-          dimColor={disabled}
-        >
-          {label}
-        </Text>
-      )}
-    </Box>
-  );
-};
+export { Checkbox }

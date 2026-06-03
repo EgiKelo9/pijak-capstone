@@ -5,6 +5,7 @@ import * as React from 'react';
 import { DateRange } from 'react-day-picker';
 
 import { FileUploadDemo } from '@/components/file-upload-demo';
+import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
 import { DashboardHeader } from './dashboard-header';
@@ -18,6 +19,7 @@ interface AnalysisConfig {
   preferences: {
     forecastAggressiveness: number;
     clusteringConfig: { mode: 'auto' | 'manual'; clusterCount: number };
+    dataConfig: DataConfigState;
   }
 }
 
@@ -31,6 +33,12 @@ export default function AnalysisEmptyState() {
   const [isLoadingDataset, setIsLoadingDataset] = React.useState(false);
   const [forecastAggressiveness, setForecastAggressiveness] = React.useState(50);
   const [clusteringConfig, setClusteringConfig] = React.useState<{mode: 'auto' | 'manual'; clusterCount: number}>({ mode: 'auto', clusterCount: 3 });
+  const [dataConfig, setDataConfig] = React.useState<DataConfigState>({
+    availableColumns: [],
+    dateColumn: '',
+    targetColumn: '',
+    includedColumns: []
+  });
 
   // Mengambil datasetId dari session storage saat pertama kali dimuat (jika ada)
   React.useEffect(() => {
@@ -47,9 +55,10 @@ export default function AnalysisEmptyState() {
     datasetId: activeDatasetId,
     preferences: {
       forecastAggressiveness,
-      clusteringConfig
+      clusteringConfig,
+      dataConfig
     }
-  }), [mode, date, activeDatasetId, forecastAggressiveness, clusteringConfig]);
+  }), [mode, date, activeDatasetId, forecastAggressiveness, clusteringConfig, dataConfig]);
 
   const handleOpenUploadModal = React.useCallback(() => {
     console.info('=== [DUMMY PAYLOAD] UNGGAH CSV ===');
@@ -107,7 +116,8 @@ export default function AnalysisEmptyState() {
       endDate: format(analysisConfig.dateRange.to, 'yyyy-MM-dd'),
       preferences: {
         forecasting_learning_rate: analysisConfig.preferences.forecastAggressiveness,
-        clustering_target: analysisConfig.preferences.clusteringConfig.mode === 'auto' ? null : analysisConfig.preferences.clusteringConfig.clusterCount
+        clustering_target: analysisConfig.preferences.clusteringConfig.mode === 'auto' ? null : analysisConfig.preferences.clusteringConfig.clusterCount,
+        data_config: analysisConfig.preferences.dataConfig
       },
       timestamp: new Date().toISOString()
     };
@@ -210,6 +220,17 @@ export default function AnalysisEmptyState() {
         }
         console.log(`[Dashboard] Parsed ${parsedData.length} rows for preview`);
         setDatasetData(parsedData);
+        
+        // Ekstrak nama kolom untuk inisiasi Konfigurasi Data
+        if (parsedData.length > 0) {
+          const cols = Object.keys(parsedData[0]);
+          setDataConfig({
+            availableColumns: cols,
+            dateColumn: cols[0] || '', // Set default kolom pertama sebagai tanggal
+            targetColumn: cols.length > 1 ? cols[1] : (cols[0] || ''), // Set default kolom kedua sebagai target
+            includedColumns: cols.length > 2 ? cols.slice(2) : [] // Sisanya dimasukkan sebagai fitur
+          });
+        }
       } catch (error) {
         console.error("[Dashboard] Fetch Dataset Error:", error);
       } finally {
@@ -239,6 +260,8 @@ export default function AnalysisEmptyState() {
             setForecastAggressiveness={setForecastAggressiveness}
             clusteringConfig={clusteringConfig}
             setClusteringConfig={setClusteringConfig}
+            dataConfig={dataConfig}
+            setDataConfig={setDataConfig}
           />
         ) : (
           <EmptyStateView
