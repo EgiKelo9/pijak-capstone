@@ -26,7 +26,7 @@ def main():
 
     # Summary (Prophet + regressors, weekly, mean aggregation):
     # Latest run -> R2 ~ 0.665, MAPE ~ 66.6, RMSE ~ 110.
-    # Good baseline but not near 0.8+; next step is to try other models.
+
     print(metrics)
 
 

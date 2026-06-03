@@ -21,6 +21,9 @@ def main():
         regressor_columns=regressor_columns,
     )
 
+    # Summary (XGBoost + regressors, weekly, mean aggregation):
+    # Latest run -> R2 ~ 0.716, MAPE ~ 13.6, RMSE ~ 38.3.
+
     print(metrics)
 
 
