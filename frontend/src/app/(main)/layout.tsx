@@ -6,9 +6,9 @@ export default function LandingPageLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <div className="fixed top-0 left-0 w-full z-50">
+        <div className="fixed top-0 left-0 w-full h-screen z-50 flex flex-col overflow-hidden">
           <AppSidebarLayout>
             {children}
           </AppSidebarLayout>
