@@ -1,14 +1,26 @@
 import os
 import time
 from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError # <-- FIXED: Must use SQLAlchemy's error
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import get_settings
 from app.shared.transaction_manager import TransactionManager
 
 setting = get_settings()
-DEFAULT_DB_URL = setting.DATABASE_URL
-DATABASE_TARGET_URL = f"{setting.DATABASE_URL}{setting.DATABASE_NAME}"
+
+# --- BULLETPROOF URL PARSING ---
+# Strip the specific DB name or trailing slash to get the base connection string
+base_url = setting.DATABASE_URL
+if base_url.endswith(f"/{setting.DATABASE_NAME}"):
+    base_url = base_url.replace(f"/{setting.DATABASE_NAME}", "")
+base_url = base_url.rstrip("/")
+
+# 1. Default DB for admin tasks (MUST be 'postgres' to avoid the chicken-and-egg error)
+DEFAULT_DB_URL = f"{base_url}/postgres"
+
+# 2. Target DB for your application
+DATABASE_TARGET_URL = f"{base_url}/{setting.DATABASE_NAME}"
+# -------------------------------
 
 # SQLAlchemy engines are lazy. They won't actually connect until you execute a query.
 engine = create_engine(DATABASE_TARGET_URL)

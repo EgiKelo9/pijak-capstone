@@ -19,7 +19,7 @@ const features = [
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
           // Added a fallback dark color (#2c2c2c) in case the image fails to load
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 63.png') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 63.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
@@ -41,7 +41,7 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(45, 45, 45, 0.96) 53.37%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 64.png') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(45, 45, 45, 0.96) 53.37%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 64.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
@@ -63,7 +63,7 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 65.png') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 65.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
@@ -85,7 +85,7 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 66.png') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 66.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),

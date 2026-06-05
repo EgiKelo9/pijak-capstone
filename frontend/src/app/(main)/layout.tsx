@@ -6,7 +6,7 @@ export default function LandingPageLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    // <html lang="en" suppressHydrationWarning>
       <body>
         <div className="fixed top-0 left-0 w-full h-screen z-50 flex flex-col overflow-hidden">
           <AppSidebarLayout>
@@ -14,6 +14,6 @@ export default function LandingPageLayout({
           </AppSidebarLayout>
         </div>
       </body>
-    </html>
+    // </html>
   );
 }

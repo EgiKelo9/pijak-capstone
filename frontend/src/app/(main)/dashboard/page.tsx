@@ -9,6 +9,7 @@ import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
 import { DashboardHeader } from './dashboard-header';
+import type { TerminalStep } from './terminal';
 
 type AnalysisMode = 'forecasting' | 'clustering' | 'both';
 
@@ -39,6 +40,7 @@ export default function AnalysisEmptyState() {
     targetColumn: '',
     includedColumns: []
   });
+  const [terminalLogs, setTerminalLogs] = React.useState<TerminalStep[]>([]);
 
   // Mengambil datasetId dari session storage saat pertama kali dimuat (jika ada)
   React.useEffect(() => {
@@ -47,6 +49,10 @@ export default function AnalysisEmptyState() {
       setActiveDatasetId(parseInt(storedId, 10));
     }
   }, []);
+
+  // TODO: [TEMPORARY DEV ONLY]
+  // Remove this line once the actual login page is implemented.
+  useTemporaryMockLogin();
 
   // Memoize the config for stable references if passed to useEffects later
   const analysisConfig = React.useMemo<AnalysisConfig>(() => ({
@@ -68,13 +74,56 @@ export default function AnalysisEmptyState() {
     setIsFileUploadOpen(true);
   }, [analysisConfig]);
 
+  // Fungsi orkestrasi Pipeline ML (Dipanggil otomatis setelah upload sukses)
+  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string) => {
+    // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
+    setTerminalLogs([
+      { stepId: 'init', text: 'system_ready: memulai pipeline otomatis...', status: 'info' },
+      { stepId: 'analyze_col', text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...`, status: 'loading' }
+    ]);
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+      
+      // TODO: Ganti URL ini dengan URL endpoint FastAPI ML Services Anda yang sebenarnya
+      const response = await fetch("http://localhost:8000/ml/v1/openrouter/analyze-columns", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dataset_id: datasetId, model_type: currentMode }),
+      });
+
+      if (response.status === 401) throw new Error("Sesi API kedaluwarsa (401)");
+      if (!response.ok) throw new Error(`API Error: Gagal menghubungi ML Services`);
+
+      // const result = await response.json(); // Anda bisa menangkap hasil pemetaan fitur di sini
+
+      // 2. Post-calling: Sukses - Ubah status log analyze_col menjadi success
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Pemetaan kolom berhasil dianalisis.', status: 'success' } : log
+      ));
+
+      // 3. Pre-calling Langkah 2 (Jika Anda perlu memanggil endpoint clean data terpisah)
+      // setTerminalLogs((prev) => [...prev, { stepId: 'data_clean', text: 'Memulai pembersihan data...', status: 'loading' }]);
+      // await fetch(...); dsb
+
+    } catch (error: any) {
+      // 4. Post-calling: Gagal - Ubah status log yang loading menjadi error
+      setTerminalLogs((prev) => prev.map(log => 
+        log.status === 'loading' ? { ...log, text: `Pipeline Error: ${error.message}`, status: 'error' } : log
+      ));
+    }
+  }, []);
+
   const handleUploadConfirm = React.useCallback(async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    // TODO: Retrieve token dynamically from your auth provider (e.g. NextAuth or cookies)
-    const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo0LCJleHAiOjE3ODA1MDMyMjh9.gV4t4FejMZeJrDjyf8aCxJGMHWi5x2pYUOPCOpVySX4'; 
-    
+    // Get token dynamically from localStorage
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    console.log("token-->",token)
     // TODO: Use environment variables instead of hardcoded localhost
     const response = await fetch("http://localhost:5000/api/v1/datasets/upload", {
       method: "POST",
@@ -83,6 +132,14 @@ export default function AnalysisEmptyState() {
       },
       body: formData,
     });
+
+    // Handle expired token directly
+    if (response.status === 401) {
+      localStorage.removeItem("access_token");
+      alert("Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman.");
+      window.location.reload();
+      return;
+    }
 
     // Cek apakah response benar-benar JSON (mencegah SyntaxError JSON.parse)
     const contentType = response.headers.get("content-type");
@@ -100,7 +157,8 @@ export default function AnalysisEmptyState() {
 
     console.log("[Dashboard] Upload Success. Dataset ID:", result.data.dataset_id);
     setActiveDatasetId(result.data.dataset_id);
-  }, []);
+    setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
+  }, [analysisConfig.mode, runPreprocessingPipeline]);
 
   const handleRunAnalysis = React.useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
@@ -166,14 +224,22 @@ export default function AnalysisEmptyState() {
     const fetchDatasetInfo = async () => {
       setIsLoadingDataset(true);
       try {
-        // TODO: Retrieve token dynamically from your auth provider
-        const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo0LCJleHAiOjE3ODA1MDMyMjh9.gV4t4FejMZeJrDjyf8aCxJGMHWi5x2pYUOPCOpVySX4'; 
+        // Get token dynamically from localStorage
+        const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
         
         const response = await fetch(`http://localhost:5000/api/v1/datasets/${activeDatasetId}`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
+
+        // Handle expired token directly
+        if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          console.warn("[Dashboard] Token expired. Cleared from localStorage.");
+          window.location.reload();
+          return;
+        }
 
         const contentType = response.headers.get("content-type");
         let csvString = "";
@@ -239,7 +305,29 @@ export default function AnalysisEmptyState() {
     };
 
     fetchDatasetInfo();
+
+    // Jalankan pipeline otomatis saat dataset dimuat (baik dari upload baru maupun session storage)
+    runPreprocessingPipeline(activeDatasetId, mode);
   }, [activeDatasetId]);
+
+  // ... fungsi ketika menerima payload dari backend ...
+  const handleBackendMessage = (incomingPayload: string) => {
+    const newLog = JSON.parse(incomingPayload) as TerminalStep;
+
+    setTerminalLogs((prevLogs) => {
+      // Jika backend mengirim status success/error, kita UPDATE log yang sedang loading
+      const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
+      
+      if (existingLogIndex !== -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[existingLogIndex] = newLog; // Ganti "loading" dengan "success"
+        return updatedLogs;
+      }
+
+      // Jika ini adalah stepId baru, tambahkan ke baris bawah terminal
+      return [...prevLogs, newLog];
+    });
+  };
 
   return (
     <div className="flex h-full flex-1 flex-col gap-3 min-h-0 min-w-0">
@@ -262,6 +350,7 @@ export default function AnalysisEmptyState() {
             setClusteringConfig={setClusteringConfig}
             dataConfig={dataConfig}
             setDataConfig={setDataConfig}
+            terminalLogs={terminalLogs}
           />
         ) : (
           <EmptyStateView
@@ -281,3 +370,44 @@ export default function AnalysisEmptyState() {
     </div>
   );
 }
+
+// ============================================================================
+// TODO: [TEMPORARY DEV ONLY] REMOVE THIS ENTIRE SECTION ONCE LOGIN IS IMPLEMENTED
+// ============================================================================
+function useTemporaryMockLogin() {
+  React.useEffect(() => {
+    const fetchMockToken = async () => {
+      if (typeof window !== "undefined" && !localStorage.getItem("access_token")) {
+        try {
+          const email = process.env.NEXT_PUBLIC_MOCK_EMAIL;
+          const password = process.env.NEXT_PUBLIC_MOCK_PASSWORD;
+          
+          if (!email || !password) {
+            console.warn("Dev mode: Missing NEXT_PUBLIC_MOCK_EMAIL or NEXT_PUBLIC_MOCK_PASSWORD in environment variables.");
+            return;
+          }
+
+          const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.data?.access_token) {
+            localStorage.setItem("access_token", result.data.access_token);
+            console.warn("Dev mode: Successfully fetched and injected access token from API.");
+          } else {
+            console.error("Dev mode: Failed to fetch mock token:", result);
+          }
+        } catch (error) {
+          console.error("Dev mode: Error fetching mock token:", error);
+        }
+      }
+    };
+
+    fetchMockToken();
+  }, []);
+}
+// ============================================================================

@@ -7,6 +7,7 @@ import { AnalysisCard } from '@/components/main-card';
 import { ClusteringPreference } from './clustering-preference';
 import { DataConfigState, DataConfiguration } from './column-preference';
 import { ForecastingPreference } from './forecasting-preference';
+import { TerminalLog, type TerminalStep } from './terminal';
 
 interface FilledStateViewProps {
   tableData: any;
@@ -16,6 +17,7 @@ interface FilledStateViewProps {
   setClusteringConfig: (config: { mode: 'auto' | 'manual'; clusterCount: number }) => void;
   dataConfig: DataConfigState;
   setDataConfig: (config: DataConfigState) => void;
+  terminalLogs: TerminalStep[];
 }
 
 export function FilledStateView({ 
@@ -25,7 +27,8 @@ export function FilledStateView({
   clusteringConfig, 
   setClusteringConfig,
   dataConfig,
-  setDataConfig
+  setDataConfig,
+  terminalLogs
 }: FilledStateViewProps) {
 
   // Memoize data tabel yang sudah difilter berdasarkan kolom yang dipilih
@@ -68,12 +71,10 @@ export function FilledStateView({
         <AnalysisCard 
           title="Update Langkah Pemrosesan" 
           status="menunggu"
-          className="min-h-50 shrink-0"
+          className="flex-1 min-h-[150px]"
+          innerClassName="flex flex-col h-full min-h-0 overflow-hidden p-0.5"
         >
-          <div className="font-mono text-sm text-neutral-800">
-            <p>Last login: {new Date().toLocaleString()} on ttys00</p>
-            <p className="text-emerald-600 mt-2">beez-engine:~ $ initializing_pipeline...</p>
-          </div>
+          <TerminalLog logs={terminalLogs}/>
         </AnalysisCard>
 
         {/* Data Configuration Card */}
