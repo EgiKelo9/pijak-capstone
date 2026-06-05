@@ -17,13 +17,14 @@ router = APIRouter(prefix="/openrouter")
 )
 async def suggest_columns(request: DatasetMetadataRequest):
     """
-    Endpoint untuk menyarankan mapping kolom berdasarkan metadata dataset yang diberikan.
+    Endpoint untuk menyarankan mapping kolom berdasarkan dataset_id dan model_type.
+    Dataset akan di-fetch internal dari backend, lalu metadata dikirim ke OpenRouter untuk analisis.
     
     Args:
-        request (DatasetMetadataRequest): Request body yang berisi metadata dataset untuk dianalisis oleh OpenRouter.
+        request (DatasetMetadataRequest): Request body berisi dataset_id dan model_type (forecasting/clustering).
         
     Returns:
-        StandardResponse[OpenRouterMappingResponse]: Response yang berisi status, task, dan mapping kolom yang disarankan oleh OpenRouter.
+        StandardResponse[OpenRouterMappingResponse]: Response berisi status, task, dan mapping kolom yang disarankan.
     """
     mapping = await analyze_columns(request)
     return StandardResponse(

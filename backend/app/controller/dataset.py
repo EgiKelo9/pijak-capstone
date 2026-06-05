@@ -180,3 +180,51 @@ async def fetch_dataset_bin(dataset_id: int, current_user: User, db: Session):
             f"attachment; filename={dataset.dataset_name}"
         }
     )
+
+async def soft_delete_cleaned_datasets(
+    ori_data_id: int,
+    model: str,
+    current_user: User,
+    db: Session
+):
+    """
+    Soft-delete semua record cleaned dataset yang mengacu ke dataset original
+    yang sama (ori_data_id) dan model yang sama, untuk mencegah duplikasi record
+    aktif sebelum preprocessing baru diupload.
+
+    Mengisi kolom deleted_at dengan timestamp saat ini pada semua record yang
+    memenuhi kriteria: is_cleaned=True, ori_data_id cocok, model cocok,
+    dan deleted_at masih NULL (belum di-soft-delete sebelumnya).
+    """
+    transaction_manager = TransactionManager(db)
+
+    try:
+        with transaction_manager.transaction() as session:
+            existing_records = (
+                session.query(Dataset_Bin)
+                .filter(
+                    Dataset_Bin.ori_data_id == ori_data_id,
+                    Dataset_Bin.model == model,
+                    Dataset_Bin.is_cleaned == True,
+                    Dataset_Bin.deleted_at == None,
+                )
+                .all()
+            )
+
+            affected = 0
+            for record in existing_records:
+                record.delete()
+                affected += 1
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal menghapus record cleaned dataset lama: {e}"
+        )
+
+    return StandardResponse(
+        code=200,
+        error=False,
+        message=f"{affected} record cleaned dataset lama berhasil di-soft-delete",
+        data={"affected_records": affected}
+    )

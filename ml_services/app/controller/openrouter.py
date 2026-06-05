@@ -2,76 +2,79 @@ import json
 from typing import Any
 from app.core.config import get_settings
 from app.core.utils import generate_from_openrouter
-from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse, ColumnMapping
+from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse
+from app.schemas.features import Feature
+from app.core.utils import get_dataset, get_dataset_info
 
 settings = get_settings()
 LLM_MODEL = settings.LLM_MODEL
 
+TASK_LABEL_MAP = {
+    "forecasting": "forecasting penjualan produk",
+    "clustering": "clustering produk",
+}
+
 
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
-    prompt = f"""
-    Kamu adalah Lead AI Data Scientist. Tugasmu adalah memetakan kolom dari dataset transaksional bisnis secara akurat untuk tahap preprocessing.
-
-    Task Machine Learning saat ini: "{req.target_task}"
-
-    # METADATA DATASET
-    - Kolom yang tersedia: {req.columns}
-    - Tipe Data: {req.data_types}
-    - Contoh data: {req.sample_rows[:2]}
-
-    # ATURAN PEMETAAN (WAJIB DIIKUTI)
-    1. date_column: Pilih tepat SATU kolom yang menunjukkan waktu/tanggal transaksi (misal: Order Date, Date). Dataset ini adalah data transaksional, jadi kolom ini PASTI ada.
-    2. identifier_column: Pilih tepat SATU kolom yang menjadi identitas utama (misal: Product ID, Order ID).
-    3. target_metrics: 
-    - Jika task adalah "sales-forecasting", isi dengan metrik yang akan diprediksi (misal: Sales, Quantity).
-    - Jika task adalah "product-clustering", kosongkan array ini [] karena clustering adalah Unsupervised Learning (metrik kuantitatif akan masuk ke feature_columns).
-    4. feature_columns: Array berisi kolom-kolom yang relevan untuk dianalisis (misal: Category, Segment, Discount, Profit).
-    - EKSKLUSI 1: JANGAN masukkan kolom yang sudah terpilih di date_column, identifier_column, atau target_metrics.
-    - EKSKLUSI 2: JANGAN masukkan teks bebas, nama orang, atau identifier sekunder yang menjadi noise (misal: Customer Name, Row ID).
-
-    # ATURAN FORMAT
-    Balas HANYA dengan JSON valid. Nama kolom harus SAMA PERSIS (case-sensitive) dengan daftar yang tersedia.
-
-    {{
-        "date_column": "nama_kolom",
-        "target_metrics": ["kolom_target"] atau [],
-        "identifier_column": "nama_kolom",
-        "feature_columns": ["fitur1", "fitur2", "fitur3"]
-    }}
-    """
-    
     try:
-        gemma_response = await generate_from_openrouter(prompt)
+        # 1. Fetch dataset dari backend
+        df, _ = await get_dataset(req.dataset_id)
         
-        if getattr(gemma_response, "error", False):
+        # 2. Build metadata dari DataFrame
+        dataset_info = get_dataset_info(df)
+        columns = list(df.columns)
+        data_types = {col: str(dtype) for col, dtype in df.dtypes.items()}
+        sample_rows = df.head(2).to_dict(orient="records")
+        
+        # 3. Handle model_type map (Clustering, Forecasting, or Both)
+        task_str = req.model_type
+        if task_str.lower() == "both":
+            task_str = "Both"
+
+        # 4. Build prompt identik dengan gemini.py, ditambah instruksi skema JSON
+        prompt = f"""
+            Please extract features(columns) from the following dataset.
+            The user wants to do {task_str} option from the available service of Clustering and Forecasting.
+            Dataset:
+            {dataset_info}
+
+            Respond ONLY with a valid JSON object that strictly matches the following JSON schema. Do not add markdown blocks or explanations:
+            {json.dumps(Feature.model_json_schema(), indent=2)}
+        """
+        
+        # 5. Kirim ke OpenRouter
+        llm_response = await generate_from_openrouter(prompt)
+        
+        if getattr(llm_response, "error", False):
             return OpenRouterMappingResponse(
                 status="error",
-                task=req.target_task,
-                suggested_mapping=ColumnMapping()
+                task=task_str,
+                suggested_mapping=Feature()  # fallback empty
             )
     
-        raw_text = gemma_response.data.get("response", "")
+        raw_text = llm_response.data.get("response", "")
         clean_json = raw_text.replace("```json", "").replace("```", "").strip()
-        gemma_dict = json.loads(clean_json)
+        parsed = json.loads(clean_json)
         
-        mapping = ColumnMapping(
-            date_column=gemma_dict.get("date_column"),
-            target_metrics=gemma_dict.get("target_metrics", []),
-            identifier_column=gemma_dict.get("identifier_column"),
-            feature_columns=gemma_dict.get("feature_columns", [])
-        )
+        mapping = Feature(**parsed)
         
         return OpenRouterMappingResponse(
             status="success",
-            task=req.target_task,
+            task=task_str,
             suggested_mapping=mapping,
         )
     except Exception as e:
+        # Fallback ke empty feature jika parsing gagal
+        try:
+            fallback_mapping = Feature()
+        except:
+            fallback_mapping = None
+
         return OpenRouterMappingResponse(
             status="error",
-            task=req.target_task,
-            suggested_mapping=ColumnMapping()
+            task=req.model_type,
+            suggested_mapping=fallback_mapping
         )        
     
         

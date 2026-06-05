@@ -1,6 +1,6 @@
 # Pijak Capstone
 
-Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next.js, FastAPI, dan ML service mandiri yang terintegrasi dengan Google Gemma (via Ollama) untuk insight bisnis.
+Platform prediksi permintaan retail berbasis microservices, dibangun dengan Next.js, FastAPI, dan ML service mandiri yang terintegrasi dengan LLM (via OpenRouter) untuk insight bisnis.
 
 ---
 
@@ -34,8 +34,8 @@ pijak_capstone/
 ├── ml_services/                # FastAPI — ML inference & Gemma integration
 │   ├── app/
 │   │   ├── controller/         # Logic untuk model ML dan Gemma
-│   │   ├── core/               # Konfigurasi ML settings (Ollama URL, model path)
-│   │   ├── router/             # Definisi API routes (gemma.py, model.py)
+│   │   ├── core/               # Konfigurasi ML settings (OpenRouter URL, model path)
+│   │   ├── router/             # Definisi API routes (openrouter.py, model.py)
 │   │   ├── pipeline/           # Fungsi dan Class untuk pipeline machine learning
 │   │   └── schemas/            # Pydantic schemas
 │   ├── artifacts/              # File binary / saved model (h5, pkl, dsb.)
@@ -56,7 +56,7 @@ pijak_capstone/
 | `ml_services`| FastAPI + Uvicorn     | 8000 |
 | `db`         | PostgreSQL 15         | 5432 |
 | `adminer`    | Adminer               | 8080 |
-| `gemma-llm`  | Ollama + Google Gemma | 8080 |
+
 
 ---
 
@@ -83,9 +83,10 @@ POSTGRES_DB=pijak_db
 # Backend
 DATABASE_URL=postgresql://pijak_user:your_password@db:5432/pijak_db
 
-# ML Services (Ollama & Gemma Local Server)
-OLLAMA_BASE_URL=http://host.docker.internal:11434/api/generate
-LLM_MODEL=gemma:2b
+# ML Services (OpenRouter LLM)
+OPEN_ROUTER_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+OPEN_ROUTER_API_KEY=your_openrouter_api_key
+LLM_MODEL=google/gemma-2-9b-it:free
 
 # Frontend
 NEXT_PUBLIC_API_URL=http://localhost:5000
@@ -173,8 +174,9 @@ cd ml_services
 
 # Buat .env
 cat > .env << EOF
-OLLAMA_BASE_URL=http://localhost:11434/api/generate
-LLM_MODEL=gemma:2b
+OPEN_ROUTER_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+OPEN_ROUTER_API_KEY=your_openrouter_api_key
+LLM_MODEL=google/gemma-2-9b-it:free
 EOF
 
 python -m venv .venv
@@ -206,7 +208,7 @@ ml_services/artifacts/
 | `GET /health/ml`       | Backend   | Status koneksi ke ml_services                  |
 | `GET /health/gemma`    | Backend   | Status koneksi ke Gemma via ml_services        |
 | `GET /health`          | ML Service| Status ml_services                             |
-| `GET /health/gemma`    | ML Service| Status Gemma API / Ollama langsung             |
+| `GET /health/gemma`    | ML Service| Status LLM API via OpenRouter                  |
 
 **Response codes:** `200 OK` jika healthy, `503 Service Unavailable` jika ada dependency yang tidak bisa dijangkau.
 

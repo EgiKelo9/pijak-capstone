@@ -1,24 +1,23 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-
+from typing import List, Optional
+from app.schemas.features import Feature
     
 class DatasetMetadataRequest(BaseModel):
-    file_path: str
-    columns: List[str]
-    data_types: Dict[str, str]
-    sample_rows: List[Dict[str, Any]]
-    target_task: str
-    
-class ColumnMapping(BaseModel):
-    date_column: Optional[str] = None
-    target_metrics: List[str] = []
-    identifier_column: Optional[str] = None
-    feature_columns: List[str] = []
+    dataset_id: int
+    model_type: str  # "forecasting", "clustering", atau "both"
     
 class OpenRouterMappingResponse(BaseModel):
     status: str
     task: str
-    suggested_mapping: ColumnMapping
+    suggested_mapping: Feature
+
+class PreprocessRequest(BaseModel):
+    dataset_id: int
+    model_type: str  # "forecasting", "clustering", atau "both"
+
+
+class PreprocessResponse(BaseModel):
+    insight: Feature
 
 class OpenRouterInsightRequest(BaseModel):
     target_task: str
@@ -26,4 +25,3 @@ class OpenRouterInsightRequest(BaseModel):
 
 class OpenRouterInsightResponse(BaseModel):
     insight: str
-    
