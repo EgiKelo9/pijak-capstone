@@ -5,6 +5,7 @@ from io import BytesIO
 import pandas as pd
 
 from app.schemas.base import StandardResponse
+from app.schemas.features import Feature
 from app.core.config import get_settings
 
 logger = logging.getLogger("uvicorn.error")
@@ -237,7 +238,7 @@ def get_dataset_info(df: pd.DataFrame) -> dict:
     }
 
 
-async def generate_from_openrouter(prompt: str) -> StandardResponse[dict]:
+async def generate_from_openrouter(prompt: str, schema = None) -> StandardResponse[dict]:
     """Generate response melalui OpenRouter."""
     settings = get_settings()
     
@@ -248,17 +249,36 @@ async def generate_from_openrouter(prompt: str) -> StandardResponse[dict]:
             "Content-Type": "application/json"
         }
         
-        payload = {
-            "model": settings.LLM_MODEL,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.0,
-        }
-        
+        if not schema:
+            payload = {
+                "model": settings.LLM_MODEL,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False,
+                "temperature": 0.0,
+            }
+        else:
+            # print("Schema is not empty")
+            payload = {
+                "model": settings.LLM_MODEL,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "feature_extraction",
+                        "strict": True,
+                        "schema": Feature.model_json_schema()
+                    }
+                },
+                "stream": False,
+                "temperature": 0.0,
+            }
+            
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
-        
+        print(payload)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.OPEN_ROUTER_BASE_URL,
