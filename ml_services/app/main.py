@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from app.schemas.base import StandardResponse
 from app.middleware import cors
-from app.router import gemma, model, health, gemini, preprocess
+from app.router import openrouter, model, health, gemini, preprocess
 
 app = FastAPI(
     title="Beez - Pijak Capstone ML Service",
@@ -16,7 +16,7 @@ if not os.getenv("ENV"):
 
 cors.add(app)
 
-app.include_router(gemma.router, prefix="/ml/v1", tags=["Gemma Endpoints"])
+app.include_router(openrouter.router, prefix="/ml/v1", tags=["OpenRouter Endpoints"])
 app.include_router(gemini.router, prefix="/ml/v1", tags=["Gemini Endpoints"])
 app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
 app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])

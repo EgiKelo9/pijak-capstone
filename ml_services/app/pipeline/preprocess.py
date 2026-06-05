@@ -1,12 +1,11 @@
-from io import BytesIO
-
 import pandas as pd
 import numpy as np
 from typing import Tuple
 
-import requests
-from app.controller.gemini import get_preprocess_from_gemini
 from app.schemas.features import Feature
+from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset
+from app.controller.openrouter import analyze_columns
+from app.schemas.openrouter import DatasetMetadataRequest
 
 def drop_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     """Membersihkan raw data dari missing values"""
@@ -40,107 +39,32 @@ def prepare_forecasting_data(df: pd.DataFrame) -> pd.DataFrame:
 
 # ------------------------------------- Baroe --------------------------------------------
 
-async def get_dataset(dataset_id):
-    """
-    Fetch dataset from backend API,
-    load into pandas DataFrame,
-    and return summarized dataset information.
-    """
-
-    auth_url = f"http://backend:5000/api/v1/auth/login"
-    auth_response = requests.post(auth_url, json={'email': 'user@example.com', 'password': 'string'})
-    print(auth_response.json())
-    access_token = auth_response.json()["data"]["access_token"]
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-    
-    fetch_dataset_url = f"http://backend:5000/api/v1/datasets/{dataset_id}"
-    fetch_dataset_response = requests.get(
-        fetch_dataset_url,
-        headers=headers
-    )
-
-    if fetch_dataset_response.status_code != 200:
-        raise Exception(
-            f"Failed to fetch dataset: "
-            f"{fetch_dataset_response.status_code} - {fetch_dataset_response.text}"
-        )
-
-    csv_bytes = fetch_dataset_response.content
-
-    df = pd.read_csv(
-        BytesIO(csv_bytes)
-    )
-
-    return df
-
-async def upload_cleaned_dataset(df: pd.DataFrame, original_dataset_id: int, model: str):
-    """
-    Convert processed DataFrame to CSV and upload it back to the backend.
-    """
-    auth_url = f"http://backend:5000/api/v1/auth/login"
-    auth_response = requests.post(auth_url, json={'email': 'user@example.com', 'password': 'string'})
-    access_token = auth_response.json()["data"]["access_token"]
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-    
-    csv_buffer = BytesIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-    
-    upload_url = "http://backend:5000/api/v1/datasets/upload" # Adjust if your endpoint URL is different
-    
-    files = {
-        'file': (f"cleaned_dataset_{original_dataset_id}.csv", csv_buffer, "text/csv")
-    }
-    data = {
-        'is_cleaned': 'true',
-        'ori_data_id': str(original_dataset_id),
-        'model': model
-    }
-    
-    response = requests.post(upload_url, headers=headers, files=files, data=data)
-    
-    if response.status_code != 200:
-        raise Exception(f"Failed to upload cleaned dataset: {response.status_code} - {response.text}")
-        
-    return response.json()
-
-def get_dataset_info(df: pd.DataFrame):
-    dataset_summary = {
-        "shape": df.shape,
-        "dtypes": df.dtypes.astype(str).to_dict(),
-        "head": df.head().to_dict(orient="records"),
-        "missing_values": df.isnull().sum().to_dict()
-    }
-
-    return dataset_summary
-
 def extract_response(response):
     col_dt_whole = None
     is_whole = False
-    col_date_time = response.col_date_time
+    col_date_time = getattr(response, "col_date_time", None)
     
-    if not col_date_time.col_whole:
-        col_day = col_date_time.col_day
-        col_month = col_date_time.col_month
-        col_year = col_date_time.col_year  
-    else:
+    col_day, col_month, col_year = None, None, None
+    
+    if isinstance(col_date_time, str):
         is_whole = True
-        col_dt_whole = col_date_time.col_whole
-        col_day = None
-        col_month = None
-        col_year = None
+        col_dt_whole = col_date_time
+    elif col_date_time is not None:
+        if getattr(col_date_time, 'col_whole', None):
+            is_whole = True
+            col_dt_whole = col_date_time.col_whole
+        else:
+            col_day = getattr(col_date_time, 'col_day', None)
+            col_month = getattr(col_date_time, 'col_month', None)
+            col_year = getattr(col_date_time, 'col_year', None)
 
     return {
-        "cols_to_drop": response.cols_to_drop,
-        "col_product": response.col_product,
-        "col_target": response.col_target,
-        "col_to_cat": response.col_to_categorical,
-        "col_to_num": response.col_to_numerical,
-        "col_pairing": response.new_feature_pairing,
+        "cols_to_drop": getattr(response, "cols_to_drop", []),
+        "col_product": getattr(response, "col_product", []),
+        "col_target": getattr(response, "col_target", None),
+        "col_to_cat": getattr(response, "col_to_categorical", []),
+        "col_to_num": getattr(response, "col_to_numerical", []),
+        "col_pairing": getattr(response, "new_feature_pairing", []),
         "is_whole": is_whole,
         "col_dt_whole": col_dt_whole,
         "col_day": col_day,
@@ -284,20 +208,17 @@ def generate_new_features(df, col_pairing, numeric_cols):
 async def temp_pipeline(dataset_id:int, model: str):
     shapes = []
     
-    df: pd.DataFrame = await get_dataset(dataset_id)
+    df, _ = await get_dataset(dataset_id)
     shapes.append(df.shape)
 
-    dataset_summ = get_dataset_info(df)
-
-    respons = await get_preprocess_from_gemini(dataset_summary=dataset_summ, model_type=model)
-    print(f'Respon Gemini begini kira-kira: {respons}')
-
-    # `respons` could be an error string or the actual Pydantic model parsed from Gemini
-    if isinstance(respons, str):
-        print(f"Gemini returned an error or fallback: {respons}")
+    req = DatasetMetadataRequest(dataset_id=dataset_id, model_type=model)
+    mapping_res = await analyze_columns(req)
+    
+    if mapping_res.status == "error" or not mapping_res.suggested_mapping:
+        print(f"OpenRouter returned an error or fallback.")
         return None
         
-    xtracted = extract_response(respons)
+    xtracted = extract_response(mapping_res.suggested_mapping)
 
     try:
         df = (
