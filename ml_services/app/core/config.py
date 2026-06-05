@@ -57,4 +57,4 @@ def get_settings():
         return TestSettings()
     if env == "dev":
         return DevSettings()
-    return Settings()  # Default to production settings
+    return Settings()

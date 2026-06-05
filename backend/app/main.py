@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from app.schemas.base import StandardResponse
 from app.database.main import Base, engine, create_db
 from app.middleware import cors, static
-from app.router import auth, health, dataset
+from app.router import auth, health, dataset, clustering_router
 
 app = FastAPI(
     title="Beez - Pijak Capstone API",
@@ -17,13 +17,13 @@ if not os.getenv("ENV"):
 
 cors.add(app)
 static.add(app)
-
 create_db()
 Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(dataset.router, prefix="/api/v1", tags=["Dataset Management"])
 app.include_router(health.router, prefix="/api/v1", tags=["System Check"])
+app.include_router(clustering_router.router, prefix="/api/v1", tags=["Clustering"])
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
