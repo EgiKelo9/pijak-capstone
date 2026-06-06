@@ -135,7 +135,7 @@ INSERT INTO users (name, email, password) VALUES
     ('string', 'user@example.com', crypt('string', gen_salt('bf')));
 
 INSERT INTO ml_models (name, type, description) VALUES
-    ('ARIMA', 'forecasting', 'AutoRegressive Integrated Moving Average for time-series forecasting'),
+    ('XGBoost', 'forecasting', 'Extreme Gradient Boosting for time-series forecasting'),
     ('Prophet', 'forecasting', 'Advanced time-series forecasting developed by Meta'),
     ('K-Means', 'clustering', 'Unsupervised learning algorithm for partitioning data into K clusters'),
     ('DBSCAN', 'clustering', 'Density-Based Spatial Clustering of Applications with Noise');
