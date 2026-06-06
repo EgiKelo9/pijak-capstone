@@ -49,6 +49,21 @@ export default function AnalysisEmptyState() {
     if (storedId) {
       setActiveDatasetId(parseInt(storedId, 10));
     }
+
+    const handleDatasetChanged = () => {
+      const newStoredId = sessionStorage.getItem('pijak_active_dataset_id');
+      if (newStoredId) {
+        setActiveDatasetId(parseInt(newStoredId, 10));
+      }
+    };
+    const openUploadModalEvent = () => setIsFileUploadOpen(true);
+
+    window.addEventListener('dataset_changed', handleDatasetChanged);
+    window.addEventListener('open_upload_modal', openUploadModalEvent);
+    return () => {
+      window.removeEventListener('dataset_changed', handleDatasetChanged);
+      window.removeEventListener('open_upload_modal', openUploadModalEvent);
+    };
   }, []);
 
   // TODO: [TEMPORARY DEV ONLY]
