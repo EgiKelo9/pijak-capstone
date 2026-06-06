@@ -1,234 +1,207 @@
 'use client';
 
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
-import {
-  Calendar as CalendarIcon,
-  ChevronDown,
-  FileUp,
-  Flame,
-  Presentation
-} from 'lucide-react';
 import * as React from 'react';
 import { DateRange } from 'react-day-picker';
 
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from '@/components/animate-ui/components/animate/tabs';
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { FileUploadDemo } from '@/components/file-upload-demo';
+import { DataConfigState } from './column-preference';
+import { EmptyStateView } from './dashboard-empty-state';
+import { FilledStateView } from './dashboard-filled-state';
+import { DashboardHeader } from './dashboard-header';
+import type { TerminalStep } from './terminal';
 
 type AnalysisMode = 'forecasting' | 'clustering' | 'both';
 
 interface AnalysisConfig {
   mode: AnalysisMode;
   dateRange: DateRange | undefined;
-}
-
-// --- Sub-components for better debugging and separation of concerns ---
-function DashboardHeader({
-  mode,
-  setMode,
-  date,
-  setDate,
-  isOpen,
-  setIsOpen
-}: {
-  mode: AnalysisMode;
-  setMode: (mode: AnalysisMode) => void;
-  date: DateRange | undefined;
-  setDate: (date: DateRange | undefined) => void;
-  isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
-}) {
-  const handleDateSelect = (range: DateRange | undefined) => {
-    console.debug('[DashboardHeader] Date selected:', range);
-    setDate(range);
-    
-    // Fix: Prevent auto-closing on the first click if the start and end dates are the same.
-    // Wait for a distinct range selection before auto-closing.
-    if (range?.from && range?.to) {
-      const isSameDay = range.from.getTime() === range.to.getTime();
-      if (!isSameDay) {
-        setTimeout(() => setIsOpen(false), 150);
-      }
-    }
-  };
-
-  const handleClearDate = (e: React.MouseEvent) => {
-    console.debug('[DashboardHeader] Clearing date');
-    e.stopPropagation();
-    e.preventDefault();
-    setDate(undefined);
-  };
-
-  const handleModeChange = (v: string) => {
-    console.debug('[DashboardHeader] Mode changed:', v);
-    setMode(v as AnalysisMode);
+  datasetId: number
+  preferences: {
+    forecastAggressiveness: number;
+    clusteringConfig: { mode: 'auto' | 'manual'; clusterCount: number };
+    dataConfig: DataConfigState;
   }
-
-  return (
-    <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      {/* Tab Switch */}
-      <div className="w-full md:w-[360px]">
-        <Tabs
-          value={mode}
-          onValueChange={handleModeChange}
-          className="w-full !gap-0"
-        >
-          <TabsList
-            className={cn(
-              'relative flex w-full flex-row items-center h-11 md:h-12 p-1 gap-1 rounded-xl px-2',
-              'bg-neutral-100', // Refactored from !bg-[#F3F3F3]
-              '[&>[data-slot=highlight]]:!rounded-[10px]',
-              '[&>[data-slot=highlight]]:bg-[#2BBAEE]',
-              '[&>[data-slot=highlight]]:shadow-sm',
-            )}
-          >
-            <TabsTrigger
-              value="forecasting"
-              className="relative z-10 flex-1 inline-flex h-full items-center justify-center rounded-[10px] text-sm font-medium transition-colors duration-300 ease-out data-[state=active]:text-primary data-[state=inactive]:text-neutral-800/60"
-            >
-              Forecasting
-            </TabsTrigger>
-            <TabsTrigger
-              value="clustering"
-              className="relative z-10 flex-1 inline-flex h-full items-center justify-center rounded-[10px] text-sm font-medium transition-colors duration-300 ease-out data-[state=active]:text-primary data-[state=inactive]:text-neutral-800/60"
-            >
-              Clustering
-            </TabsTrigger>
-            <TabsTrigger
-              value="both"
-              className="relative z-10 flex-1 inline-flex h-full items-center justify-center gap-1.5 rounded-[10px] text-sm font-medium transition-colors duration-300 ease-out data-[state=active]:text-primary data-[state=inactive]:text-neutral-800/60"
-            >
-              Both <Flame className="size-3.5" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Date Range Picker */}
-      <div className="w-full md:w-[380px]">
-        <Popover open={isOpen} onOpenChange={setIsOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                'w-full justify-between rounded-xl border-neutral-800/20 bg-gradient-to-b from-white to-[#2BBAEE]/10 px-4 h-11 md:h-12 text-left text-sm font-medium hover:bg-[#2BBAEE]/5 transition-all',
-                !date && 'text-neutral-800/60',
-              )}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <CalendarIcon className="size-4 text-black/50 shrink-0" />
-                <span className="truncate">
-                  {date?.from ? (
-                    date.to
-                      ? `${format(date.from, 'dd LLL y', { locale: id })} — ${format(date.to, 'dd LLL y', { locale: id })}`
-                      : format(date.from, 'dd LLL y', { locale: id })
-                  ) : (
-                    'Pilih Rentang Tanggal'
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {date && (
-                  <span
-                    role="button"
-                    onClick={handleClearDate}
-                    className="flex size-5 items-center justify-center rounded-full text-black/30 hover:text-black/70 hover:bg-black/10 transition-colors text-xs leading-none select-none"
-                    aria-label="Hapus tanggal"
-                  >
-                    ✕
-                  </span>
-                )}
-                <ChevronDown className={cn(
-                  'size-4 text-black/40 transition-transform duration-200',
-                  isOpen && 'rotate-180'
-                )} />
-              </div>
-            </Button>
-          </PopoverTrigger>
-
-          <PopoverContent
-            align="end"
-            sideOffset={6}
-            className={cn(
-              'w-[95vw] sm:w-auto p-2 bg-white border border-black/10 rounded-xl shadow-xl z-50',
-              'overflow-y-auto max-h-[85vh]',
-              '!animate-none',
-              'transition-[opacity,transform] duration-200 ease-out',
-              'data-[state=open]:opacity-100 data-[state=open]:translate-y-0',
-              'data-[state=closed]:opacity-0 data-[state=closed]:-translate-y-1',
-              'will-change-transform',
-            )}
-          >
-            <Calendar
-              mode="range"
-              defaultMonth={date?.from ?? new Date()}
-              selected={date}
-              onSelect={handleDateSelect}
-              numberOfMonths={2}
-              locale={id}
-            />
-            <div className="flex items-center justify-between border-t border-black/5 pt-3 px-2 mt-2">
-              <span className="text-xs text-black/40">
-                {date?.from && date?.to
-                  ? `${Math.round((date.to.getTime() - date.from.getTime()) / 86_400_000)} hari dipilih`
-                  : 'Pilih tanggal mulai & akhir'}
-              </span>
-              <div className="flex items-center gap-3">
-                {date && (
-                  <button
-                    onClick={() => {
-                      console.debug('[DashboardHeader] Resetting calendar selection');
-                      setDate(undefined);
-                    }}
-                    className="text-xs font-medium text-[#2BBAEE] hover:underline transition-colors"
-                  >
-                    Reset
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-xs font-medium text-black/60 hover:text-black transition-colors"
-                >
-                  Tutup
-                </button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
 }
 
 export default function AnalysisEmptyState() {
   const [date, setDate] = React.useState<DateRange | undefined>();
   const [isOpen, setIsOpen] = React.useState(false);
   const [mode, setMode] = React.useState<AnalysisMode>('both');
+  const [isFileUploadOpen, setIsFileUploadOpen] = React.useState(false);
+  const [activeDatasetId, setActiveDatasetId] = React.useState<number>(-1);
+  const [datasetData, setDatasetData] = React.useState<any>(null);
+  const [isLoadingDataset, setIsLoadingDataset] = React.useState(false);
+  const [forecastAggressiveness, setForecastAggressiveness] = React.useState(50);
+  const [clusteringConfig, setClusteringConfig] = React.useState<{mode: 'auto' | 'manual'; clusterCount: number}>({ mode: 'auto', clusterCount: 3 });
+  const [dataConfig, setDataConfig] = React.useState<DataConfigState>({
+    availableColumns: [],
+    dateColumn: '',
+    targetColumn: '',
+    includedColumns: []
+  });
+  const [terminalLogs, setTerminalLogs] = React.useState<TerminalStep[]>([]);
+  const [dataConfigStatus, setDataConfigStatus] = React.useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
+
+  // Mengambil datasetId dari session storage saat pertama kali dimuat (jika ada)
+  React.useEffect(() => {
+    const storedId = sessionStorage.getItem('pijak_active_dataset_id');
+    if (storedId) {
+      setActiveDatasetId(parseInt(storedId, 10));
+    }
+  }, []);
+
+  // TODO: [TEMPORARY DEV ONLY]
+  // Remove this line once the actual login page is implemented.
+  useTemporaryMockLogin();
 
   // Memoize the config for stable references if passed to useEffects later
   const analysisConfig = React.useMemo<AnalysisConfig>(() => ({
     mode,
-    dateRange: date
-  }), [mode, date]);
+    dateRange: date,
+    datasetId: activeDatasetId,
+    preferences: {
+      forecastAggressiveness,
+      clusteringConfig,
+      dataConfig
+    }
+  }), [mode, date, activeDatasetId, forecastAggressiveness, clusteringConfig, dataConfig]);
 
-  const handleUpload = React.useCallback(() => {
+  const handleOpenUploadModal = React.useCallback(() => {
     console.info('=== [DUMMY PAYLOAD] UNGGAH CSV ===');
     console.info('Current Config Context:', analysisConfig);
     console.info('-> Ready to trigger file upload dialog or API...');
     console.info('========================================');
-    // Add your upload logic here
+    setIsFileUploadOpen(true);
   }, [analysisConfig]);
+
+  // Fungsi orkestrasi Pipeline ML (Dipanggil otomatis setelah upload sukses)
+  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string) => {
+    // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
+    setTerminalLogs([
+      { stepId: 'init', text: 'system_ready: memulai pipeline otomatis...', status: 'info' },
+      { stepId: 'analyze_col', text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...`, status: 'loading' }
+    ]);
+    setDataConfigStatus('menunggu');
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+      
+      // TODO: Ganti URL ini dengan URL endpoint FastAPI ML Services Anda yang sebenarnya
+      const response = await fetch("http://localhost:8000/ml/v1/openrouter/analyze-columns", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ dataset_id: datasetId, model_type: currentMode }),
+      });
+
+      if (response.status === 401) throw new Error("Sesi API kedaluwarsa (401)");
+      if (!response.ok) throw new Error(`API Error: Gagal menghubungi ML Services`);
+
+      const catchRes = await response.json(); // Anda bisa menangkap hasil pemetaan fitur di sini
+      const result = catchRes.data
+
+      if (result.status === 'success' && result.suggested_mapping) {
+        const mapping = result.suggested_mapping;
+        
+        setDataConfig((prev) => {
+          let dateCol = prev.dateColumn;
+          if (typeof mapping.col_date_time === 'string') {
+            if (prev.availableColumns.includes(mapping.col_date_time)) dateCol = mapping.col_date_time;
+          } else if (mapping.col_date_time?.col_whole) {
+            const extractedDate = Array.isArray(mapping.col_date_time.col_whole) 
+              ? mapping.col_date_time.col_whole[0] 
+              : mapping.col_date_time.col_whole;
+            if (extractedDate && prev.availableColumns.includes(extractedDate)) dateCol = extractedDate;
+          }
+
+          let targetCol = prev.targetColumn;
+          if (mapping.col_target && prev.availableColumns.includes(mapping.col_target)) {
+            targetCol = mapping.col_target;
+          }
+
+          let colsToDrop: string[] = [];
+          if (Array.isArray(mapping.cols_to_drop)) colsToDrop = mapping.cols_to_drop;
+          else if (typeof mapping.cols_to_drop === 'string') colsToDrop = [mapping.cols_to_drop];
+
+          const includedCols = prev.availableColumns.filter(
+            (col) => col !== dateCol && col !== targetCol && !colsToDrop.includes(col)
+          );
+
+          return {
+            ...prev,
+            dateColumn: dateCol,
+            targetColumn: targetCol,
+            includedColumns: includedCols,
+          };
+        });
+        setDataConfigStatus('berhasil');
+      } else {
+        setDataConfigStatus('gagal');
+      }
+
+      // 2. Post-calling: Sukses - Ubah status log analyze_col menjadi success
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Pemetaan kolom berhasil dianalisis.', status: 'success' } : log
+      ));
+
+      // 3. Pre-calling Langkah 2 (Jika Anda perlu memanggil endpoint clean data terpisah)
+      // setTerminalLogs((prev) => [...prev, { stepId: 'data_clean', text: 'Memulai pembersihan data...', status: 'loading' }]);
+      // await fetch(...); dsb
+
+    } catch (error: any) {
+      // 4. Post-calling: Gagal - Ubah status log yang loading menjadi error
+      setTerminalLogs((prev) => prev.map(log => 
+        log.status === 'loading' ? { ...log, text: `Pipeline Error: ${error.message}`, status: 'error' } : log
+      ));
+      setDataConfigStatus('gagal');
+    }
+  }, []);
+
+  const handleUploadConfirm = React.useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Get token dynamically from localStorage
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    console.log("token-->",token)
+    // TODO: Use environment variables instead of hardcoded localhost
+    const response = await fetch("http://localhost:5000/api/v1/datasets/upload", {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    // Handle expired token directly
+    if (response.status === 401) {
+      localStorage.removeItem("access_token");
+      alert("Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman.");
+      window.location.reload();
+      return;
+    }
+
+    // Cek apakah response benar-benar JSON (mencegah SyntaxError JSON.parse)
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const textError = await response.text();
+      console.error("[Dashboard] Non-JSON response from upload:", textError);
+      throw new Error(`Server error: Expected JSON but received HTML/Text. Check backend logs.`);
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to upload dataset");
+    }
+
+    console.log("[Dashboard] Upload Success. Dataset ID:", result.data.dataset_id);
+    setActiveDatasetId(result.data.dataset_id);
+    setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
+  }, [analysisConfig.mode, runPreprocessingPipeline]);
 
   const handleRunAnalysis = React.useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
@@ -238,9 +211,15 @@ export default function AnalysisEmptyState() {
 
     // EXTRACT AND FORMAT VALUES
     const payload = {
+      datasetId: analysisConfig.datasetId,
       mode: analysisConfig.mode,
       startDate: format(analysisConfig.dateRange.from, 'yyyy-MM-dd'),
       endDate: format(analysisConfig.dateRange.to, 'yyyy-MM-dd'),
+      preferences: {
+        forecasting_learning_rate: analysisConfig.preferences.forecastAggressiveness,
+        clustering_target: analysisConfig.preferences.clusteringConfig.mode === 'auto' ? null : analysisConfig.preferences.clusteringConfig.clusterCount,
+        data_config: analysisConfig.preferences.dataConfig
+      },
       timestamp: new Date().toISOString()
     };
 
@@ -269,8 +248,137 @@ export default function AnalysisEmptyState() {
     console.debug('[Dashboard] State updated:', { isReady, mode, date });
   }, [isReady, mode, date]);
 
+  // Menyimpan datasetId ke session storage secara reaktif tiap kali nilainya berubah
+  React.useEffect(() => {
+    if (activeDatasetId !== -1) {
+      sessionStorage.setItem('pijak_active_dataset_id', activeDatasetId.toString());
+    } else {
+      sessionStorage.removeItem('pijak_active_dataset_id');
+    }
+  }, [activeDatasetId]);
+
+  // Otomatis Fetch Dataset setiap kali activeDatasetId berubah menjadi valid
+  React.useEffect(() => {
+    if (activeDatasetId === -1) {
+      setDatasetData(null);
+      return;
+    }
+
+    const fetchDatasetInfo = async () => {
+      setIsLoadingDataset(true);
+      try {
+        // Get token dynamically from localStorage
+        const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+        
+        const response = await fetch(`http://localhost:5000/api/v1/datasets/${activeDatasetId}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        // Handle expired token directly
+        if (response.status === 401) {
+          localStorage.removeItem("access_token");
+          console.warn("[Dashboard] Token expired. Cleared from localStorage.");
+          window.location.reload();
+          return;
+        }
+
+        const contentType = response.headers.get("content-type");
+        let csvString = "";
+
+        if (contentType && contentType.includes("application/json")) {
+          const result = await response.json();
+          if (!response.ok || result.error) {
+            throw new Error(result.message || "Failed to fetch dataset");
+          }
+          console.log("[Dashboard] Fetch Dataset Success (JSON):", result.data);
+          csvString = result.data?.dataset_file || "";
+        } else {
+          // Fallback jika API mengembalikan raw text / CSV langsung
+          csvString = await response.text();
+          if (!response.ok) {
+            throw new Error(`Server error: ${csvString.substring(0, 100)}`);
+          }
+          console.log("[Dashboard] Fetch Dataset Success (Raw Text/CSV). Length:", csvString.length);
+        }
+
+        let parsedData: any[] = [];
+        if (csvString) {
+          const lines = csvString.trim().split('\n');
+          if (lines.length > 0) {
+            // Regex ini memisahkan berdasarkan koma, kecuali jika koma tersebut ada di dalam tanda kutip ("")
+            const csvRegex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+            const headers = lines[0].split(csvRegex).map((h: string) => h.trim().replace(/^"|"$/g, ''));
+            
+            // Batasi hanya menampilkan 50 baris data pertama untuk menghemat RAM (Tampilan Preview)
+            const maxRows = Math.min(lines.length, 51); // 1 header + 50 baris data
+            
+            for (let i = 1; i < maxRows; i++) {
+              const line = lines[i];
+              if (!line.trim()) continue; // Abaikan baris kosong
+              
+              const values = line.split(csvRegex);
+              const obj: any = {};
+              headers.forEach((header: string, index: number) => {
+                obj[header] = values[index]?.trim().replace(/^"|"$/g, '');
+              });
+              parsedData.push(obj);
+            }
+          }
+        }
+        console.log(`[Dashboard] Parsed ${parsedData.length} rows for preview`);
+        setDatasetData(parsedData);
+        
+        // Ekstrak nama kolom untuk inisiasi Konfigurasi Data
+        if (parsedData.length > 0) {
+          const cols = Object.keys(parsedData[0]);
+          setDataConfig(prev => {
+            if (prev.availableColumns.join(',') !== cols.join(',')) {
+              return {
+                availableColumns: cols,
+                dateColumn: cols[0] || '', 
+                targetColumn: cols.length > 1 ? cols[1] : (cols[0] || ''), 
+                includedColumns: cols.length > 2 ? cols.slice(2) : [] 
+              };
+            }
+            return prev;
+          });
+        }
+      } catch (error) {
+        console.error("[Dashboard] Fetch Dataset Error:", error);
+      } finally {
+        setIsLoadingDataset(false);
+      }
+    };
+
+    fetchDatasetInfo();
+
+    // Jalankan pipeline otomatis saat dataset dimuat (baik dari upload baru maupun session storage)
+    runPreprocessingPipeline(activeDatasetId, mode);
+  }, [activeDatasetId]);
+
+  // ... fungsi ketika menerima payload dari backend ...
+  const handleBackendMessage = (incomingPayload: string) => {
+    const newLog = JSON.parse(incomingPayload) as TerminalStep;
+
+    setTerminalLogs((prevLogs) => {
+      // Jika backend mengirim status success/error, kita UPDATE log yang sedang loading
+      const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
+      
+      if (existingLogIndex !== -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[existingLogIndex] = newLog; // Ganti "loading" dengan "success"
+        return updatedLogs;
+      }
+
+      // Jika ini adalah stepId baru, tambahkan ke baris bawah terminal
+      return [...prevLogs, newLog];
+    });
+  };
+
   return (
-    <div className="flex h-full flex-1 flex-col gap-3">
+    <div className="flex h-full flex-1 flex-col gap-3 min-h-0 min-w-0">
       <DashboardHeader
         mode={mode}
         setMode={setMode}
@@ -281,105 +389,74 @@ export default function AnalysisEmptyState() {
       />
 
       <div className="flex h-full flex-1 flex-col min-h-0">
-        <EmptyStateView
-          modeLabel={modeLabel}
-          isReady={isReady}
-          dateRange={date}
-          onUpload={handleUpload}
-          onRunAnalysis={handleRunAnalysis}
-        />
+        {activeDatasetId !== -1 ? (
+          <FilledStateView 
+            tableData={datasetData || []} 
+            forecastAggressiveness={forecastAggressiveness}
+            setForecastAggressiveness={setForecastAggressiveness}
+            clusteringConfig={clusteringConfig}
+            setClusteringConfig={setClusteringConfig}
+            dataConfig={dataConfig}
+            setDataConfig={setDataConfig}
+            terminalLogs={terminalLogs}
+            cardStatuses={{ dataConfig: dataConfigStatus }}
+          />
+        ) : (
+          <EmptyStateView
+            modeLabel={modeLabel}
+            isReady={isReady}
+            dateRange={date}
+            onUpload={handleOpenUploadModal}
+            onRunAnalysis={handleRunAnalysis}
+          />
+        )}
       </div>
+      <FileUploadDemo 
+        isOpen={isFileUploadOpen} 
+        onClose={() => setIsFileUploadOpen(false)} 
+        onUploadConfirm={handleUploadConfirm}
+      />
     </div>
   );
 }
 
-// ─── Empty State View ─────────────────────────────────────────────────────────
+// ============================================================================
+// TODO: [TEMPORARY DEV ONLY] REMOVE THIS ENTIRE SECTION ONCE LOGIN IS IMPLEMENTED
+// ============================================================================
+function useTemporaryMockLogin() {
+  React.useEffect(() => {
+    const fetchMockToken = async () => {
+      if (typeof window !== "undefined" && !localStorage.getItem("access_token")) {
+        try {
+          const email = process.env.NEXT_PUBLIC_MOCK_EMAIL;
+          const password = process.env.NEXT_PUBLIC_MOCK_PASSWORD;
+          
+          if (!email || !password) {
+            console.warn("Dev mode: Missing NEXT_PUBLIC_MOCK_EMAIL or NEXT_PUBLIC_MOCK_PASSWORD in environment variables.");
+            return;
+          }
 
-interface EmptyStateViewProps {
-  modeLabel: string;
-  isReady: boolean;
-  dateRange: DateRange | undefined;
-  onUpload: () => void;
-  onRunAnalysis: () => void;
+          const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.data?.access_token) {
+            localStorage.setItem("access_token", result.data.access_token);
+            console.warn("Dev mode: Successfully fetched and injected access token from API.");
+          } else {
+            console.error("Dev mode: Failed to fetch mock token:", result);
+          }
+        } catch (error) {
+          console.error("Dev mode: Error fetching mock token:", error);
+        }
+      }
+    };
+
+    fetchMockToken();
+  }, []);
 }
-
-function EmptyStateView({ modeLabel, isReady, dateRange, onUpload, onRunAnalysis }: EmptyStateViewProps) {
-  const steps = [
-    'Upload a CSV or Excel file containing your historical sales or inventory metrics.',
-    'Select your analysis mode (Forecasting, Clustering, or both) and set the date range in the controls above.',
-    "Hit 'Mulai Analisis' in the top-right corner to generate a full suite of interactive visualizations.",
-  ];
-
-  return (
-    <div className="flex h-full flex-1 w-full flex-col items-center justify-center rounded-2xl border border-neutral-800/20 bg-white p-6 md:p-8">
-      <div className="flex w-full max-w-xl flex-col items-center gap-6 text-center">
-
-        {/* Hero Icon */}
-        <div className="relative flex size-20 md:size-24 items-center justify-center rounded-2xl bg-gradient-to-b from-[#2BBAEE]/20 to-transparent shadow-inner">
-          <Presentation className="relative size-10 md:size-12 text-[#2BBAEE]" />
-        </div>
-
-        {/* Title */}
-        <div className="flex flex-col gap-2">
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-800">
-            Ready for{' '}
-            <span className="text-[#2BBAEE]">{modeLabel}</span>{' '}
-            insights?
-          </h2>
-          <p className="text-sm md:text-base text-neutral-800/50 leading-relaxed max-w-md">
-            Upload your data and configure the analysis above.
-            Our engine will automatically detect patterns and trends.
-          </p>
-        </div>
-
-        {/* Steps */}
-        <div className="flex w-full flex-col gap-3 rounded-xl border border-[#2BBAEE]/15 bg-gradient-to-b from-[#2BBAEE]/8 to-transparent p-5 md:p-6 text-left">
-          {steps.map((text, idx) => (
-            <div key={idx} className="flex items-start gap-3.5">
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#2BBAEE]/25 mt-0.5 ring-1 ring-[#2BBAEE]/20">
-                <span className="text-sm font-bold text-[#1a9fd4]">{idx + 1}</span>
-              </div>
-              <p className="text-sm md:text-base font-medium text-slate-600 leading-snug pt-0.5">{text}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <button
-            onClick={onUpload}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg border border-neutral-800/20 bg-gradient-to-b from-[#2BBAEE]/20 to-transparent px-6 py-2.5 text-sm font-medium text-neutral-800 transition-all hover:from-[#2BBAEE]/30 active:scale-95"
-          >
-            <FileUp className="size-4 shrink-0" />
-            Unggah CSV
-          </button>
-
-          <button
-            onClick={onRunAnalysis}
-            disabled={!isReady}
-            title={!isReady ? 'Pilih rentang tanggal terlebih dahulu' : undefined}
-            className={cn(
-              'w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg border px-6 py-2.5 text-sm font-medium transition-all active:scale-95',
-              isReady
-                ? 'border-neutral-800/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] text-neutral-800 hover:opacity-90 shadow-sm'
-                : 'border-neutral-800/10 bg-neutral-100 text-neutral-800/30 cursor-not-allowed',
-            )}
-          >
-            Mulai Analisis
-          </button>
-        </div>
-
-        {/* Ready-state hint */}
-        <p className={cn(
-          'text-xs transition-opacity duration-300 -mt-1',
-          isReady ? 'text-[#2BBAEE]/70' : 'text-neutral-800/30'
-        )}>
-          {isReady && dateRange?.from && dateRange?.to
-            ? `${Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / 86_400_000)} hari dipilih — siap untuk dianalisis`
-            : 'Pilih rentang tanggal untuk mengaktifkan analisis'}
-        </p>
-
-      </div>
-    </div>
-  );
-}
+// ============================================================================

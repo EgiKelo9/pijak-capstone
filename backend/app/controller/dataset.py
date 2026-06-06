@@ -3,11 +3,12 @@ import time
 import shutil
 from typing import Optional
 from fastapi import HTTPException, UploadFile, Form
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset, Dataset_Bin
 from app.models.user import User
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse
 from app.shared.transaction_manager import TransactionManager
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -169,7 +170,7 @@ async def fetch_dataset_bin(dataset_id: int, current_user: User, db: Session):
     except Exception as e:
         raise HTTPException(
             status_code=500, 
-            detail=f"Gagal menyimpan metadata dataset ke database: {e}"
+            detail=f"Gagal mengambil dataset_file dari dataset yang dicari: {e}"
         )
 
     return StreamingResponse(
@@ -179,4 +180,90 @@ async def fetch_dataset_bin(dataset_id: int, current_user: User, db: Session):
             "Content-Disposition":
             f"attachment; filename={dataset.dataset_name}"
         }
+    )
+
+async def fetch_datasets_bin_by_user(current_user: User, db: Session):
+    """Menampilkan dataset(s) original yang terkait dengan user."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            # Cari dataset yang terkait dengan user saat ini dengan relasi ori data null untuk menandakan data asli
+            stmt = select(Dataset_Bin.dataset_name, Dataset_Bin.id).where(
+                Dataset_Bin.user_id  == current_user.id,
+                Dataset_Bin.ori_data_id == None
+            )
+            datasets = session.execute(stmt).mappings().all()
+
+            if not datasets:
+                raise HTTPException(
+                    status_code=404,
+                    detail="dataset tidak ditemukan jir, dah upload belom"
+                )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengambil dataset terkait user: {e}"
+        )
+
+    # print(datasets)
+    return StandardResponse(
+    code=200,
+    error=False,
+    message="Datasets fetched successfully",
+    data=DatasetFetchByUserResponse(
+        datasets=datasets
+    )
+)
+
+async def soft_delete_cleaned_datasets(
+    ori_data_id: int,
+    model: str,
+    current_user: User,
+    db: Session
+):
+    """
+    Soft-delete semua record cleaned dataset yang mengacu ke dataset original
+    yang sama (ori_data_id) dan model yang sama, untuk mencegah duplikasi record
+    aktif sebelum preprocessing baru diupload.
+
+    Mengisi kolom deleted_at dengan timestamp saat ini pada semua record yang
+    memenuhi kriteria: is_cleaned=True, ori_data_id cocok, model cocok,
+    dan deleted_at masih NULL (belum di-soft-delete sebelumnya).
+    """
+    transaction_manager = TransactionManager(db)
+
+    try:
+        with transaction_manager.transaction() as session:
+            existing_records = (
+                session.query(Dataset_Bin)
+                .filter(
+                    Dataset_Bin.ori_data_id == ori_data_id,
+                    Dataset_Bin.model == model,
+                    Dataset_Bin.is_cleaned == True,
+                    Dataset_Bin.deleted_at == None,
+                )
+                .all()
+            )
+
+            affected = 0
+            for record in existing_records:
+                record.delete()
+                affected += 1
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal menghapus record cleaned dataset lama: {e}"
+        )
+
+    return StandardResponse(
+        code=200,
+        error=False,
+        message=f"{affected} record cleaned dataset lama berhasil di-soft-delete",
+        data={"affected_records": affected}
     )

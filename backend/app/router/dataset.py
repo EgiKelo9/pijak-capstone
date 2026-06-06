@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -55,10 +55,90 @@ async def upload_dataset(
         401: {"model": StandardResponse[dict], "description": "Unauthorized"}
     }
 )
-
 async def fetch_dataset(
     dataset_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Fetch a dataset for the authenticated user.
+
+    Args:
+        dataset_id (int): The ID of the dataset to fetch.
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user from the access token.
+
+    Returns:
+        StandardResponse[DatasetFetchResponse]: Dataset containing metadata and data_url.
+
+    Raises:
+        HTTPException: 400 if the dataset ID is invalid.
+        HTTPException: 401 if the user is not authenticated.
+        HTTPException: 404 if the dataset is not found.
+        HTTPException: 500 if the dataset cannot be fetched.
+        HTTPException: 422 if request validation fails.
+    """
     return await fetch_dataset_bin(dataset_id, current_user, db)
+
+@router.get(
+    "/user/{current_user_id}",
+    response_model=StandardResponse[DatasetFetchByUserResponse],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request - Invalid File"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"}
+    }
+)
+async def fetch_datasets_by_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch a dataset for the authenticated user.
+
+    Args:
+        dataset_id (int): The ID of the dataset to fetch.
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user from the access token.
+
+    Returns:
+        StandardResponse[DatasetFetchResponse]: Dataset containing metadata and data_url specific to the user that requests it.
+
+    Raises (probably):
+        HTTPException: 400 if the dataset ID is invalid.
+        HTTPException: 401 if the user is not authenticated.
+        HTTPException: 404 if the dataset is not found.
+        HTTPException: 500 if the dataset cannot be fetched.
+        HTTPException: 422 if request validation fails.
+    """
+    return await fetch_datasets_bin_by_user(current_user, db)
+
+
+@router.delete(
+    "/cleaned",
+    response_model=StandardResponse[dict],
+    responses={
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"},
+    }
+)
+async def invalidate_cleaned_datasets(
+    ori_data_id: int,
+    model: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Soft-delete semua record cleaned dataset aktif (deleted_at IS NULL)
+    yang mengacu ke dataset original dengan ori_data_id dan model tertentu.
+
+    Dipanggil oleh ML service sebelum mengupload hasil preprocessing baru
+    untuk mencegah duplikasi record aktif di tabel datasets_bin.
+
+    Args:
+        ori_data_id (int): ID dataset original yang menjadi referensi.
+        model (str): Nama model ('Forecasting' atau 'Clustering').
+
+    Returns:
+        StandardResponse[dict]: Jumlah record yang berhasil di-soft-delete.
+    """
+    return await soft_delete_cleaned_datasets(ori_data_id, model, current_user, db)
