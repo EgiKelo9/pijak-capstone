@@ -1,22 +1,15 @@
 import httpx
 import logging
-<<<<<<< HEAD
-from app.schemas.base import StandardResponse
-=======
 from io import BytesIO
 
 import pandas as pd
 
 from app.schemas.base import StandardResponse
 from app.schemas.features import Feature
->>>>>>> b9c3917e09ec7b7cedb4441e7ceb4eae449d4a99
 from app.core.config import get_settings
 
 logger = logging.getLogger("uvicorn.error")
 
-<<<<<<< HEAD
-async def generate_from_openrouter(prompt: str) -> StandardResponse[dict]:
-=======
 
 async def _get_backend_token(client: httpx.AsyncClient, settings) -> str:
     """
@@ -246,7 +239,6 @@ def get_dataset_info(df: pd.DataFrame) -> dict:
 
 
 async def generate_from_openrouter(prompt: str, schema = None) -> StandardResponse[dict]:
->>>>>>> b9c3917e09ec7b7cedb4441e7ceb4eae449d4a99
     """Generate response melalui OpenRouter."""
     settings = get_settings()
     
@@ -257,17 +249,6 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
             "Content-Type": "application/json"
         }
         
-<<<<<<< HEAD
-        payload = {
-            "model": settings.LLM_MODEL,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.0,
-        }
-        
-=======
         if not schema:
             payload = {
                 "model": settings.LLM_MODEL,
@@ -298,7 +279,6 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
             
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
         print(payload)
->>>>>>> b9c3917e09ec7b7cedb4441e7ceb4eae449d4a99
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.OPEN_ROUTER_BASE_URL,
@@ -306,16 +286,11 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 json=payload,
                 timeout=60.0
             )
-<<<<<<< HEAD
-            response.raise_for_status()
-            data = response.json()
-=======
             
             logger.info("Received response from OpenRouter: status_code=%s, response_text=%s", response.status_code, response.text)
             response.raise_for_status()
             data = response.json()
             
->>>>>>> b9c3917e09ec7b7cedb4441e7ceb4eae449d4a99
             reply = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
             
             return StandardResponse(
