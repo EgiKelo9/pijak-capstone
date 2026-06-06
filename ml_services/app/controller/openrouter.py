@@ -38,13 +38,10 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             The user wants to do {task_str} option from the available service of Clustering and Forecasting.
             Dataset:
             {dataset_info}
-
-            Respond ONLY with a valid JSON object that strictly matches the following JSON schema. Do not add markdown blocks or explanations:
-            {json.dumps(Feature.model_json_schema(), indent=2)}
         """
-        
+                
         # 5. Kirim ke OpenRouter
-        llm_response = await generate_from_openrouter(prompt)
+        llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
         if getattr(llm_response, "error", False):
             return OpenRouterMappingResponse(
