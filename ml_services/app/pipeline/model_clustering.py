@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
-from app.controller.gemma import get_insight_from_clustering
+from app.controller.openrouter import get_insight_from_clustering
 
 class ClusteringPipeline:
     def __init__(self, n_clusters: int = 3, random_state: int = 42):
