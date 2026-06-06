@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.controller.openrouter import get_insight_from_data
 from app.controller.model import generate_dummy_forecast
 from app.controller.clustering_controller import run_clustering
+from app.controller.forecasting_controller import run_forecasting
 from app.schemas.model import PredictRequest, FullPredictResponse, PredictResponseForecast
 from app.schemas.clustering_schema import ClusteringRequest, ClusteringResponse, ClusteringErrorResponse
+from app.schemas.forecasting_schema import ForecastingRequest, ForecastingResponse, ForecastingErrorResponse
 
 router = APIRouter(prefix="/model")
 
@@ -59,3 +61,19 @@ async def clustering(request: ClusteringRequest):
         raise HTTPException(status_code=400, detail=result.error)
 
     return result
+
+
+# forecasting endpoint
+
+@router.post(
+    "/forecasting",
+)
+async def forecasting(request: ForecastingRequest, background_tasks: BackgroundTasks):
+    """
+    Endpoint untuk menjalankan forecasting penjualan per produk secara background.
+    Menerima dataset cleaned dari preprocessing beserta konfigurasi kolom,
+    menjalankan prediksi secara asinkron, dan mengembalikan 202.
+    """
+    background_tasks.add_task(run_forecasting, request)
+
+    return {"status": "processing", "analysis_id": request.analysis_id}

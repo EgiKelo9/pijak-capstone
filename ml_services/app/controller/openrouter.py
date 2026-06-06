@@ -105,3 +105,64 @@ async def get_insight_from_data(target_task: str, json_data: Any) -> str:
     except Exception as e:
         return f"OpenRouter error: {str(e)}"
         
+
+async def get_insight_from_clustering(cluster_summary: dict) -> str:
+    """Mendapatkan insight bisnis dari hasil clustering via OpenRouter.
+    
+    Diadaptasi dari gemma.py::get_insight_from_clustering.
+    Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
+    """
+    prompt = (
+        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Berdasarkan hasil segmentasi produk berikut (rata-rata fitur per klaster):\n"
+        f"{json.dumps(cluster_summary, default=str)}\n\n"
+        f"Berikan insight bisnis dalam format berikut. "
+        f"Jangan gunakan markdown formatting seperti ** atau *. "
+        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
+        f"KATEGORI CLUSTER: Kategorikan tiap cluster sebagai Fast Moving, "
+        f"Medium Moving, atau Slow Moving berdasarkan Sales dan Quantity.\n\n"
+        f"INSIGHT PER CLUSTER (maks 2 kalimat per cluster): "
+        f"Sebutkan karakteristik utama dan 1 rekomendasi aksi.\n\n"
+        f"PRIORITAS AKSI BISNIS:\n"
+        f"- Produk yang perlu RESTOCK\n"
+        f"- Produk yang perlu DISKON\n"
+        f"- Produk yang perlu DIEVALUASI\n\n"
+        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+    )
+    try:
+        result = await generate_from_openrouter(prompt)
+        if getattr(result, "error", False):
+            return f"OpenRouter error: {result.message}"
+        return result.data.get("response", "") if result.data else ""
+    except Exception as e:
+        return f"OpenRouter error: {str(e)}"
+
+
+async def get_insight_from_forecasting(forecast_summary: dict) -> str:
+    """Mendapatkan insight bisnis dari hasil forecasting via OpenRouter.
+    
+    Diadaptasi dari gemma.py::get_insight_from_gemma.
+    Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
+    """
+    prompt = (
+        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Berdasarkan prediksi penjualan produk berikut:\n"
+        f"{json.dumps(forecast_summary, default=str)}\n\n"
+        f"Berikan insight bisnis dalam format berikut. "
+        f"Jangan gunakan markdown formatting seperti ** atau *. "
+        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
+        f"TREN PENJUALAN: Ringkasan tren secara keseluruhan.\n\n"
+        f"PRODUK PRIORITAS:\n"
+        f"- Produk yang perlu RESTOCK segera\n"
+        f"- Produk dengan tren NAIK yang perlu dipertahankan\n"
+        f"- Produk dengan tren TURUN yang perlu dievaluasi\n\n"
+        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang.\n\n"
+        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+    )
+    try:
+        result = await generate_from_openrouter(prompt)
+        if getattr(result, "error", False):
+            return f"OpenRouter error: {result.message}"
+        return result.data.get("response", "") if result.data else ""
+    except Exception as e:
+        return f"OpenRouter error: {str(e)}"

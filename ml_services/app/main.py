@@ -16,11 +16,11 @@ if not os.getenv("ENV"):
 
 cors.add(app)
 
+app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])
+app.include_router(preprocess.router, prefix="/ml/v1", tags=["Preprocess Endpoints"])
 app.include_router(openrouter.router, prefix="/ml/v1", tags=["OpenRouter Endpoints"])
 app.include_router(gemini.router, prefix="/ml/v1", tags=["Gemini Endpoints"])
 app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
-app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])
-app.include_router(preprocess.router, prefix="/ml/v1", tags=["Preprocess Endpoints ;D"])
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):

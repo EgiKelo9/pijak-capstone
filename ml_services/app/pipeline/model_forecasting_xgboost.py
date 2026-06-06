@@ -35,17 +35,17 @@ class XGBoostForecastingPipeline:
         self.regressor_columns = None
         self.uses_regressors = False
 
-    def load_frame_from_csv(
+    def load_frame(
         self,
-        csv_path: str,
+        data: pd.DataFrame,
         date_column: str,
         target_column: str,
         regressor_columns: list[str],
         freq: str = "W",
-        agg: str = "mean",
+        agg: str = "sum",
         fill_missing: float = 0.0,
     ) -> pd.DataFrame:
-        df = pd.read_csv(csv_path)
+        df = data.copy()
         df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
         df[target_column] = pd.to_numeric(df[target_column], errors="coerce")
         for col in regressor_columns:
