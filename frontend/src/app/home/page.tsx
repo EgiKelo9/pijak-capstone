@@ -27,10 +27,10 @@ export default function LandingPage() {
         <div className="relative z-10 flex flex-col grow">
           <div className="flex flex-col items-center justify-center grow text-center px-4 md:px-3 mx-auto gap-2">
             <Badge icon={<IconSparklesFilled className="h-4 font-bold text-primary"/>} className="text-xs mb-3">Kecerdasan Bisnis Berbasis-AI</Badge>
-            <h1 className="text-5xl md:text-8xl font-semibold">
+            <h1 className="text-5xl md:text-7xl 2xl:text-8xl font-semibold">
               Kelola Bisnis Makin <span className="inline-block bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">eZ</span>
             </h1>
-            <p className="text-sm md:text-xl font-light max-w-3xl">
+            <p className="text-sm md:text-lg 2xl:text-xl font-light max-w-2xl md:max-w-3xl 2xl:max-w-4xl">
               Ambil keputusan bisnis berdasarkan analisa berbasis data, serta insight bisnis berbasis kecerdasan buatan — sehingga anda selalu selangkah lebih maju
             </p>
 
@@ -46,7 +46,7 @@ export default function LandingPage() {
         
         <div className="relative z-10 w-full h-full my-auto flex flex-col justify-center items-center text-center gap-8 md:gap-12 px-4 md:px-0">
           <TextHome />
-          <span className="text-sm md:text-xl font-light text-foreground/40 max-w-3xl mt-10">
+          <span className="text-sm md:text-lg 2xl:text-xl font-light text-foreground/40 max-w-2xl md:max-w-3xl 2xl:max-w-4xl mt-8 md:mt-10 2xl:mt-12">
             Mengapa harus membuang waktu memilah data mentah?
             BeeZ secara cerdas menyajikan laporan visual yang menjabarkan tren, pengeluaran, dan pendapatan dengan kejernihan maksimal.
             Keputusan bisnis yang akurat dan berbasis data is just one click away!
@@ -57,7 +57,7 @@ export default function LandingPage() {
       <section id="About" className="relative flex min-h-screen w-full flex-col items-center pt-12 text-white lg:pt-20">
         <Tabs defaultValue={'tim'} className="flex flex-1 w-full flex-col items-center">
           
-          <TabsList className="z-10 shrink-0">
+          <TabsList className="z-10 shrink-0 border-[#5D5D5D]/20 border-1">
             <TabsTrigger value={'visi'}>Visi Kami</TabsTrigger>
             <TabsTrigger value={'tim'}>Tim Kami</TabsTrigger>
           </TabsList>
@@ -70,7 +70,7 @@ export default function LandingPage() {
                 <div className="w-full lg:col-span-8 flex flex-col items-start gap-12 min-w-0 break-words">
                   
                   {/* Block 1 */}
-                  <div className="flex flex-col items-start gap-3 w-full">
+                  <div className="flex flex-col items-start gap-2 2xl:gap-3 w-full">
                     <div className="w-full max-w-full">
                       <BlurredStagger 
                         mode="sentence" 
@@ -86,7 +86,7 @@ export default function LandingPage() {
                   </div>
 
                   {/* Block 2 */}
-                  <div className="flex flex-col items-start gap-3 w-full">
+                  <div className="flex flex-col items-start gap-2 2xl:gap-3 w-full">
                     <div className="w-full max-w-full">
                       <BlurredStagger 
                         mode="sentence" 
@@ -102,7 +102,7 @@ export default function LandingPage() {
                   </div>
 
                   {/* Block 3 */}
-                  <div className="flex flex-col items-start gap-4 w-full">
+                  <div className="flex flex-col items-start gap-2 2xl:gap-3 w-full">
                     <div className="w-full max-w-full">
                       <BlurredStagger 
                         mode="sentence" 
@@ -158,7 +158,7 @@ export default function LandingPage() {
               <TeamSection />
 
               <div className="w-full flex flex-col items-center justify-center px-4 py-12 md:py-24">
-                <span className="text-sm md:text-xl font-light max-w-4xl text-muted/40 text-center leading-relaxed">
+                <span className="text-sm md:text-lg 2xl:text-xl font-light max-w-2xl md:max-w-3xl 2xl:max-w-4xl text-muted/40 text-center leading-relaxed">
                   Kami mungkin lebih sering menghabiskan waktu di depan layar laptop daripada terjun langsung ke lapangan. 
                   Kami juga sadar kalau kami masih muda. 
                   Tapi justru karena itu kami ingin menyumbangkan apa yang kami bisa. 
@@ -172,13 +172,13 @@ export default function LandingPage() {
       </section>
 
       <section id="Feature" className="relative min-h-screen md:min-h-270 flex flex-col">
-        <div className="relative z-10 w-full h-full my-auto flex flex-col justify-around items-center text-center gap-4 md:gap-12 px-4 md:px-0">
+        <div className="relative z-10 w-full h-full my-auto flex flex-col justify-around items-center text-center gap-3 md:gap-6 px-4 md:px-0">
           {/* Container Title */}
           <div>
-            <h1 className="text-5xl md:text-8xl font-extralight text-primary-foreground">
+            <h1 className="text-5xl md:text-7xl 2xl:text-8xl font-extralight text-primary-foreground">
               Bersama Kami,
             </h1>
-            <h1 className=" text-5xl md:text-8xl bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-7xl 2xl:text-8xl bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
               Kamu Bisa...
             </h1>
           </div>
@@ -188,13 +188,13 @@ export default function LandingPage() {
       </section>
       
       <section id="Pricing" className="relative min-h-screen  flex flex-col">
-        <div className="relative z-10 w-full h-full my-auto flex flex-col justify-around items-center text-center gap-4 md:gap-12 px-4 md:px-0">
+        <div className="relative z-10 w-full h-full my-auto flex flex-col justify-around items-center text-center gap-3 md:gap-6 px-4 md:px-0 mb-20">
           {/* Container Title */}
           <div>
-            <h1 className="text-5xl md:text-8xl font-extralight text-primary-foreground">
+            <h1 className="text-5xl md:text-7xl 2xl:text-8xl font-extralight text-primary-foreground">
               Berkomitmen
             </h1>
-            <h1 className=" text-5xl md:text-8xl bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-7xl 2xl:text-8xl bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
               Bersama Kami
             </h1>
           </div>
@@ -208,17 +208,18 @@ export default function LandingPage() {
         
         {/* Replaced 'h-full my-auto' with 'flex-1' and restored 'lg:py-24' so it doesn't hit the screen edge */}
         <div className="relative z-10 w-full flex-1 flex flex-col justify-between items-center text-center gap-4 md:gap-12 px-4 md:px-0 py-12 lg:py-24">
-          <div className="text-5xl md:text-9xl font-medium">
-              Berhenti menebak,
-            <br/>
-              mulai bertindak.
-            <br />
+          <div className="flex flex-col items-center gap-8 md:gap-12">
+            <h2 className="text-5xl md:text-7xl 2xl:text-9xl font-medium leading-tight">
+                Berhenti menebak,
+              <br/>
+                mulai bertindak.
+            </h2>
 
-              <Button className="px-10 py-8 md:px-12 md:py-10 text-3xl md:text-4xl rounded-full bg-[#272727] hover:bg-[#333333] border-[0.4px] border-[#5D5D5D] shadow-xl hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer">
-                <span className="bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
-                  Mulai Lebih eZ
-                </span>
-              </Button>
+            <Button className="px-6 py-4 md:px-8 md:py-7 2xl:px-12 2xl:py-10 text-xl md:text-2xl 2xl:text-3xl rounded-full bg-[#272727] hover:bg-[#333333] border-[0.4px] border-[#5D5D5D] shadow-xl hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer">
+              <span className="bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
+                Mulai Lebih eZ
+              </span>
+            </Button>
           </div>
           <div className="w-full max-h-[24vh]">
             <TextHoverEffect text="BeeZ" />

@@ -94,7 +94,7 @@ const features = [
 
 export function BentoFeature() {
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 md:px-8">
+    <div className="w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 md:px-8">
       {/* lg:grid-cols-3 paired with the col-span-1 and col-span-2 classes handles the sizing natively */}
       <BentoGrid className="lg:grid-cols-7">
         {features.map((feature, idx) => (
