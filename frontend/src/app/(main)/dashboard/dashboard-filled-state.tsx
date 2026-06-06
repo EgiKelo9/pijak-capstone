@@ -1,14 +1,36 @@
-// components/FilledStateView.tsx
 'use client';
-import { useMemo } from 'react';
 
+import { useMemo } from 'react';
 import { DynamicDataTable } from '@/components/dynamic-data-table';
-import { AnalysisCard } from '@/components/main-card';
+import { AnalysisCard, StatusType } from '@/components/main-card';
 import { ClusteringPreference } from './clustering-preference';
 import { DataConfigState, DataConfiguration } from './column-preference';
 import { ForecastingPreference } from './forecasting-preference';
 import { TerminalLog, type TerminalStep } from './terminal';
 
+// ── Card status map ─────────────────────────────────────────────────────────
+export type CardId =
+  | 'terminal'
+  | 'dataConfig'
+  | 'dataQuality'
+  | 'forecasting'
+  | 'clustering';
+
+export type CardStatusMap = Partial<Record<CardId, StatusType>>;
+
+const CARD_DEFAULTS: Record<CardId, StatusType> = {
+  terminal:    'menunggu',
+  dataConfig:  'berhasil',
+  dataQuality: 'menunggu',
+  forecasting: 'kosong',
+  clustering:  'kosong',
+};
+
+function resolveStatuses(overrides?: CardStatusMap): Record<CardId, StatusType> {
+  return { ...CARD_DEFAULTS, ...overrides };
+}
+
+// ── Props ───────────────────────────────────────────────────────────────────
 interface FilledStateViewProps {
   tableData: any;
   forecastAggressiveness: number;
@@ -18,104 +40,123 @@ interface FilledStateViewProps {
   dataConfig: DataConfigState;
   setDataConfig: (config: DataConfigState) => void;
   terminalLogs: TerminalStep[];
+  /**
+   * Override the status badge on any card.
+   * @example cardStatuses={{ terminal: 'berhasil', dataQuality: 'gagal' }}
+   */
+  cardStatuses?: CardStatusMap;
 }
 
-export function FilledStateView({ 
-  tableData, 
-  forecastAggressiveness, 
-  setForecastAggressiveness, 
-  clusteringConfig, 
+// ── Component ───────────────────────────────────────────────────────────────
+export function FilledStateView({
+  tableData,
+  forecastAggressiveness,
+  setForecastAggressiveness,
+  clusteringConfig,
   setClusteringConfig,
   dataConfig,
   setDataConfig,
-  terminalLogs
+  terminalLogs,
+  cardStatuses,
 }: FilledStateViewProps) {
+  const statuses = resolveStatuses(cardStatuses);
 
-  // Memoize data tabel yang sudah difilter berdasarkan kolom yang dipilih
   const filteredTableData = useMemo(() => {
     if (!tableData || tableData.length === 0) return [];
-
-    // Kumpulkan semua kolom yang aktif
-    const activeColumns = new Set([
-      dataConfig.dateColumn,
-      dataConfig.targetColumn,
-      ...(dataConfig.includedColumns || [])
-    ].filter(Boolean));
-
+    const activeColumns = new Set(
+      [dataConfig.dateColumn, dataConfig.targetColumn, ...(dataConfig.includedColumns || [])].filter(Boolean)
+    );
     return tableData.map((row: any) => {
       const filteredRow: any = {};
       for (const col of activeColumns) {
-        if (row.hasOwnProperty(col)) {
-          filteredRow[col] = row[col];
-        }
+        if (Object.prototype.hasOwnProperty.call(row, col)) filteredRow[col] = row[col];
       }
       return filteredRow;
     });
   }, [tableData, dataConfig]);
 
   return (
-    // Mengubah dari flex menjadi grid untuk memaksa rasio (3:2) dan mencegah tabel mendobrak batas lebar
     <div className="grid grid-cols-1 lg:grid-cols-5 w-full gap-3 flex-1 min-h-0 min-w-0 overflow-hidden h-full">
-      
-      {/* Left Column: Data Table */}
+
+      {/* ── Left: Data Table ─────────────────────────────────────────────── */}
       <div className="lg:col-span-3 flex flex-col rounded-3xl border border-neutral-800/20 bg-white overflow-hidden min-w-0 min-h-0">
         <div className="flex flex-col flex-1 min-h-0 min-w-0 w-full bg-neutral-50/50 p-2 sm:p-1.5">
-          <DynamicDataTable data={filteredTableData}/>
+          <DynamicDataTable data={filteredTableData} />
         </div>
       </div>
 
-      {/* Right Column: Configuration & Status Cards */}
-      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 mb-2">
-        
-        {/* Terminal Card */}
-        <AnalysisCard 
-          title="Update Langkah Pemrosesan" 
-          status="menunggu"
-          className="flex-1 min-h-[150px]"
+      {/* ── Right: Config & Status Cards ─────────────────────────────────── */}
+      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 mb-2 overflow-hidden">
+
+        {/* Terminal — non-collapsible, flex-1 to fill remaining height */}
+        <AnalysisCard
+          title="Update Langkah Pemrosesan"
+          status={statuses.terminal}
+          className="flex-1 min-h-37.5"
           innerClassName="flex flex-col h-full min-h-0 overflow-hidden p-0.5"
         >
-          <TerminalLog logs={terminalLogs}/>
+          <TerminalLog logs={terminalLogs} />
         </AnalysisCard>
 
-        {/* Data Configuration Card */}
+        {/* Data Configuration — collapsible.
+            Strategy: give the card a fixed max-height via className so the
+            outer shell is bounded. innerClassName carries h-full + flex so
+            the DataConfiguration's internal flex+ScrollArea chain resolves
+            against a real pixel height instead of an unbounded parent.     */}
         <AnalysisCard
-            title="Konfigurasi Data"
-            status="berhasil"
-            className="shrink-0"
-            innerClassName="max-h-52.5 p-3" 
+          title="Konfigurasi Data"
+          status={statuses.dataConfig}
+          className="shrink-0 max-h-64"
+          innerClassName="p-3 flex flex-col h-full min-h-0"
+          collapsible
+          defaultOpen={false}
         >
-            <DataConfiguration config={dataConfig} onChange={setDataConfig} />
+          <DataConfiguration config={dataConfig} onChange={setDataConfig} />
         </AnalysisCard>
 
-
-        {/* Data Quality Card */}
-        <AnalysisCard title="Cek Kualitas Data" status="menunggu" className="min-h-40 shrink-0">
-           <div className="h-full text-neutral-400 flex items-center justify-center">
-             Quality Metrics Placeholder
-           </div>
+        {/* Data Quality — collapsible, closed by default */}
+        <AnalysisCard
+          title="Cek Kualitas Data"
+          status={statuses.dataQuality}
+          className="shrink-0"
+          collapsible
+          defaultOpen={false}
+        >
+          <div className="h-full text-neutral-400 flex items-center justify-center">
+            Quality Metrics Placeholder
+          </div>
         </AnalysisCard>
 
-        {/* Bottom Row: Preferences (Side by side) */}
+        {/* Preferences row */}
         <div className="flex gap-4 shrink-0">
-          <AnalysisCard title="Preferensi Forecasting" status="kosong" className="flex-1 truncate justify-center">
-             <div className="w-full p-2">
-                <ForecastingPreference 
-                    value={forecastAggressiveness} 
-                    onChange={setForecastAggressiveness} 
-                />
+          <AnalysisCard
+            title="Preferensi Forecasting"
+            status={statuses.forecasting}
+            className="flex-1 truncate justify-center"
+            defaultOpen
+          >
+            <div className="w-full p-2">
+              <ForecastingPreference
+                value={forecastAggressiveness}
+                onChange={setForecastAggressiveness}
+              />
             </div>
           </AnalysisCard>
-          
-          <AnalysisCard title="Preferensi Clustering" status="kosong" className="flex-1 truncate justify-center">
-             <div className=" flex w-full p-2 justify-center items-center pt-5">
-                <ClusteringPreference 
-                    config={clusteringConfig} 
-                    onChange={setClusteringConfig} 
-                />
+
+          <AnalysisCard
+            title="Preferensi Clustering"
+            status={statuses.clustering}
+            className="flex-1 truncate justify-center"
+            defaultOpen
+          >
+            <div className="flex w-full p-2 justify-center items-center pt-5">
+              <ClusteringPreference
+                config={clusteringConfig}
+                onChange={setClusteringConfig}
+              />
             </div>
           </AnalysisCard>
         </div>
-
       </div>
     </div>
   );

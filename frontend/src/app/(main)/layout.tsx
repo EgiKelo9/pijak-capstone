@@ -7,13 +7,13 @@ export default function LandingPageLayout({
 }>) {
   return (
     // <html lang="en" suppressHydrationWarning>
-      <body>
+      // <body>
         <div className="fixed top-0 left-0 w-full h-screen z-50 flex flex-col overflow-hidden">
           <AppSidebarLayout>
             {children}
           </AppSidebarLayout>
         </div>
-      </body>
+      // </body>
     // </html>
   );
 }

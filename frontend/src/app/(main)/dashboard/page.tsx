@@ -41,6 +41,7 @@ export default function AnalysisEmptyState() {
     includedColumns: []
   });
   const [terminalLogs, setTerminalLogs] = React.useState<TerminalStep[]>([]);
+  const [dataConfigStatus, setDataConfigStatus] = React.useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
 
   // Mengambil datasetId dari session storage saat pertama kali dimuat (jika ada)
   React.useEffect(() => {
@@ -81,6 +82,7 @@ export default function AnalysisEmptyState() {
       { stepId: 'init', text: 'system_ready: memulai pipeline otomatis...', status: 'info' },
       { stepId: 'analyze_col', text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...`, status: 'loading' }
     ]);
+    setDataConfigStatus('menunggu');
 
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -98,7 +100,47 @@ export default function AnalysisEmptyState() {
       if (response.status === 401) throw new Error("Sesi API kedaluwarsa (401)");
       if (!response.ok) throw new Error(`API Error: Gagal menghubungi ML Services`);
 
-      // const result = await response.json(); // Anda bisa menangkap hasil pemetaan fitur di sini
+      const catchRes = await response.json(); // Anda bisa menangkap hasil pemetaan fitur di sini
+      const result = catchRes.data
+
+      if (result.status === 'success' && result.suggested_mapping) {
+        const mapping = result.suggested_mapping;
+        
+        setDataConfig((prev) => {
+          let dateCol = prev.dateColumn;
+          if (typeof mapping.col_date_time === 'string') {
+            if (prev.availableColumns.includes(mapping.col_date_time)) dateCol = mapping.col_date_time;
+          } else if (mapping.col_date_time?.col_whole) {
+            const extractedDate = Array.isArray(mapping.col_date_time.col_whole) 
+              ? mapping.col_date_time.col_whole[0] 
+              : mapping.col_date_time.col_whole;
+            if (extractedDate && prev.availableColumns.includes(extractedDate)) dateCol = extractedDate;
+          }
+
+          let targetCol = prev.targetColumn;
+          if (mapping.col_target && prev.availableColumns.includes(mapping.col_target)) {
+            targetCol = mapping.col_target;
+          }
+
+          let colsToDrop: string[] = [];
+          if (Array.isArray(mapping.cols_to_drop)) colsToDrop = mapping.cols_to_drop;
+          else if (typeof mapping.cols_to_drop === 'string') colsToDrop = [mapping.cols_to_drop];
+
+          const includedCols = prev.availableColumns.filter(
+            (col) => col !== dateCol && col !== targetCol && !colsToDrop.includes(col)
+          );
+
+          return {
+            ...prev,
+            dateColumn: dateCol,
+            targetColumn: targetCol,
+            includedColumns: includedCols,
+          };
+        });
+        setDataConfigStatus('berhasil');
+      } else {
+        setDataConfigStatus('gagal');
+      }
 
       // 2. Post-calling: Sukses - Ubah status log analyze_col menjadi success
       setTerminalLogs((prev) => prev.map(log => 
@@ -114,6 +156,7 @@ export default function AnalysisEmptyState() {
       setTerminalLogs((prev) => prev.map(log => 
         log.status === 'loading' ? { ...log, text: `Pipeline Error: ${error.message}`, status: 'error' } : log
       ));
+      setDataConfigStatus('gagal');
     }
   }, []);
 
@@ -290,11 +333,16 @@ export default function AnalysisEmptyState() {
         // Ekstrak nama kolom untuk inisiasi Konfigurasi Data
         if (parsedData.length > 0) {
           const cols = Object.keys(parsedData[0]);
-          setDataConfig({
-            availableColumns: cols,
-            dateColumn: cols[0] || '', // Set default kolom pertama sebagai tanggal
-            targetColumn: cols.length > 1 ? cols[1] : (cols[0] || ''), // Set default kolom kedua sebagai target
-            includedColumns: cols.length > 2 ? cols.slice(2) : [] // Sisanya dimasukkan sebagai fitur
+          setDataConfig(prev => {
+            if (prev.availableColumns.join(',') !== cols.join(',')) {
+              return {
+                availableColumns: cols,
+                dateColumn: cols[0] || '', 
+                targetColumn: cols.length > 1 ? cols[1] : (cols[0] || ''), 
+                includedColumns: cols.length > 2 ? cols.slice(2) : [] 
+              };
+            }
+            return prev;
           });
         }
       } catch (error) {
@@ -351,6 +399,7 @@ export default function AnalysisEmptyState() {
             dataConfig={dataConfig}
             setDataConfig={setDataConfig}
             terminalLogs={terminalLogs}
+            cardStatuses={{ dataConfig: dataConfigStatus }}
           />
         ) : (
           <EmptyStateView
