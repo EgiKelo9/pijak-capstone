@@ -27,3 +27,9 @@ class DatasetFetchByUserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class DatasetFeatureMetadataUpdateResponse(BaseModel):
+    status: str
+
+    class Config:
+        from_attributes = True

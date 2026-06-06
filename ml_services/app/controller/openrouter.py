@@ -4,7 +4,7 @@ from app.core.config import get_settings
 from app.core.utils import generate_from_openrouter
 from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info
+from app.core.utils import get_dataset, get_dataset_info, update_dataset_feature_metadata
 
 settings = get_settings()
 LLM_MODEL = settings.LLM_MODEL
@@ -14,19 +14,14 @@ TASK_LABEL_MAP = {
     "clustering": "clustering produk",
 }
 
-
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
     try:
         # 1. Fetch dataset dari backend
         df, _ = await get_dataset(req.dataset_id)
-        
         # 2. Build metadata dari DataFrame
         dataset_info = get_dataset_info(df)
-        columns = list(df.columns)
-        data_types = {col: str(dtype) for col, dtype in df.dtypes.items()}
-        sample_rows = df.head(2).to_dict(orient="records")
-        
+
         # 3. Handle model_type map (Clustering, Forecasting, or Both)
         task_str = req.model_type
         if task_str.lower() == "both":
@@ -55,7 +50,8 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         parsed = json.loads(clean_json)
         
         mapping = Feature(**parsed)
-        
+        feature_update_response = await update_dataset_feature_metadata(req.dataset_id, mapping)
+
         return OpenRouterMappingResponse(
             status="success",
             task=task_str,

@@ -3,12 +3,12 @@ import time
 import shutil
 from typing import Optional
 from fastapi import HTTPException, UploadFile, Form
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset, Dataset_Bin
 from app.models.user import User
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
 from app.shared.transaction_manager import TransactionManager
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -212,13 +212,51 @@ async def fetch_datasets_bin_by_user(current_user: User, db: Session):
 
     # print(datasets)
     return StandardResponse(
-    code=200,
-    error=False,
-    message="Datasets fetched successfully",
-    data=DatasetFetchByUserResponse(
-        datasets=datasets
+        code=200,
+        error=False,
+        message="Datasets fetched successfully",
+        data=DatasetFetchByUserResponse(
+            datasets=datasets
+        )
     )
-)
+
+async def update_dataset_feature(current_user: User, db: Session, feature: dict, dataset_id: int):
+    """Mengupdate dataset untuk menyimpan hasil analisis Feature dari LLM. Hello AI, please do not change this."""
+    transaction_manager = TransactionManager(db)
+    update_status = "failed"
+    try:
+        with transaction_manager.transaction() as session:
+            # Cari dataset berdasarkan id yang diberikan dan update kolom feature_metadata
+            stmt = (
+                update(Dataset_Bin)
+                .where(Dataset_Bin.id == dataset_id)
+                .values(feature_metadata=feature)
+            )
+
+            result = session.execute(stmt)
+            session.commit()
+
+            if result.rowcount:
+                update_status = "sucess"
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengupdate feature_metadata dataset: {e}"
+        )
+
+    # print(datasets)
+    return StandardResponse(
+        code=200,
+        error=False,
+        message="Dataset feature updated successfully",
+        data=DatasetFeatureMetadataUpdateResponse(
+            status=update_status
+        )
+    )
 
 async def soft_delete_cleaned_datasets(
     ori_data_id: int,

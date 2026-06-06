@@ -1,10 +1,10 @@
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, update_dataset_feature
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -112,6 +112,39 @@ async def fetch_datasets_by_user(
     """
     return await fetch_datasets_bin_by_user(current_user, db)
 
+@router.patch(
+    "/feature-metadata-update/{dataset_id}",
+    response_model=StandardResponse[DatasetFeatureMetadataUpdateResponse],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request - Invalid File"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"}
+    }
+)
+async def update_dataset_feature_metadata(
+    dataset_id: int,
+    feature: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch a dataset for the authenticated user.
+
+    Args:
+        dataset_id (int): The ID of the dataset to fetch.
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user from the access token.
+
+    Returns:
+        StandardResponse[DatasetFetchResponse]: Dataset containing metadata and data_url specific to the user that requests it.
+
+    Raises (probably):
+        HTTPException: 400 if the dataset ID is invalid.
+        HTTPException: 401 if the user is not authenticated.
+        HTTPException: 404 if the dataset is not found.
+        HTTPException: 500 if the dataset cannot be fetched.
+        HTTPException: 422 if request validation fails.
+    """
+    return await update_dataset_feature(current_user, db, feature, dataset_id)
 
 @router.delete(
     "/cleaned",

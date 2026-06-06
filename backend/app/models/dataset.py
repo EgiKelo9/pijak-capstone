@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, LargeBinary, Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.database.main import Base
 
@@ -31,6 +32,7 @@ class Dataset_Bin(Base):
     dataset_name = Column(String(255), nullable=False)
     dataset_file = Column(LargeBinary, nullable=False)
     original_encoding= Column(String(55), nullable=False)
+    feature_metadata = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     deleted_at = Column(DateTime, nullable=True)
