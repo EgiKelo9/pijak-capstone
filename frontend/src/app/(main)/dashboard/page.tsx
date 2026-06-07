@@ -168,7 +168,7 @@ export default function AnalysisEmptyState() {
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     console.log("token-->",token)
     // TODO: Use environment variables instead of hardcoded localhost
-    const response = await fetch("http://localhost:5000/api/v1/datasets/upload", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/datasets/upload`, {
       method: "POST",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -177,12 +177,11 @@ export default function AnalysisEmptyState() {
     });
 
     // Handle expired token directly
-    if (response.status === 401) {
-      localStorage.removeItem("access_token");
-      alert("Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman.");
-      window.location.reload();
-      return;
-    }
+   if (response.status === 401) {
+  localStorage.removeItem("access_token");
+  window.location.reload();
+  return;
+}
 
     // Cek apakah response benar-benar JSON (mencegah SyntaxError JSON.parse)
     const contentType = response.headers.get("content-type");
@@ -270,7 +269,7 @@ export default function AnalysisEmptyState() {
         // Get token dynamically from localStorage
         const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
         
-        const response = await fetch(`http://localhost:5000/api/v1/datasets/${activeDatasetId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/datasets/${activeDatasetId}`, {
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
@@ -436,7 +435,7 @@ function useTemporaryMockLogin() {
             return;
           }
 
-          const response = await fetch("http://localhost:5000/api/v1/auth/login", {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),

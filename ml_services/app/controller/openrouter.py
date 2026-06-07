@@ -14,6 +14,16 @@ TASK_LABEL_MAP = {
     "clustering": "clustering produk",
 }
 
+FALLBACK_FEATURE = Feature(
+    cols_to_drop=None,
+    col_date_time=None,
+    col_product=None,
+    col_target=None,
+    col_to_numerical=None,
+    col_to_categorical=None,
+    new_feature_pairing=None,
+    reasonings="Fallback: gagal menganalisis kolom."
+)
 
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
@@ -23,16 +33,13 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         
         # 2. Build metadata dari DataFrame
         dataset_info = get_dataset_info(df)
-        columns = list(df.columns)
-        data_types = {col: str(dtype) for col, dtype in df.dtypes.items()}
-        sample_rows = df.head(2).to_dict(orient="records")
-        
+
         # 3. Handle model_type map (Clustering, Forecasting, or Both)
         task_str = req.model_type
         if task_str.lower() == "both":
             task_str = "Both"
 
-        # 4. Build prompt identik dengan gemini.py, ditambah instruksi skema JSON
+        # 4. Build prompt
         prompt = f"""
             Please extract features(columns) from the following dataset.
             The user wants to do {task_str} option from the available service of Clustering and Forecasting.
@@ -47,7 +54,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             return OpenRouterMappingResponse(
                 status="error",
                 task=task_str,
-                suggested_mapping=Feature()  # fallback empty
+                suggested_mapping=FALLBACK_FEATURE
             )
     
         raw_text = llm_response.data.get("response", "")
@@ -61,44 +68,31 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             task=task_str,
             suggested_mapping=mapping,
         )
-    except Exception as e:
-        # Fallback ke empty feature jika parsing gagal
-        try:
-            fallback_mapping = Feature()
-        except:
-            fallback_mapping = None
 
+    except Exception as e:
+        print(f"[analyze_columns] Error: {e}")
         return OpenRouterMappingResponse(
             status="error",
             task=req.model_type,
-            suggested_mapping=fallback_mapping
-        )        
-    
-        
+            suggested_mapping=FALLBACK_FEATURE
+        )
+
+
 async def get_insight_from_data(target_task: str, json_data: Any) -> str:
     """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
     prompt = f"""
     Kamu adalah Business Analyst non-teknis untuk wirausaha retail.
-
     Task Machine Learning saat ini: "{target_task}"
-
     Berdasarkan data prediksi berikut:
     {json.dumps(json_data, default=str)}
-
     Berikan insight bisnis yang konkret, singkat, dan mudah dipahami.
     Fokus pada stok, barang tak laku, peluang promo, dan tindakan prioritas yang relevan dengan task.
-
     Balas hanya dengan teks insight, tanpa markdown berlebihan.
     """
-
     try:
         insight_response = await generate_from_openrouter(prompt)
-
         if getattr(insight_response, "error", False):
             return f"OpenRouter error: {insight_response.message}"
-
         return insight_response.data.get("response", "") if insight_response.data else ""
-
     except Exception as e:
         return f"OpenRouter error: {str(e)}"
-        
