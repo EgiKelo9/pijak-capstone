@@ -3,7 +3,7 @@ import time
 import shutil
 from typing import Optional
 from fastapi import HTTPException, UploadFile, Form
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset, Dataset_Bin
 from app.models.user import User
@@ -267,3 +267,46 @@ async def soft_delete_cleaned_datasets(
         message=f"{affected} record cleaned dataset lama berhasil di-soft-delete",
         data={"affected_records": affected}
     )
+
+async def fetch_analysis_history_by_user(current_user: User, db: Session):
+    """Menampilkan riwayat analisis beserta insight summary yang terkait dengan user."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            # Gunakan Raw SQL untuk nge-join tabel dan format data agar langsung 
+            # cocok dengan bentuk `AnalysisRow` interface di frontend.
+            stmt = text("""
+                SELECT 
+                    ah.id::TEXT,
+                    COALESCE(d.dataset_name, 'Dataset Dihapus') AS dataset,
+                    TO_CHAR(ah.created_at, 'Mon DD, YYYY') AS tanggal,
+                    INITCAP(m.type) AS metode,
+                    ah.status,
+                    COALESCE(fr.insight_summary, cr.insight_summary, 'Belum ada insight.') AS insight,
+                    fr.confidence_level,
+                    cr.silhouette_score
+                FROM analysis_history ah
+                LEFT JOIN datasets d ON ah.dataset_id = d.id
+                LEFT JOIN ml_models m ON ah.model_id = m.id
+                LEFT JOIN forecasting_results fr ON ah.id = fr.analysis_id
+                LEFT JOIN clustering_results cr ON ah.id = cr.analysis_id
+                WHERE ah.user_id = :user_id
+                ORDER BY ah.created_at DESC
+            """)
+            
+            records = session.execute(stmt, {"user_id": current_user.id}).mappings().all()
+            history_data = [dict(row) for row in records]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengambil riwayat analisis: {e}"
+        )
+
+    return StandardResponse(
+    code=200,
+    error=False,
+    message="Analysis history fetched successfully",
+    data=history_data
+)

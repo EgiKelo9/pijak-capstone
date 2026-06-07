@@ -5,6 +5,7 @@ import * as React from 'react';
 import { DateRange } from 'react-day-picker';
 
 import { FileUploadDemo } from '@/components/file-upload-demo';
+import { analyzeColumns, getDataset, mockLogin, uploadDataset } from '@/lib/middle-man';
 import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
@@ -100,23 +101,7 @@ export default function AnalysisEmptyState() {
     setDataConfigStatus('menunggu');
 
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      
-      // TODO: Ganti URL ini dengan URL endpoint FastAPI ML Services Anda yang sebenarnya
-      const response = await fetch("http://localhost:8000/ml/v1/openrouter/analyze-columns", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ dataset_id: datasetId, model_type: currentMode }),
-      });
-
-      if (response.status === 401) throw new Error("Sesi API kedaluwarsa (401)");
-      if (!response.ok) throw new Error(`API Error: Gagal menghubungi ML Services`);
-
-      const catchRes = await response.json(); // Anda bisa menangkap hasil pemetaan fitur di sini
-      const result = catchRes.data
+      const result = await analyzeColumns(datasetId, currentMode);
 
       if (result.status === 'success' && result.suggested_mapping) {
         const mapping = result.suggested_mapping;
@@ -176,46 +161,16 @@ export default function AnalysisEmptyState() {
   }, []);
 
   const handleUploadConfirm = React.useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Get token dynamically from localStorage
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    console.log("token-->",token)
-    // TODO: Use environment variables instead of hardcoded localhost
-    const response = await fetch("http://localhost:5000/api/v1/datasets/upload", {
-      method: "POST",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: formData,
-    });
-
-    // Handle expired token directly
-    if (response.status === 401) {
-      localStorage.removeItem("access_token");
-      alert("Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman.");
-      window.location.reload();
-      return;
+    try {
+      const data = await uploadDataset(file);
+      console.log("[Dashboard] Upload Success. Dataset ID:", data.dataset_id);
+      setActiveDatasetId(data.dataset_id);
+      setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
+    } catch (error: any) {
+      console.error("[Dashboard] Upload Error:", error);
+      const isAuthError = error.message === "Unauthorized";
+      alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
-
-    // Cek apakah response benar-benar JSON (mencegah SyntaxError JSON.parse)
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const textError = await response.text();
-      console.error("[Dashboard] Non-JSON response from upload:", textError);
-      throw new Error(`Server error: Expected JSON but received HTML/Text. Check backend logs.`);
-    }
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to upload dataset");
-    }
-
-    console.log("[Dashboard] Upload Success. Dataset ID:", result.data.dataset_id);
-    setActiveDatasetId(result.data.dataset_id);
-    setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
   }, [analysisConfig.mode, runPreprocessingPipeline]);
 
   const handleRunAnalysis = React.useCallback(() => {
@@ -282,41 +237,7 @@ export default function AnalysisEmptyState() {
     const fetchDatasetInfo = async () => {
       setIsLoadingDataset(true);
       try {
-        // Get token dynamically from localStorage
-        const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-        
-        const response = await fetch(`http://localhost:5000/api/v1/datasets/${activeDatasetId}`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        // Handle expired token directly
-        if (response.status === 401) {
-          localStorage.removeItem("access_token");
-          console.warn("[Dashboard] Token expired. Cleared from localStorage.");
-          window.location.reload();
-          return;
-        }
-
-        const contentType = response.headers.get("content-type");
-        let csvString = "";
-
-        if (contentType && contentType.includes("application/json")) {
-          const result = await response.json();
-          if (!response.ok || result.error) {
-            throw new Error(result.message || "Failed to fetch dataset");
-          }
-          console.log("[Dashboard] Fetch Dataset Success (JSON):", result.data);
-          csvString = result.data?.dataset_file || "";
-        } else {
-          // Fallback jika API mengembalikan raw text / CSV langsung
-          csvString = await response.text();
-          if (!response.ok) {
-            throw new Error(`Server error: ${csvString.substring(0, 100)}`);
-          }
-          console.log("[Dashboard] Fetch Dataset Success (Raw Text/CSV). Length:", csvString.length);
-        }
+        const csvString = await getDataset(activeDatasetId);
 
         let parsedData: any[] = [];
         if (csvString) {
@@ -451,20 +372,9 @@ function useTemporaryMockLogin() {
             return;
           }
 
-          const response = await fetch("http://localhost:5000/api/v1/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-          });
-
-          const result = await response.json();
-
-          if (response.ok && result.data?.access_token) {
-            localStorage.setItem("access_token", result.data.access_token);
-            console.warn("Dev mode: Successfully fetched and injected access token from API.");
-          } else {
-            console.error("Dev mode: Failed to fetch mock token:", result);
-          }
+          const token = await mockLogin(email, password);
+          localStorage.setItem("access_token", token);
+          console.warn("Dev mode: Successfully fetched and injected access token from API.");
         } catch (error) {
           console.error("Dev mode: Error fetching mock token:", error);
         }

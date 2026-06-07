@@ -75,7 +75,7 @@ CREATE TABLE analysis_history (
     user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     dataset_id  INT REFERENCES datasets(id) ON DELETE SET NULL,
     model_id    INT REFERENCES ml_models(id) ON DELETE RESTRICT,
-    status      VARCHAR(50) DEFAULT 'completed',
+    status      VARCHAR(50) DEFAULT 'berhasil',
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMP NULL
@@ -146,15 +146,30 @@ INSERT INTO datasets (user_id, dataset_name, file_path) VALUES
     (3, 'revenue_Q1.csv', '/static/datasets/3_revenue_Q1.csv');
 
 INSERT INTO analysis_history (user_id, dataset_id, model_id, status) VALUES
-    (1, 1, 1, 'completed'),
-    (2, 2, 3, 'completed'),
-    (3, 3, 2, 'pending');
+    (4, 1, 1, 'berhasil'),
+    (4, 2, 3, 'berhasil'),
+    (4, 3, 2, 'menunggu'),
+    (4, 1, 2, 'gagal'),
+    (4, 2, 4, 'berhasil'),
+    (4, 3, 1, 'berhasil'),
+    (4, 1, 3, 'menunggu'),
+    (4, 2, 2, 'berhasil'),
+    (4, 3, 4, 'gagal'),
+    (4, 1, 1, 'berhasil');
 
 INSERT INTO forecasting_results (analysis_id, confidence_level, trend_data, insight_summary) VALUES
-    (1, 0.85, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.');
+    (1, 0.85, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
+    (3, NULL, '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
+    (4, NULL, '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
+    (6, 0.92, '[{"date": "2024-01-01", "value": 200}]', 'Terdapat tren kenaikan penjualan 15% untuk kategori elektronik di bulan depan.'),
+    (8, 0.78, '[{"date": "2024-02-01", "value": 180}]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
+    (10, 0.88, '[{"date": "2024-03-01", "value": 210}]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
 
 INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary) VALUES
-    (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.');
+    (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.'),
+    (5, 4, 0.72, 980.20, '[{"cluster": 1, "size": 100}]', 'Ditemukan 4 kelompok utama pelanggan dengan pola keluhan yang sama pada pengiriman.'),
+    (7, 0, NULL, NULL, '[]', 'Sedang memproses pengelompokan berdasarkan tingkat frekuensi dan nilai transaksi...'),
+    (9, 0, NULL, NULL, '[]', 'Dataset memiliki terlalu banyak nilai kosong sehingga gagal dikelompokkan.');
 
 INSERT INTO chat_messages (analysis_id, sender_type, message) VALUES
     (1, 'user', 'Bagaimana prediksi penjualan untuk akhir tahun?'),

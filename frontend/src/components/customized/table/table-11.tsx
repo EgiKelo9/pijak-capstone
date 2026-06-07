@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type AnalysisStatus = "menunggu" | "berhasil" | "gagal" | "berjalan";
+export type AnalysisStatus = "menunggu" | "berhasil" | "gagal" ;
 export type AnalysisMethod = "Clustering" | "Forecasting" | "Classification" | string;
 
 export interface AnalysisRow {
@@ -57,6 +57,8 @@ export interface AnalysisRow {
   metode: AnalysisMethod;
   status: AnalysisStatus;
   insight: string;
+  confidence_level?: number | null;
+  silhouette_score?: number | null;
 }
 
 // ── Status config — dot only, NO background pill ──────────────────────────────
@@ -65,7 +67,6 @@ const statusConfig: Record<AnalysisStatus, { dot: string; text: string; label: s
   menunggu: { dot: "bg-amber-500",   text: "text-amber-500",   label: "Menunggu" },
   berhasil: { dot: "bg-emerald-500", text: "text-emerald-600", label: "Berhasil" },
   gagal:    { dot: "bg-rose-500",    text: "text-rose-500",    label: "Gagal"    },
-  berjalan: { dot: "bg-blue-500",    text: "text-blue-500",    label: "Berjalan" },
 };
 
 // ── Method icon — dark/black as in screenshot ─────────────────────────────────
@@ -156,7 +157,7 @@ function buildColumns(
         const cfg = statusConfig[s] ?? statusConfig.menunggu;
         return (
           // NO background — just dot + colored label, matching screenshot
-          <div className="flex items-center gap-1.5 overflow-hidden border border-neutral-800/20 rounded-full justify-start pl-3">
+          <div className="flex items-center gap-1.5 overflow-hidden border border-neutral-800/20 rounded-full justify-start px-4 w-fit">
             <span className={cn("size-2 rounded-full shrink-0", cfg.dot)} />
             <span className={cn("font-mono text-[11px] font-medium truncate", cfg.text)}>
               {cfg.label}
