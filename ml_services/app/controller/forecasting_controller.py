@@ -48,10 +48,10 @@ async def run_forecasting(
                 horizon,
             ]
         )
-        actual_regressors = [c for c in col_regressors if c in df.columns]
+        actual_regressors = [c for c in df.columns if c not in [col_date, col_target]]
 
         try:
-            df_grouped = pipeline.load_frame(
+            df_grouped, actual_regressors = pipeline.load_frame(
                 data=df,
                 date_column=col_date,
                 target_column=col_target,
@@ -69,8 +69,6 @@ async def run_forecasting(
 
         # 3. Jalankan pipeline (training & validation)
         logger.info("Step 3: Training pipeline for aggregated data")
-        # actual_regressors sudah dihitung dan disimpan dari load_frame, gunakan ulang
-        actual_regressors = [c for c in col_regressors if c in df_grouped.columns]
 
         metrics = pipeline.train_with_regressors(
             data=df_grouped,

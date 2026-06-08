@@ -34,6 +34,91 @@ class XGBoostForecastingPipeline:
         self.feature_columns = None
         self.regressor_columns = None
         self.uses_regressors = False
+        
+        # Adaptive encoding properties
+        self.encoding_strategies = {}
+        self.label_encoders = {}
+        self.one_hot_columns = []
+
+    def _apply_adaptive_encoding(
+        self, df: pd.DataFrame, regressor_columns: list[str], is_training: bool = True
+    ) -> tuple[pd.DataFrame, list[str]]:
+        from sklearn.preprocessing import LabelEncoder
+
+        new_regressors = list(regressor_columns)
+
+        if is_training:
+            self.encoding_strategies = {}
+            self.label_encoders = {}
+            self.one_hot_columns = []
+
+            for col in regressor_columns:
+                if df[col].dtype == "object" or pd.api.types.is_categorical_dtype(df[col]):
+                    n_unique = df[col].nunique()
+                    if n_unique <= 10:
+                        self.encoding_strategies[col] = "one_hot"
+                    elif n_unique <= 50:
+                        self.encoding_strategies[col] = "label"
+                    else:
+                        self.encoding_strategies[col] = "drop"
+
+            cols_to_drop = []
+            cols_to_add = []
+
+            for col, strategy in self.encoding_strategies.items():
+                if strategy == "one_hot":
+                    dummies = pd.get_dummies(df[col], prefix=col, dummy_na=False)
+                    df = pd.concat([df, dummies], axis=1)
+                    cols_to_drop.append(col)
+                    cols_to_add.extend(dummies.columns.tolist())
+                elif strategy == "label":
+                    le = LabelEncoder()
+                    df[col] = le.fit_transform(df[col].astype(str))
+                    self.label_encoders[col] = le
+                elif strategy == "drop":
+                    cols_to_drop.append(col)
+
+            if cols_to_drop:
+                df = df.drop(columns=cols_to_drop)
+                new_regressors = [c for c in new_regressors if c not in cols_to_drop]
+                new_regressors.extend(cols_to_add)
+
+            self.one_hot_columns = cols_to_add
+            return df, new_regressors
+
+        else:
+            cols_to_drop = []
+            for col, strategy in self.encoding_strategies.items():
+                if col not in df.columns:
+                    continue
+                if strategy == "one_hot":
+                    dummies = pd.get_dummies(df[col], prefix=col, dummy_na=False)
+                    df = pd.concat([df, dummies], axis=1)
+                    cols_to_drop.append(col)
+                elif strategy == "label":
+                    le = self.label_encoders[col]
+                    known_classes = set(le.classes_)
+                    mapped = []
+                    for val in df[col].astype(str):
+                        if val in known_classes:
+                            mapped.append(le.transform([val])[0])
+                        else:
+                            mapped.append(-1)
+                    df[col] = mapped
+                elif strategy == "drop":
+                    cols_to_drop.append(col)
+
+            if cols_to_drop:
+                df = df.drop(columns=cols_to_drop)
+
+            for ohe_col in self.one_hot_columns:
+                if ohe_col not in df.columns:
+                    df[ohe_col] = 0
+
+            new_regressors = [c for c in regressor_columns if c not in cols_to_drop]
+            new_regressors.extend(self.one_hot_columns)
+
+            return df, new_regressors
 
     def load_frame(
         self,
@@ -44,38 +129,35 @@ class XGBoostForecastingPipeline:
         freq: str = "W",
         agg: str = "sum",
         fill_missing: float = 0.0,
-    ) -> pd.DataFrame:
+    ) -> tuple[pd.DataFrame, list[str]]:
         df = data.copy()
         df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
         df[target_column] = pd.to_numeric(df[target_column], errors="coerce")
-        for col in regressor_columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
         df = df.dropna(subset=[date_column, target_column])
+        
+        # Apply adaptive encoding
+        df, encoded_regressors = self._apply_adaptive_encoding(df, regressor_columns, is_training=True)
+
+        for col in encoded_regressors:
+            if col not in self.encoding_strategies or self.encoding_strategies.get(col) != "label":
+                df[col] = pd.to_numeric(df[col], errors="coerce")
 
         # Set index tanggal sebelum groupby
         df = df.set_index(date_column)
 
-        if agg == "sum":
-            grouped = (
-                df[[target_column] + regressor_columns]
-                .resample(freq)
-                .sum()
-                .sort_index()
-            )
-        elif agg == "mean":
-            grouped = (
-                df[[target_column] + regressor_columns]
-                .resample(freq)
-                .mean()
-                .sort_index()
-            )
-        else:
-            raise ValueError("agg harus 'sum' atau 'mean'")
+        agg_dict = {target_column: agg}
+        for col in encoded_regressors:
+            if col in self.encoding_strategies and self.encoding_strategies[col] == "label":
+                agg_dict[col] = lambda x: x.mode()[0] if not x.mode().empty else np.nan
+            else:
+                agg_dict[col] = agg
+                
+        grouped = df.resample(freq).agg(agg_dict).sort_index()
 
         grouped[target_column] = grouped[target_column].fillna(fill_missing)
-        grouped[regressor_columns] = grouped[regressor_columns].fillna(0.0)
+        grouped[encoded_regressors] = grouped[encoded_regressors].fillna(0.0)
         self.freq = freq
-        return grouped
+        return grouped, encoded_regressors
 
     def _build_features_from_frame(
         self,
@@ -115,6 +197,7 @@ class XGBoostForecastingPipeline:
         target_column: str,
         regressor_columns: list[str],
     ) -> dict:
+        self.original_regressor_columns = list(regressor_columns)
         if data.empty:
             raise ValueError("data kosong")
 
@@ -174,6 +257,11 @@ class XGBoostForecastingPipeline:
             raise ValueError("regressor_columns belum tersedia")
         if steps != len(future_regressors):
             raise ValueError("steps harus sama dengan panjang future_regressors")
+
+        # Apply encoding on future data
+        future_regressors, _ = self._apply_adaptive_encoding(
+            future_regressors, self.original_regressor_columns, is_training=False
+        )
 
         preds = []
         series = history.copy()
