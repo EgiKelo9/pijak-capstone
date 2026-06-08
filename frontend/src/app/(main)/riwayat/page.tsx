@@ -63,38 +63,38 @@ export default function History() {
     }, [clusteringData]);
 
     return (
-        <div className="flex flex-col h-full flex-1 gap-3 min-h-0">
-        <div className="flex gap-3 h-fit shrink-0">
-            <AnalysisCard title={"Performa Historis Forecasting"} className="w-full min-h-76">
-                <div className="flex h-full w-full">
-                    <PerformanceBarChart 
-                      type="forecasting"
-                      data={forecastingData}
-                      badgeLabel="Mean Confidence"
-                      badgeValue={forecastingMean}
-                    />
-                </div>
-            </AnalysisCard>
-            <AnalysisCard title={"Performa Historis Clustering"} className="w-full min-h-76">
-                <div className="flex h-full w-full">
-                    <PerformanceBarChart 
-                      type="clustering"
-                      data={clusteringData}
-                      badgeLabel="Mean Silhouette"
-                      badgeValue={clusteringMean}
-                    />
-                </div>
-            </AnalysisCard>
-            <AnalysisCard title={"Rangkuman Status Pengajuan"} className="w-full min-h-76">
-                <div className="flex h-full w-full flex-col pt-2">
-                    <StatusDonutChart data={historyData} />
-                </div>
-            </AnalysisCard>
+        <div className="flex flex-col h-full flex-1 gap-4 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 shrink-0 h-auto lg:h-[38%] xl:h-[36%] 2xl:h-[34%] lg:min-h-[260px] min-h-0">
+              <AnalysisCard title={"Performa Historis Forecasting"} className="w-full h-[280px] lg:h-full min-h-0">
+                  <div className="flex h-full w-full">
+                      <PerformanceBarChart 
+                        type="forecasting"
+                        data={forecastingData}
+                        badgeLabel="Mean Confidence"
+                        badgeValue={forecastingMean}
+                      />
+                  </div>
+              </AnalysisCard>
+              <AnalysisCard title={"Performa Historis Clustering"} className="w-full h-[280px] lg:h-full min-h-0">
+                  <div className="flex h-full w-full">
+                      <PerformanceBarChart 
+                        type="clustering"
+                        data={clusteringData}
+                        badgeLabel="Mean Silhouette"
+                        badgeValue={clusteringMean}
+                      />
+                  </div>
+              </AnalysisCard>
+              <AnalysisCard title={"Rangkuman Status Pengajuan"} className="w-full h-[280px] lg:h-full min-h-0">
+                  <div className="flex h-full w-full flex-col pb-4">
+                      <StatusDonutChart data={historyData} />
+                  </div>
+              </AnalysisCard>
 
-        </div>
-        <div className="flex-1 min-h-0 w-full">
-            <DynamicDataTable data={historyData} />
-        </div>
+          </div>
+          <div className="flex-1 min-h-0 w-full">
+              <DynamicDataTable data={historyData} />
+          </div>
         </div>
     )
 }

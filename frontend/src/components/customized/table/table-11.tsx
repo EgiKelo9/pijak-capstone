@@ -20,7 +20,8 @@ import {
   MoreHorizontal,
   RefreshCcw,
   SearchIcon,
-  Waypoints
+  Waypoints,
+  X
 } from "lucide-react";
 import * as React from "react";
 
@@ -94,7 +95,8 @@ function SortHeader({ label, onClick }: { label: string; onClick: () => void }) 
 
 // ── Column definitions ────────────────────────────────────────────────────────
 function buildColumns(
-  onAction?: (action: string, row: AnalysisRow) => void
+  onAction?: (action: string, row: AnalysisRow) => void,
+  onViewDetail?: (row: AnalysisRow) => void
 ): ColumnDef<AnalysisRow>[] {
   return [
     {
@@ -211,12 +213,15 @@ function buildColumns(
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuLabel className="text-xs text-neutral-500">Aksi</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onAction?.("view", row.original)}>
+            <DropdownMenuItem onClick={() => {
+              onViewDetail?.(row.original);
+              onAction?.("view", row.original);
+            }}>
               Lihat Detail
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onAction?.("rerun", row.original)}>
+            {/* <DropdownMenuItem onClick={() => onAction?.("rerun", row.original)}>
               Jalankan Ulang
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-rose-500 focus:text-rose-500"
@@ -249,8 +254,9 @@ export function DynamicDataTable({
   const [sorting, setSorting]                     = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters]         = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility]   = React.useState<VisibilityState>({});
+  const [detailRow, setDetailRow]                 = React.useState<AnalysisRow | null>(null);
 
-  const columns   = React.useMemo(() => buildColumns(onAction), [onAction]);
+  const columns   = React.useMemo(() => buildColumns(onAction, setDetailRow), [onAction, setDetailRow]);
   const tableData = React.useMemo(() => data ?? [], [data]);
 
   const table = useReactTable({
@@ -271,13 +277,13 @@ export function DynamicDataTable({
     <div className="flex h-full w-full flex-col min-h-0 bg-white">
 
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-3 px-2 py-3">
+      <div className="flex shrink-0 items-center gap-4 mb-3">
 
         {/* Search — pill shaped, very subtle border, matching screenshot */}
         <div className="relative flex-1 max-w-xs">
           <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400 pointer-events-none" />
           <Input
-            className="pl-10 h-9 rounded-full border-neutral-200 bg-white text-sm
+            className="pl-10 h-9 rounded-md border-neutral-200 bg-white text-sm
                        placeholder:text-neutral-400 focus-visible:ring-1
                        focus-visible:ring-[#2BBAEE]/40 focus-visible:border-[#2BBAEE]/60"
             onChange={(e) => setGlobalFilter(e.target.value)}
@@ -290,7 +296,7 @@ export function DynamicDataTable({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              className="ml-auto h-9 rounded-xl border-neutral-200 bg-white
+              className="ml-auto h-9 rounded-md shadow-none border-neutral-200 bg-white
                          text-sm text-neutral-600 hover:bg-neutral-50 gap-1.5"
               variant="outline"
             >
@@ -437,6 +443,40 @@ export function DynamicDataTable({
           </div>
         </div>
       </div>
+
+      {/* ── Modal Detail Insight ────────────────────────────────────────────── */}
+      {detailRow && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setDetailRow(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-200 border border-neutral-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 md:p-8 border-b border-neutral-100 flex items-start justify-between bg-neutral-50/50">
+              <div className="flex flex-col gap-1 pr-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <MethodIcon method={detailRow.metode} />
+                  <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">{detailRow.metode}</span>
+                </div>
+                <h3 className="font-bold text-xl text-neutral-900 leading-tight">Detail Insight</h3>
+                <p className="text-sm text-neutral-500 font-medium mt-1">{detailRow.dataset} • {detailRow.tanggal}</p>
+              </div>
+              <button onClick={() => setDetailRow(null)} className="p-2 -mr-2 rounded-full hover:bg-neutral-200/60 text-neutral-400 hover:text-neutral-600 transition-colors">
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="p-6 md:p-8 max-h-[60vh] overflow-y-auto">
+              <div className="rounded-xl bg-[#2BBAEE]/5 border border-[#2BBAEE]/20 p-5">
+                <p className="text-sm md:text-base text-neutral-700 leading-relaxed font-medium">
+                  {detailRow.insight || "Belum ada insight yang dihasilkan untuk analisis ini."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
