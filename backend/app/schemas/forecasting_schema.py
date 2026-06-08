@@ -31,21 +31,35 @@ class ForecastingRunRequest(BaseModel):
 # RESPONSE SCHEMA
 # ================================
 
-class ForecastingProductResultData(BaseModel):
-    """Hasil prediksi untuk satu produk."""
-    product: str
-    predictions: list[float]    # nilai prediksi sejumlah `horizon` periode
+class TrendDataPoint(BaseModel):
+    date: str
+    value: float
+
+
+class FeatureDetail(BaseModel):
+    name: str
+    mode: float
+    mean: float
+    max: float
+    min: float
+    influence: float
+
+
+class ForecastingMetrics(BaseModel):
+    confidence_percentage: float
+    confidence_value: float
     mae: float
+    mape: float
+    mse: float
     rmse: float
     r2: float
 
 
 class ForecastingResultData(BaseModel):
     """Hasil keseluruhan forecasting dari ML service."""
-    product_amount: int
-    horizon: int
-    freq: str
-    results: list[ForecastingProductResultData]
+    metrics: ForecastingMetrics
+    trend_data: list[TrendDataPoint]
+    feature_importances: list[FeatureDetail]
     insight_summary: str
 
 

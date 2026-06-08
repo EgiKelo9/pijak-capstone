@@ -137,7 +137,30 @@ class XGBoostForecastingPipeline:
         self.uses_regressors = True
 
         y_pred = self.model.predict(X_test)
-        return self._evaluate(y_test, y_pred)
+        metrics = self._evaluate(y_test, y_pred)
+
+        # Calculate feature importances with Pearson Correlation direction
+        importances = self.model.feature_importances_
+        raw_importances = {}
+        for col, imp in zip(feature_columns, importances):
+            if col in regressor_columns:
+                # Calculate correlation with target to determine positive/negative influence
+                corr = data[col].corr(data[target_column])
+                direction = 1 if pd.isna(corr) or corr >= 0 else -1
+                raw_importances[col] = float(imp) * direction
+                
+        # Normalize to 100% among regressors
+        total_imp = sum(abs(v) for v in raw_importances.values())
+        norm_importances = {}
+        if total_imp > 0:
+            for col, val in raw_importances.items():
+                norm_importances[col] = round((val / total_imp) * 100, 2)
+        else:
+            for col in regressor_columns:
+                norm_importances[col] = 0.0
+                
+        metrics["feature_importances"] = norm_importances
+        return metrics
 
     def forecast_with_regressors(
         self,
@@ -217,10 +240,49 @@ class XGBoostForecastingPipeline:
         else:
             mape = float("nan")
 
+        # Bootstrapping for Confidence Level (CV of RMSE)
+        n_iterations = 1000
+        n_size = len(y_true)
+        
+        if n_size > 0:
+            bootstrapped_cv_rmses = []
+            bootstrapped_rmses = []
+            
+            y_t_arr = y_true.values
+            y_p_arr = y_pred
+            
+            for _ in range(n_iterations):
+                indices = np.random.choice(n_size, size=n_size, replace=True)
+                sample_true = y_t_arr[indices]
+                sample_pred = y_p_arr[indices]
+                
+                sample_mse = mean_squared_error(sample_true, sample_pred)
+                sample_rmse = np.sqrt(sample_mse)
+                sample_mean_true = np.mean(sample_true)
+                
+                if sample_mean_true > 0:
+                    cv_rmse = sample_rmse / sample_mean_true
+                    bootstrapped_cv_rmses.append(cv_rmse)
+                    
+                bootstrapped_rmses.append(sample_rmse)
+                
+            if bootstrapped_cv_rmses:
+                cv = float(np.mean(bootstrapped_cv_rmses))
+                confidence_percentage = max(0.0, min(1.0, 1.0 - cv))
+            else:
+                confidence_percentage = 0.0
+                
+            confidence_value = float(np.mean(bootstrapped_rmses))
+        else:
+            confidence_percentage = 0.0
+            confidence_value = 0.0
+
         return {
             "mae": float(mae),
             "mse": float(mse),
             "rmse": float(rmse),
             "mape": float(mape),
             "r2": float(r2),
+            "confidence_percentage": float(confidence_percentage),
+            "confidence_value": float(confidence_value),
         }

@@ -12,7 +12,9 @@ from app.schemas.forecasting_schema import (
     ForecastingRequest,
     ForecastingResponse,
     ForecastingErrorResponse,
-    ForecastingProductResult,
+    TrendDataPoint,
+    FeatureDetail,
+    ForecastingMetrics,
     ForecastingResult,
 )
 
@@ -100,18 +102,40 @@ async def run_forecasting(
         predictions = [max(0.0, round(p, 4)) for p in predictions]
         
         mae = round(metrics.get("mae", 0.0), 4)
+        mape = round(metrics.get("mape", 0.0), 4)
+        mse = round(metrics.get("mse", 0.0), 4)
         rmse = round(metrics.get("rmse", 0.0), 4)
         r2 = round(metrics.get("r2", 0.0), 4)
+        confidence_percentage = round(metrics.get("confidence_percentage", 0.0), 4)
+        confidence_value = round(metrics.get("confidence_value", 0.0), 4)
 
-        product_results = [
-            ForecastingProductResult(
-                product="All Products",
-                predictions=predictions,
-                mae=mae,
-                rmse=rmse,
-                r2=r2,
-            )
-        ]
+        # Build trend_data list
+        trend_data_list = []
+        for date, val in history.items():
+            trend_data_list.append(TrendDataPoint(date=date.strftime('%Y-%m-%d'), value=float(val)))
+        
+        for idx, p_val in zip(future_index, predictions):
+            trend_data_list.append(TrendDataPoint(date=idx.strftime('%Y-%m-%d'), value=float(p_val)))
+
+        # Build feature importances
+        feature_importances_dict = metrics.get("feature_importances", {})
+        feature_details_list = []
+        for col, influence in feature_importances_dict.items():
+            if col in df_grouped.columns:
+                series = df_grouped[col]
+                mode_val = series.mode().iloc[0] if not series.mode().empty else 0.0
+                mean_val = series.mean()
+                max_val = series.max()
+                min_val = series.min()
+                
+                feature_details_list.append(FeatureDetail(
+                    name=col,
+                    mode=float(mode_val),
+                    mean=float(mean_val),
+                    max=float(max_val),
+                    min=float(min_val),
+                    influence=float(influence)
+                ))
 
         # Susun ringkasan untuk dikirim ke LLM
         forecast_summary = {
@@ -136,10 +160,17 @@ async def run_forecasting(
             analysis_id=request.analysis_id,
             status="completed",
             result=ForecastingResult(
-                product_amount=len(product_results),
-                horizon=horizon,
-                freq=freq,
-                results=product_results,
+                metrics=ForecastingMetrics(
+                    confidence_percentage=confidence_percentage,
+                    confidence_value=confidence_value,
+                    mae=mae,
+                    mape=mape,
+                    mse=mse,
+                    rmse=rmse,
+                    r2=r2,
+                ),
+                trend_data=trend_data_list,
+                feature_importances=feature_details_list,
                 insight_summary=insight,
             ),
         )

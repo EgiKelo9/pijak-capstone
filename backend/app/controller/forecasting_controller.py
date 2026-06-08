@@ -125,17 +125,21 @@ async def handle_forecasting_callback(request: ForecastingCallbackRequest, db: S
     if not result_data:
         raise HTTPException(status_code=400, detail="Result data is missing on success")
         
-    trend_data = {
-        "product_amount": result_data.product_amount,
-        "horizon": result_data.horizon,
-        "freq": result_data.freq,
-        "results": [p.model_dump() for p in result_data.results],
-    }
+    trend_data = [p.model_dump() for p in result_data.trend_data]
+    feature_importances = [p.model_dump() for p in result_data.feature_importances]
     
     with transaction_manager.transaction() as session:
         forecasting_result = ForecastingResult(
             analysis_id=analysis_id,
+            confidence_percentage=result_data.metrics.confidence_percentage,
+            confidence_value=result_data.metrics.confidence_value,
+            mae=result_data.metrics.mae,
+            mape=result_data.metrics.mape,
+            mse=result_data.metrics.mse,
+            rmse=result_data.metrics.rmse,
+            r2=result_data.metrics.r2,
             trend_data=trend_data,
+            feature_importances=feature_importances,
             insight_summary=result_data.insight_summary
         )
         session.add(forecasting_result)
@@ -197,10 +201,17 @@ async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
             "analysis_id": analysis_id,
             "status": analysis.status,
             "result": {
-                "product_amount": result.trend_data.get("product_amount"),
-                "horizon": result.trend_data.get("horizon"),
-                "freq": result.trend_data.get("freq"),
-                "results": result.trend_data.get("results"),
+                "metrics": {
+                    "confidence_percentage": result.confidence_percentage,
+                    "confidence_value": result.confidence_value,
+                    "mae": result.mae,
+                    "mape": result.mape,
+                    "mse": result.mse,
+                    "rmse": result.rmse,
+                    "r2": result.r2,
+                },
+                "trend_data": result.trend_data,
+                "feature_importances": result.feature_importances,
                 "insight_summary": result.insight_summary
             }
         }
@@ -238,10 +249,17 @@ async def get_forecasting_history(user_id: int, db: Session):
             "status": analysis.status,
             "created_at": analysis.created_at.isoformat(),
             "result": {
-                "product_amount": result.trend_data.get("product_amount") if result else None,
-                "horizon": result.trend_data.get("horizon") if result else None,
-                "freq": result.trend_data.get("freq") if result else None,
-                "results": result.trend_data.get("results") if result else None,
+                "metrics": {
+                    "confidence_percentage": result.confidence_percentage if result else None,
+                    "confidence_value": result.confidence_value if result else None,
+                    "mae": result.mae if result else None,
+                    "mape": result.mape if result else None,
+                    "mse": result.mse if result else None,
+                    "rmse": result.rmse if result else None,
+                    "r2": result.r2 if result else None,
+                } if result else None,
+                "trend_data": result.trend_data if result else None,
+                "feature_importances": result.feature_importances if result else None,
                 "insight_summary": result.insight_summary if result else None
             } if result else None
         })
