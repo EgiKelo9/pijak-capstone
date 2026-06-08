@@ -100,8 +100,15 @@ async def call_backend_api(
             )
         elif method.upper() == "DELETE":
             response = await client.delete(url, headers=headers, timeout=timeout)
+        elif method.upper() == "PATCH":
+            response = await client.patch(
+                url,
+                headers=headers,
+                json=json,
+                timeout=timeout,
+            )
         else:
-            raise ValueError(f"Unsupported HTTP method: {method!r}. Gunakan 'GET', 'POST', atau 'DELETE'.")
+            raise ValueError(f"Unsupported HTTP method: {method!r}. Gunakan 'GET', 'POST', 'DELETE', atau 'PATCH'.")
 
         logger.info(
             "Backend API response: %s %s → status_code=%s",
@@ -110,6 +117,22 @@ async def call_backend_api(
         response.raise_for_status()
         return response
 
+async def update_dataset_feature_metadata(dataset_id:int, feature: Feature):
+    """Update feature metadata, digunakan setelah analyze column untuk menyimpan hasil analisis kolom oleh LLM"""
+    feature_dump = feature.model_dump()
+    response = await call_backend_api(
+        "PATCH",
+        f"/api/v1/datasets/feature-metadata-update/{dataset_id}",
+        json=feature.model_dump()
+    )
+
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to fetch dataset: "
+            f"{response.status_code} - {response.text}"
+        )
+    
+    return response.json()
 
 async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     """
@@ -147,7 +170,6 @@ async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     csv_bytes = response.content
     df = pd.read_csv(BytesIO(csv_bytes))
     return df, dataset_name
-
 
 async def upload_cleaned_dataset(
     df: pd.DataFrame,
