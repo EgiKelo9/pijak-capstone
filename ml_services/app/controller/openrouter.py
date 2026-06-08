@@ -146,17 +146,14 @@ async def get_insight_from_forecasting(forecast_summary: dict) -> str:
     """
     prompt = (
         f"Kamu adalah Business Analyst untuk wirausaha retail. "
-        f"Berdasarkan prediksi penjualan produk berikut:\n"
+        f"Berdasarkan prediksi penjualan agregat (keseluruhan) berikut:\n"
         f"{json.dumps(forecast_summary, default=str)}\n\n"
         f"Berikan insight bisnis dalam format berikut. "
         f"Jangan gunakan markdown formatting seperti ** atau *. "
         f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
-        f"TREN PENJUALAN: Ringkasan tren secara keseluruhan.\n\n"
-        f"PRODUK PRIORITAS:\n"
-        f"- Produk yang perlu RESTOCK segera\n"
-        f"- Produk dengan tren NAIK yang perlu dipertahankan\n"
-        f"- Produk dengan tren TURUN yang perlu dievaluasi\n\n"
-        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang.\n\n"
+        f"TREN KESELURUHAN: Ringkasan tren prediksi penjualan keseluruhan usaha di masa depan.\n\n"
+        f"ANALISIS PERFORMA: Penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya (berdasarkan data prediksi).\n\n"
+        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang oleh UMKM (seperti alokasi modal, strategi promosi keseluruhan, atau manajemen operasional).\n\n"
         f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
     )
     try:
