@@ -17,7 +17,7 @@ export const DATA = {
     },
     {
       title: 'Analisis',
-      url: '/dashboard',
+      url: '/analisis',
       icon: '/icons8/icons8-area-chart-100.png',
       isActive: false,
     },

@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { DynamicDataTable } from '@/components/dynamic-data-table';
 import { AnalysisCard, StatusType } from '@/components/main-card';
+import { useMemo } from 'react';
 import { ClusteringPreference } from './clustering-preference';
 import { DataConfigState, DataConfiguration } from './column-preference';
 import { ForecastingPreference } from './forecasting-preference';
@@ -45,6 +45,8 @@ interface FilledStateViewProps {
    * @example cardStatuses={{ terminal: 'berhasil', dataQuality: 'gagal' }}
    */
   cardStatuses?: CardStatusMap;
+  onConfirmMapping?: () => void;
+  onReloadMapping?: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ export function FilledStateView({
   setDataConfig,
   terminalLogs,
   cardStatuses,
+  onConfirmMapping,
+  onReloadMapping,
 }: FilledStateViewProps) {
   const statuses = resolveStatuses(cardStatuses);
 
@@ -111,7 +115,13 @@ export function FilledStateView({
           collapsible
           defaultOpen={false}
         >
-          <DataConfiguration config={dataConfig} onChange={setDataConfig} />
+          <DataConfiguration 
+            config={dataConfig} 
+            onChange={setDataConfig} 
+            onConfirm={onConfirmMapping}
+            onReload={onReloadMapping}
+            isProcessing={statuses.dataConfig === 'menunggu'}
+          />
         </AnalysisCard>
 
         {/* Data Quality — collapsible, closed by default */}

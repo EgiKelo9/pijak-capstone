@@ -77,6 +77,7 @@ export async function analyzeColumns(datasetId: number, modelType: string) {
   });
 
   const catchRes = await response.json();
+  console.log(catchRes);
   if (!response.ok) {
     throw new Error(`API Error: Gagal menghubungi ML Services`);
   }

@@ -5,7 +5,7 @@ import * as React from 'react';
 import { DateRange } from 'react-day-picker';
 
 import { FileUploadDemo } from '@/components/file-upload-demo';
-import { analyzeColumns, getDataset, mockLogin, uploadDataset } from '@/lib/middle-man';
+import { analyzeColumns, getDataset, uploadDataset } from '@/lib/middle-man';
 import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
@@ -67,10 +67,6 @@ export default function AnalysisEmptyState() {
     };
   }, []);
 
-  // TODO: [TEMPORARY DEV ONLY]
-  // Remove this line once the actual login page is implemented.
-  useTemporaryMockLogin();
-
   // Memoize the config for stable references if passed to useEffects later
   const analysisConfig = React.useMemo<AnalysisConfig>(() => ({
     mode,
@@ -92,16 +88,16 @@ export default function AnalysisEmptyState() {
   }, [analysisConfig]);
 
   // Fungsi orkestrasi Pipeline ML (Dipanggil otomatis setelah upload sukses)
-  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string) => {
+  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string, forceReload: boolean = false) => {
     // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
     setTerminalLogs([
-      { stepId: 'init', text: 'system_ready: memulai pipeline otomatis...', status: 'info' },
+      { stepId: 'init', text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
       { stepId: 'analyze_col', text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...`, status: 'loading' }
     ]);
     setDataConfigStatus('menunggu');
 
     try {
-      const result = await analyzeColumns(datasetId, currentMode);
+      const result = await analyzeColumns(datasetId, currentMode, forceReload);
 
       if (result.status === 'success' && result.suggested_mapping) {
         const mapping = result.suggested_mapping;
@@ -138,14 +134,15 @@ export default function AnalysisEmptyState() {
           };
         });
         setDataConfigStatus('berhasil');
+        setTerminalLogs((prev) => prev.map(log => 
+          log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Pemetaan kolom berhasil dianalisis.', status: 'success' } : log
+        ));
       } else {
         setDataConfigStatus('gagal');
+        setTerminalLogs((prev) => prev.map(log => 
+          log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Gagal menganalisis pemetaan kolom.', status: 'error' } : log
+        ));
       }
-
-      // 2. Post-calling: Sukses - Ubah status log analyze_col menjadi success
-      setTerminalLogs((prev) => prev.map(log => 
-        log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Pemetaan kolom berhasil dianalisis.', status: 'success' } : log
-      ));
 
       // 3. Pre-calling Langkah 2 (Jika Anda perlu memanggil endpoint clean data terpisah)
       // setTerminalLogs((prev) => [...prev, { stepId: 'data_clean', text: 'Memulai pembersihan data...', status: 'loading' }]);
@@ -172,6 +169,41 @@ export default function AnalysisEmptyState() {
       alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
   }, [analysisConfig.mode, runPreprocessingPipeline]);
+
+  const handleReloadMapping = React.useCallback(() => {
+    if (activeDatasetId !== -1) {
+      runPreprocessingPipeline(activeDatasetId, mode, true);
+    }
+  }, [activeDatasetId, mode, runPreprocessingPipeline]);
+
+  const handleConfirmMapping = React.useCallback(async () => {
+    if (activeDatasetId === -1) return;
+    
+    try {
+      setTerminalLogs((prev) => [...prev, { stepId: 'confirm_col', text: 'Menyimpan konfigurasi kolom ke database...', status: 'loading' }]);
+      
+      // Mapping konfigurasi UI saat ini ke format backend (Feature schema)
+      const featureMapping = {
+        col_date_time: dataConfig.dateColumn || undefined,
+        col_target: dataConfig.targetColumn || undefined,
+        cols_to_drop: dataConfig.availableColumns.filter(
+          c => c !== dataConfig.dateColumn && c !== dataConfig.targetColumn && !dataConfig.includedColumns.includes(c)
+        )
+      };
+
+      // TODO: Panggil fungsi update_dataset_feature_metadata() dari lib/middle-man Anda
+      // await updateDatasetFeatureMetadata(activeDatasetId, featureMapping);
+      
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === 'confirm_col' ? { ...log, text: 'Konfigurasi kolom berhasil disimpan.', status: 'success' } : log
+      ));
+      alert("Konfigurasi kolom berhasil disimpan!");
+    } catch (error: any) {
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === 'confirm_col' ? { ...log, text: `Gagal menyimpan: ${error.message}`, status: 'error' } : log
+      ));
+    }
+  }, [activeDatasetId, dataConfig]);
 
   const handleRunAnalysis = React.useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
@@ -336,6 +368,8 @@ export default function AnalysisEmptyState() {
             setDataConfig={setDataConfig}
             terminalLogs={terminalLogs}
             cardStatuses={{ dataConfig: dataConfigStatus }}
+            onConfirmMapping={handleConfirmMapping}
+            onReloadMapping={handleReloadMapping}
           />
         ) : (
           <EmptyStateView
@@ -355,33 +389,3 @@ export default function AnalysisEmptyState() {
     </div>
   );
 }
-
-// ============================================================================
-// TODO: [TEMPORARY DEV ONLY] REMOVE THIS ENTIRE SECTION ONCE LOGIN IS IMPLEMENTED
-// ============================================================================
-function useTemporaryMockLogin() {
-  React.useEffect(() => {
-    const fetchMockToken = async () => {
-      if (typeof window !== "undefined" && !localStorage.getItem("access_token")) {
-        try {
-          const email = process.env.NEXT_PUBLIC_MOCK_EMAIL;
-          const password = process.env.NEXT_PUBLIC_MOCK_PASSWORD;
-          
-          if (!email || !password) {
-            console.warn("Dev mode: Missing NEXT_PUBLIC_MOCK_EMAIL or NEXT_PUBLIC_MOCK_PASSWORD in environment variables.");
-            return;
-          }
-
-          const token = await mockLogin(email, password);
-          localStorage.setItem("access_token", token);
-          console.warn("Dev mode: Successfully fetched and injected access token from API.");
-        } catch (error) {
-          console.error("Dev mode: Error fetching mock token:", error);
-        }
-      }
-    };
-
-    fetchMockToken();
-  }, []);
-}
-// ============================================================================

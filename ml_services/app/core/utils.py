@@ -134,6 +134,19 @@ async def update_dataset_feature_metadata(dataset_id:int, feature: Feature):
     
     return response.json()
 
+async def get_dataset_feature_metadata(dataset_id: int) -> dict | None:
+    """
+    Mengambil feature metadata yang sudah ada di database.
+    """
+    try:
+        response = await call_backend_api("GET", f"/api/v1/datasets/feature-metadata/{dataset_id}")
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("data")
+    except Exception as e:
+        logger.warning(f"Could not fetch feature metadata for dataset {dataset_id}: {e}")
+    return None
+
 async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     """
     Fetch dataset dari backend API dan kembalikan sebagai pandas DataFrame
@@ -287,20 +300,27 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
+                "structured_outputs": True,
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "feature_extraction",
-                        "strict": True,
+                        # "strict": True,
+                        "strict": False,
                         "schema": Feature.model_json_schema()
                     }
                 },
+                'reasoning': {
+                    'effort': 'low'
+                },
                 "stream": False,
                 "temperature": 0.0,
+                "max_output_tokens": 1670,
+                # "max_completion_tokens": 2670,
             }
             
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
-        print(payload)
+        print(payload, flush=True)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.OPEN_ROUTER_BASE_URL,
@@ -308,6 +328,8 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 json=payload,
                 timeout=60.0
             )
+
+            print(f"Received response from OpenRouter: status_code={response.status_code}, response_text={response.text}", flush=True)
             
             logger.info("Received response from OpenRouter: status_code=%s, response_text=%s", response.status_code, response.text)
             response.raise_for_status()
@@ -324,6 +346,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
             
     except Exception as e:
         logger.error("Error generating response from OpenRouter: %s", str(e))
+        print(f"OpenRouter exception occurred: {str(e)}", flush=True)
         return StandardResponse(
             code=500,
             error=True,

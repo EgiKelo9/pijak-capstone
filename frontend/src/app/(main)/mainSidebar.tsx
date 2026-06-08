@@ -12,9 +12,10 @@ import { AppSidebarHeader } from './app-sidebar-header';
 import { AppSidebarNav } from './app-sidebar-nav';
 import { AppSidebarTopbar } from './app-sidebar-topbar';
 
-export const AppSidebarLayout = ({ children }: { children: React.ReactNode }) => {
+export const AppSidebarLayout = ({ children, defaultOpen = true }: { children: React.ReactNode; defaultOpen?: boolean }) => {
   return (
     <SidebarProvider
+      defaultOpen={defaultOpen}
       style={{
         '--sidebar-width': '18rem',        // slightly narrower than 22rem
         '--sidebar-width-icon': '5rem',    // tighter collapsed width

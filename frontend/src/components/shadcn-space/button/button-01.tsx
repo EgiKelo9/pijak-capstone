@@ -5,7 +5,7 @@ import Link from "next/link";
 // Note: React components should start with a capital letter (CtaButton instead of ctaButton)
 const CtaButton = () => {
   return (
-    <Link href='/dashboard'>
+    <Link href='/analisis'>
       <Button 
         className="relative flex shrink-0 items-center justify-center text-sm font-semibold rounded-full h-12 py-1 pl-5 pr-16 group transition-all duration-500 hover:pl-16 hover:pr-5 w-fit overflow-hidden cursor-pointer ml-4"
         >
