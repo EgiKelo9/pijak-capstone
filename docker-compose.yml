@@ -26,6 +26,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - DATABASE_NAME=${DATABASE_NAME}
       - ML_SERVICE_URL=${ML_SERVICE_URL:-http://ml_services:8000}
+      - BACKEND_BASE_URL=${BACKEND_BASE_URL}
       - ENV=dev
     depends_on:
       db:

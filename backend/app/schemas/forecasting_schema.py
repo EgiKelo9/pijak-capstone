@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 from pydantic import BaseModel
 from app.schemas.base import StandardResponse
 
@@ -25,6 +25,7 @@ class ForecastingRunRequest(BaseModel):
     col_regressors: list[str]
     horizon: int
     freq: str
+    forecasting_mode: Literal["conservative", "balanced", "aggressive"] = "balanced"  # mode forecasting
 
 
 # ================================
@@ -53,6 +54,7 @@ class ForecastingMetrics(BaseModel):
     mse: float
     rmse: float
     r2: float
+    forecasting_mode: str = "balanced"  # mode yang digunakan saat training
 
 
 class ForecastingResultData(BaseModel):

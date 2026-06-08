@@ -1,4 +1,5 @@
 import os
+# pyrefly: ignore [missing-import]
 import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -70,6 +71,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
                     "col_regressors": request.col_regressors,
                     "horizon": request.horizon,
                     "freq": request.freq,
+                    "forecasting_mode": request.forecasting_mode,
                     "callback_url": callback_url
                 },
                 timeout=15.0 # Timeout singkat karena ML service akan merespons 202 Accepted

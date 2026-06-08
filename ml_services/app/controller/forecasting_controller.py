@@ -40,13 +40,9 @@ async def run_forecasting(
 
         # 2. Initialize pipeline and load/aggregate data
         logger.info("Step 2: Initializing pipeline and loading/aggregating data")
-        pipeline = XGBoostForecastingPipeline(
-            n_lags=horizon,
-            rolling_windows=[
-                int(horizon / 3),
-                int(horizon / 1.5),
-                horizon,
-            ]
+        pipeline = XGBoostForecastingPipeline.from_mode(
+            mode=request.forecasting_mode,
+            horizon=horizon,
         )
         actual_regressors = [c for c in df.columns if c not in [col_date, col_target]]
 
@@ -144,6 +140,7 @@ async def run_forecasting(
                 "r2": r2,
                 "avg_prediction": round(float(np.mean(predictions)), 4),
                 "trend": "naik" if predictions[-1] > predictions[0] else "turun",
+                "forecasting_mode": request.forecasting_mode,
             }
         }
 

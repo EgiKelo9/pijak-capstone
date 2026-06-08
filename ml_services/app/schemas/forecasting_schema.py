@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 
 # ================================
@@ -25,6 +25,7 @@ class ForecastingRequest(BaseModel):
     horizon: int                   # jumlah periode ke depan yang ingin diprediksi
     freq: str                      # frekuensi data: "W" = weekly, "D" = daily, "M" = monthly
     callback_url: str              # URL untuk callback setelah background task selesai
+    forecasting_mode: Literal["conservative", "balanced", "aggressive"] = "balanced"  # mode forecasting
 
 
 # ================================
@@ -53,6 +54,7 @@ class ForecastingMetrics(BaseModel):
     mse: float
     rmse: float
     r2: float
+    forecasting_mode: str = "balanced"  # mode yang digunakan saat training
 
 
 class ForecastingResult(BaseModel):

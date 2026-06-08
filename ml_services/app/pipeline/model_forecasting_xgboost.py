@@ -3,6 +3,40 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from xgboost import XGBRegressor
+from typing import Literal
+
+
+FORECASTING_MODE_PARAMS: dict[str, dict] = {
+    "conservative": {
+        "learning_rate": 0.02,
+        "max_depth": 3,
+        "n_estimators": 350,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "objective": "reg:squarederror",
+        "random_state": 42
+    },
+    "balanced": {
+        "learning_rate": 0.05,
+        "max_depth": 4,
+        "n_estimators": 400,
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
+        "objective": "reg:squarederror",
+        "random_state": 42
+    },
+    "aggressive": {
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "n_estimators": 600,
+        "subsample": 0.95,
+        "colsample_bytree": 0.95,
+        "objective": "reg:squarederror",
+        "random_state": 42
+    },
+}
+
+ForecastingMode = Literal["conservative", "balanced", "aggressive"]
 
 
 class XGBoostForecastingPipeline:
@@ -13,20 +47,16 @@ class XGBoostForecastingPipeline:
         rolling_windows: list[int] | None = None,
         test_size: float = 0.2,
         model_params: dict | None = None,
+        forecasting_mode: ForecastingMode = "balanced",
     ):
         self.n_lags = n_lags
         self.rolling_windows = rolling_windows or [3, 6]
         self.test_size = test_size
+        self.forecasting_mode = forecasting_mode
 
-        self.model_params = model_params or {
-            "n_estimators": 400,
-            "max_depth": 4,
-            "learning_rate": 0.05,
-            "subsample": 0.9,
-            "colsample_bytree": 0.9,
-            "objective": "reg:squarederror",
-            "random_state": 42,
-        }
+        # Jika model_params diberikan eksplisit gunakan itu,
+        # jika tidak gunakan preset berdasarkan mode.
+        self.model_params = model_params or FORECASTING_MODE_PARAMS[forecasting_mode]
 
         self.model = XGBRegressor(**self.model_params)
         self.is_fitted = False
@@ -119,6 +149,31 @@ class XGBoostForecastingPipeline:
             new_regressors.extend(self.one_hot_columns)
 
             return df, new_regressors
+
+    @classmethod
+    def from_mode(
+        cls,
+        mode: ForecastingMode,
+        horizon: int,
+        test_size: float = 0.2,
+    ) -> "XGBoostForecastingPipeline":
+        """Membuat instance pipeline dengan konfigurasi XGBoost berdasarkan mode."""
+        if mode not in FORECASTING_MODE_PARAMS:
+            raise ValueError(
+                f"Mode '{mode}' tidak valid. Pilih salah satu dari: {list(FORECASTING_MODE_PARAMS.keys())}"
+            )
+
+        return cls(
+            n_lags=horizon,
+            rolling_windows=[
+                max(1, int(horizon / 3)),
+                max(1, int(horizon / 1.5)),
+                horizon,
+            ],
+            test_size=test_size,
+            model_params=FORECASTING_MODE_PARAMS[mode],
+            forecasting_mode=mode,
+        )
 
     def load_frame(
         self,
