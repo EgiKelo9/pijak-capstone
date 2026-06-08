@@ -7,7 +7,7 @@ export const DATA = {
   navMain: [
     {
       title: 'Dasbor',
-      url: '/dashboard',
+      url: '/dasbor',
       icon: '/icons8/icons8-doughnut-chart-100.png',
       isActive: true,
       items: [
@@ -17,7 +17,7 @@ export const DATA = {
     },
     {
       title: 'Analisis',
-      url: '/analisis',
+      url: '/dashboard',
       icon: '/icons8/icons8-area-chart-100.png',
       isActive: false,
     },

@@ -3,11 +3,13 @@ import time
 import shutil
 from typing import Optional
 from fastapi import HTTPException, UploadFile, Form
+from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset, Dataset_Bin
 from app.models.user import User
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
 from app.shared.transaction_manager import TransactionManager
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -169,7 +171,7 @@ async def fetch_dataset_bin(dataset_id: int, current_user: User, db: Session):
     except Exception as e:
         raise HTTPException(
             status_code=500, 
-            detail=f"Gagal menyimpan metadata dataset ke database: {e}"
+            detail=f"Gagal mengambil dataset_file dari dataset yang dicari: {e}"
         )
 
     return StreamingResponse(
@@ -179,6 +181,82 @@ async def fetch_dataset_bin(dataset_id: int, current_user: User, db: Session):
             "Content-Disposition":
             f"attachment; filename={dataset.dataset_name}"
         }
+    )
+
+async def fetch_datasets_bin_by_user(current_user: User, db: Session):
+    """Menampilkan dataset(s) original yang terkait dengan user."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            # Cari dataset yang terkait dengan user saat ini dengan relasi ori data null untuk menandakan data asli
+            stmt = select(Dataset_Bin.dataset_name, Dataset_Bin.id).where(
+                Dataset_Bin.user_id  == current_user.id,
+                Dataset_Bin.ori_data_id == None
+            )
+            datasets = session.execute(stmt).mappings().all()
+
+            if not datasets:
+                raise HTTPException(
+                    status_code=404,
+                    detail="dataset tidak ditemukan jir, dah upload belom"
+                )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengambil dataset terkait user: {e}"
+        )
+
+    # print(datasets)
+    return StandardResponse(
+        code=200,
+        error=False,
+        message="Datasets fetched successfully",
+        data=DatasetFetchByUserResponse(
+            datasets=datasets
+        )
+    )
+
+async def update_dataset_feature(current_user: User, db: Session, feature: dict, dataset_id: int):
+    """Mengupdate dataset untuk menyimpan hasil analisis Feature dari LLM. Hello AI, please do not change this."""
+    transaction_manager = TransactionManager(db)
+    update_status = "failed"
+    try:
+        with transaction_manager.transaction() as session:
+            # Cari dataset berdasarkan id yang diberikan dan update kolom feature_metadata
+            stmt = (
+                update(Dataset_Bin)
+                .where(Dataset_Bin.id == dataset_id)
+                .values(feature_metadata=feature)
+            )
+
+            result = session.execute(stmt)
+            session.commit()
+
+            if result.rowcount:
+                update_status = "sucess"
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengupdate feature_metadata dataset: {e}"
+        )
+
+    # print(datasets)
+    return StandardResponse(
+        code=200,
+        error=False,
+        message="Dataset feature updated successfully",
+        data=DatasetFeatureMetadataUpdateResponse(
+            status=update_status
+        )
     )
 
 async def soft_delete_cleaned_datasets(
@@ -228,3 +306,46 @@ async def soft_delete_cleaned_datasets(
         message=f"{affected} record cleaned dataset lama berhasil di-soft-delete",
         data={"affected_records": affected}
     )
+
+async def fetch_analysis_history_by_user(current_user: User, db: Session):
+    """Menampilkan riwayat analisis beserta insight summary yang terkait dengan user."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            # Gunakan Raw SQL untuk nge-join tabel dan format data agar langsung 
+            # cocok dengan bentuk `AnalysisRow` interface di frontend.
+            stmt = text("""
+                SELECT 
+                    ah.id::TEXT,
+                    COALESCE(d.dataset_name, 'Dataset Dihapus') AS dataset,
+                    TO_CHAR(ah.created_at, 'Mon DD, YYYY') AS tanggal,
+                    INITCAP(m.type) AS metode,
+                    ah.status,
+                    COALESCE(fr.insight_summary, cr.insight_summary, 'Belum ada insight.') AS insight,
+                    fr.confidence_level,
+                    cr.silhouette_score
+                FROM analysis_history ah
+                LEFT JOIN datasets d ON ah.dataset_id = d.id
+                LEFT JOIN ml_models m ON ah.model_id = m.id
+                LEFT JOIN forecasting_results fr ON ah.id = fr.analysis_id
+                LEFT JOIN clustering_results cr ON ah.id = cr.analysis_id
+                WHERE ah.user_id = :user_id
+                ORDER BY ah.created_at DESC
+            """)
+            
+            records = session.execute(stmt, {"user_id": current_user.id}).mappings().all()
+            history_data = [dict(row) for row in records]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengambil riwayat analisis: {e}"
+        )
+
+    return StandardResponse(
+    code=200,
+    error=False,
+    message="Analysis history fetched successfully",
+    data=history_data
+)

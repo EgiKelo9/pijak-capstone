@@ -13,3 +13,23 @@ class DatasetFetchResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class DatasetSummary(BaseModel):
+    id: int
+    dataset_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class DatasetFetchByUserResponse(BaseModel):
+    datasets: list[DatasetSummary]
+
+    class Config:
+        from_attributes = True
+
+class DatasetFeatureMetadataUpdateResponse(BaseModel):
+    status: str
+
+    class Config:
+        from_attributes = True

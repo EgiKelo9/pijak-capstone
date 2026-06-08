@@ -29,6 +29,7 @@ class TestSettings(Settings):
 def get_settings():
     """Return settings based on ENV variable"""
     env = os.getenv("ENV", "dev")
+    print(f"ENV: {env}")
     if env == "test":
         return TestSettings()
     if env == "dev":

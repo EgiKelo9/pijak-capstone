@@ -5,6 +5,7 @@ from io import BytesIO
 import pandas as pd
 
 from app.schemas.base import StandardResponse
+from app.schemas.features import Feature
 from app.core.config import get_settings
 
 logger = logging.getLogger("uvicorn.error")
@@ -99,8 +100,15 @@ async def call_backend_api(
             )
         elif method.upper() == "DELETE":
             response = await client.delete(url, headers=headers, timeout=timeout)
+        elif method.upper() == "PATCH":
+            response = await client.patch(
+                url,
+                headers=headers,
+                json=json,
+                timeout=timeout,
+            )
         else:
-            raise ValueError(f"Unsupported HTTP method: {method!r}. Gunakan 'GET', 'POST', atau 'DELETE'.")
+            raise ValueError(f"Unsupported HTTP method: {method!r}. Gunakan 'GET', 'POST', 'DELETE', atau 'PATCH'.")
 
         logger.info(
             "Backend API response: %s %s → status_code=%s",
@@ -109,6 +117,22 @@ async def call_backend_api(
         response.raise_for_status()
         return response
 
+async def update_dataset_feature_metadata(dataset_id:int, feature: Feature):
+    """Update feature metadata, digunakan setelah analyze column untuk menyimpan hasil analisis kolom oleh LLM"""
+    feature_dump = feature.model_dump()
+    response = await call_backend_api(
+        "PATCH",
+        f"/api/v1/datasets/feature-metadata-update/{dataset_id}",
+        json=feature.model_dump()
+    )
+
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to fetch dataset: "
+            f"{response.status_code} - {response.text}"
+        )
+    
+    return response.json()
 
 async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     """
@@ -146,7 +170,6 @@ async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     csv_bytes = response.content
     df = pd.read_csv(BytesIO(csv_bytes))
     return df, dataset_name
-
 
 async def upload_cleaned_dataset(
     df: pd.DataFrame,
@@ -237,7 +260,7 @@ def get_dataset_info(df: pd.DataFrame) -> dict:
     }
 
 
-async def generate_from_openrouter(prompt: str) -> StandardResponse[dict]:
+async def generate_from_openrouter(prompt: str, schema = None) -> StandardResponse[dict]:
     """Generate response melalui OpenRouter."""
     settings = get_settings()
     
@@ -248,17 +271,36 @@ async def generate_from_openrouter(prompt: str) -> StandardResponse[dict]:
             "Content-Type": "application/json"
         }
         
-        payload = {
-            "model": settings.LLM_MODEL,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.0,
-        }
-        
+        if not schema:
+            payload = {
+                "model": settings.LLM_MODEL,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False,
+                "temperature": 0.0,
+            }
+        else:
+            # print("Schema is not empty")
+            payload = {
+                "model": settings.LLM_MODEL,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "feature_extraction",
+                        "strict": True,
+                        "schema": Feature.model_json_schema()
+                    }
+                },
+                "stream": False,
+                "temperature": 0.0,
+            }
+            
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
-        
+        print(payload)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.OPEN_ROUTER_BASE_URL,
