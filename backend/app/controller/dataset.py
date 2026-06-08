@@ -259,6 +259,43 @@ async def update_dataset_feature(current_user: User, db: Session, feature: dict,
         )
     )
 
+async def fetch_dataset_feature_metadata(dataset_id: int, current_user: User, db: Session):
+    """Mengambil feature metadata dari dataset."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            dataset = session.get(Dataset_Bin, dataset_id)
+
+            if dataset is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Dataset tidak ditemukan"
+                )
+
+            if dataset.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Tidak memiliki akses ke dataset ini"
+                )
+
+            feature_metadata = dataset.feature_metadata
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Gagal mengambil feature_metadata dataset: {e}"
+        )
+
+    return StandardResponse(
+        code=200,
+        error=False,
+        message="Feature metadata fetched successfully",
+        data=feature_metadata
+    )
+
 async def soft_delete_cleaned_datasets(
     ori_data_id: int,
     model: str,

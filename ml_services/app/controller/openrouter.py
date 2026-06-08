@@ -22,6 +22,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             try:
                 existing_metadata = await get_dataset_feature_metadata(req.dataset_id)
                 if existing_metadata:
+                    print(f"Loaded existing feature metadata from DB for dataset {req.dataset_id}", flush=True)
                     return OpenRouterMappingResponse(
                         status="success",
                         task=req.model_type,
