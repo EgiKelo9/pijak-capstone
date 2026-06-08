@@ -71,12 +71,14 @@ CREATE TABLE datasets_bin (
 -- ============================================================
 -- 4. Analysis History
 -- ============================================================
+CREATE TYPE process_status AS ENUM ('berhasil', 'gagal', 'menunggu');
+
 CREATE TABLE analysis_history (
     id          SERIAL PRIMARY KEY,
     user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     dataset_id  INT REFERENCES datasets(id) ON DELETE SET NULL,
     model_id    INT REFERENCES ml_models(id) ON DELETE RESTRICT,
-    status      VARCHAR(50) DEFAULT 'berhasil',
+    status      process_status DEFAULT 'berhasil',
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMP NULL
@@ -165,13 +167,13 @@ INSERT INTO analysis_history (user_id, dataset_id, model_id, status) VALUES
     (4, 3, 4, 'gagal'),
     (4, 1, 1, 'berhasil');
 
-INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_value, mae, mape, mse, rmse, r2, trend_data, insight_summary) VALUES
-    (1, 0.85, 12.5, 10.2, 5.5, 150.0, 12.2, 0.88, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
-    (3, NULL, '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
-    (4, NULL, '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
-    (6, 0.92, '[{"date": "2024-01-01", "value": 200}]', 'Terdapat tren kenaikan penjualan 15% untuk kategori elektronik di bulan depan.'),
-    (8, 0.78, '[{"date": "2024-02-01", "value": 180}]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
-    (10, 0.88, '[{"date": "2024-03-01", "value": 210}]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
+INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_value, mae, mape, mse, rmse, r2, trend_data, feature_importances, insight_summary) VALUES
+    (1, 0.85, 12.5, 10.2, 5.5, 150.0, 12.2, 0.88, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', '[]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
+    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
+    (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
+    (6, 0.92, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-01-01", "value": 200}]', '[]', 'Terdapat tren kenaikan penjualan 15% untuk kategori elektronik di bulan depan.'),
+    (8, 0.78, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-02-01", "value": 180}]', '[]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
+    (10, 0.88, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-03-01", "value": 210}]', '[]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
 
 INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary) VALUES
     (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.'),

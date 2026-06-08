@@ -10,7 +10,7 @@ class AnalysisHistory(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     dataset_id = Column(Integer, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True)
     model_id = Column(Integer, ForeignKey("ml_models.id", ondelete="RESTRICT"), nullable=True)
-    status = Column(String(50), default="completed")
+    status = Column(String(50), default="berhasil")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     deleted_at = Column(DateTime, nullable=True)
