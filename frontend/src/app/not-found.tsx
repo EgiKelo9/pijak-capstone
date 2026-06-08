@@ -1,7 +1,11 @@
+'use client';
+
 import { ArrowLeft, FileQuestion } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function NotFound() {
+  const router = useRouter();
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50/50 p-6 md:p-8">
       <div className="flex w-full max-w-md flex-col items-center gap-6 text-center rounded-3xl border border-neutral-800/10 bg-white p-8 md:p-10 shadow-sm">
@@ -23,13 +27,13 @@ export default function NotFound() {
 
         {/* Actions */}
         <div className="mt-2 flex w-full flex-col sm:flex-row items-center gap-3">
-          <Link
-            href="/home"
+          <button
+            onClick={() => router.back()}
             className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-800/20 bg-gradient-to-b from-[#2BBAEE]/20 to-transparent px-6 py-3 text-sm font-medium text-neutral-800 transition-all hover:from-[#2BBAEE]/30 active:scale-95"
           >
             <ArrowLeft className="size-4 shrink-0" />
-            Kembali ke Beranda
-          </Link>
+            Kembali
+          </button>
         </div>
 
         {/* Subtle Error Code */}

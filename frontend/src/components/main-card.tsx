@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 import * as React from 'react';
 
-export type StatusType = 'menunggu' | 'berhasil' | 'gagal' | 'kosong';
+export type StatusType = 'menunggu' | 'berhasil' | 'gagal' | 'kosong' | 'none';
 
 interface AnalysisCardProps {
   title: string;
-  status: StatusType;
+  status?: StatusType;
   children: React.ReactNode;
   className?: string;
   innerClassName?: string;
@@ -51,14 +51,14 @@ const statusConfig = {
 
 export function AnalysisCard({
   title,
-  status,
+  status = 'none',
   children,
   className,
   innerClassName,
   collapsible = false,
   defaultOpen = true,
 }: AnalysisCardProps) {
-  const config = statusConfig[status];
+  const config = status !== 'none' ? statusConfig[status] : null;
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
   // 'auto' while expanded (allows natural growth); px number while animating
   const [shellHeight, setShellHeight] = React.useState<number | 'auto'>(
@@ -147,19 +147,21 @@ export function AnalysisCard({
 
         <div className="flex shrink-0 items-center gap-2">
           {/* Status badge */}
-          <div className={cn('flex items-center gap-1.5 rounded-lg px-2 py-0.5', config.bg)}>
-            <div
-              className={cn(
-                'relative flex size-[11px] shrink-0 items-center justify-center rounded-full',
-                config.dotOuter
-              )}
-            >
-              <div className={cn('size-[7px] rounded-full', config.dotInner)} />
+          {config && (
+            <div className={cn('flex items-center gap-1.5 rounded-lg px-2 py-0.5', config.bg)}>
+              <div
+                className={cn(
+                  'relative flex size-[11px] shrink-0 items-center justify-center rounded-full',
+                  config.dotOuter
+                )}
+              >
+                <div className={cn('size-[7px] rounded-full', config.dotInner)} />
+              </div>
+              <span className={cn('font-mono text-[13px] font-medium leading-tight', config.text)}>
+                {config.label}
+              </span>
             </div>
-            <span className={cn('font-mono text-[13px] font-medium leading-tight', config.text)}>
-              {config.label}
-            </span>
-          </div>
+          )}
 
           {collapsible && (
             <ChevronDown

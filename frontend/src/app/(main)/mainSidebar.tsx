@@ -25,7 +25,7 @@ export const AppSidebarLayout = ({ children }: { children: React.ReactNode }) =>
         states don't get clipped in collapsed mode. The border-r is moved to
         SidebarInset side so it doesn't depend on sidebar overflow.
       */}
-      <Sidebar collapsible="icon" className="bg-[#F3F3F3] border-r border-black/10 overflow-visible">
+      <Sidebar collapsible="icon" animateOnHover={false} className="bg-[#F3F3F3] border-r border-black/10 overflow-visible">
 
         <AppSidebarHeader />
         <AppSidebarNav />

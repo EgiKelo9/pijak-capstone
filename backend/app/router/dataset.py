@@ -1,10 +1,11 @@
-from typing import Any, Dict, Optional
+
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, update_dataset_feature
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -175,3 +176,31 @@ async def invalidate_cleaned_datasets(
         StandardResponse[dict]: Jumlah record yang berhasil di-soft-delete.
     """
     return await soft_delete_cleaned_datasets(ori_data_id, model, current_user, db)
+  
+@router.get(
+    "/analysis-history/user/me",
+    response_model=StandardResponse[List[Dict[str, Any]]],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"}
+    }
+)
+async def get_analysis_history_by_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch analysis history along with insights for the authenticated user.
+
+    Args:
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user from the access token.
+
+    Returns:
+        StandardResponse[List[Dict[str, Any]]]: Analysis history specific to the user that requests it.
+
+    Raises:
+        HTTPException: 401 if the user is not authenticated.
+        HTTPException: 500 if the analysis history cannot be fetched.
+    """
+    return await fetch_analysis_history_by_user(current_user, db)
