@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS analysis_history CASCADE;
 DROP TABLE IF EXISTS ml_models CASCADE;
 DROP TABLE IF EXISTS datasets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TYPE IF EXISTS process_status CASCADE;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -71,12 +72,14 @@ CREATE TABLE datasets_bin (
 -- ============================================================
 -- 4. Analysis History
 -- ============================================================
+CREATE TYPE process_status AS ENUM ('berhasil', 'gagal', 'menunggu');
+
 CREATE TABLE analysis_history (
     id          SERIAL PRIMARY KEY,
     user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     dataset_id  INT REFERENCES datasets(id) ON DELETE SET NULL,
     model_id    INT REFERENCES ml_models(id) ON DELETE RESTRICT,
-    status      VARCHAR(50) DEFAULT 'berhasil',
+    status      process_status DEFAULT 'berhasil',
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at  TIMESTAMP NULL
