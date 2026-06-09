@@ -33,3 +33,6 @@ class DatasetFeatureMetadataUpdateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ProcessDatasetRequest(BaseModel):
+    model_type: str

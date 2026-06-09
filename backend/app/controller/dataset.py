@@ -14,6 +14,8 @@ from app.shared.transaction_manager import TransactionManager
 from fastapi.responses import StreamingResponse
 from io import BytesIO
 import chardet 
+import httpx
+from app.core.config import get_settings
 
 UPLOAD_DIR = "static/datasets"
 
@@ -386,3 +388,73 @@ async def fetch_analysis_history_by_user(current_user: User, db: Session):
     message="Analysis history fetched successfully",
     data=history_data
 )
+
+async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user: User, db: Session):
+    """Memanggil endpoint analyze-columns di ml_services."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            dataset = session.get(Dataset_Bin, dataset_id)
+            if not dataset or dataset.user_id != current_user.id:
+                raise HTTPException(status_code=404, detail="Dataset tidak ditemukan atau tidak memiliki akses")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memverifikasi dataset: {e}")
+
+    ml_url = get_settings().ML_SERVICE_URL
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            analyze_payload = {"dataset_id": dataset_id, "model_type": model_type}
+            analyze_response = await client.post(f"{ml_url}/ml/v1/openrouter/analyze-columns", json=analyze_payload)
+            
+            if analyze_response.status_code != 200:
+                raise HTTPException(status_code=analyze_response.status_code, detail=f"Gagal saat analyze-columns: {analyze_response.text}")
+
+            return StandardResponse(
+                code=200,
+                error=False,
+                message="Berhasil menjalankan analyze-columns",
+                data=analyze_response.json()
+            )
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menghubungi ML Services: {str(e)}")
+
+async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user: User, db: Session):
+    """Memanggil endpoint run preprocessing di ml_services."""
+    transaction_manager = TransactionManager(db)
+    
+    try:
+        with transaction_manager.transaction() as session:
+            dataset = session.get(Dataset_Bin, dataset_id)
+            if not dataset or dataset.user_id != current_user.id:
+                raise HTTPException(status_code=404, detail="Dataset tidak ditemukan atau tidak memiliki akses")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gagal memverifikasi dataset: {e}")
+
+    ml_url = get_settings().ML_SERVICE_URL
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            preprocess_payload = {"dataset_id": dataset_id, "model_type": model_type}
+            preprocess_response = await client.post(f"{ml_url}/ml/v1/preprocess/run", json=preprocess_payload)
+
+            if preprocess_response.status_code != 200:
+                raise HTTPException(status_code=preprocess_response.status_code, detail=f"Gagal saat run preprocessing: {preprocess_response.text}")
+
+            return StandardResponse(
+                code=200,
+                error=False,
+                message="Berhasil menjalankan preprocessing",
+                data=preprocess_response.json()
+            )
+            
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=500, detail=f"Gagal menghubungi ML Services: {str(e)}")

@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, fetch_dataset_feature_metadata
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse, ProcessDatasetRequest
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -232,3 +232,46 @@ async def get_analysis_history_by_user(
         HTTPException: 500 if the analysis history cannot be fetched.
     """
     return await fetch_analysis_history_by_user(current_user, db)
+
+@router.post(
+    "/analyze-columns/{dataset_id}",
+    response_model=StandardResponse[Dict[str, Any]],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
+    }
+)
+async def analyze_columns(
+    dataset_id: int,
+    request: ProcessDatasetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint untuk menjalankan analyze-columns ke ML Services.
+    """
+    return await analyze_dataset_columns(dataset_id, request.model_type, current_user, db)
+
+@router.post(
+    "/preprocess/{dataset_id}",
+    response_model=StandardResponse[Dict[str, Any]],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
+    }
+)
+async def run_preprocessing(
+    dataset_id: int,
+    request: ProcessDatasetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint untuk menjalankan preprocessing ke ML Services.
+    """
+    return await preprocess_dataset_run(dataset_id, request.model_type, current_user, db)
+
