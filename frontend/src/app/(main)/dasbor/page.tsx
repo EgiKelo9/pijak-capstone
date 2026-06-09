@@ -1,9 +1,9 @@
 'use client';
 
-import { Tabs, TabsContent, TabsContents, TabsList, TabsTrigger } from "@/components/animate-ui/components/animate/tabs"
-import { AnalysisCard } from "@/components/main-card"
-import { Cpu, TrendingUp } from "lucide-react"
-import { useState } from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/animate-ui/components/animate/tabs";
+import { AnalysisCard } from "@/components/main-card";
+import { Cpu, TrendingUp } from "lucide-react";
+import { useState } from "react";
 
 export default function MainDashboar() {
     const [activeTab, setActiveTab] = useState<'forecasting' | 'clustering'>('forecasting')

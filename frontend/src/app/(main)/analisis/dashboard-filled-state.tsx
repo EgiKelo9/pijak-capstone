@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import { DynamicDataTable } from '@/components/dynamic-data-table';
 import { AnalysisCard, StatusType } from '@/components/main-card';
+import { useEffect, useMemo, useState } from 'react';
 import { ClusteringPreference } from './clustering-preference';
 import { DataConfigState, DataConfiguration } from './column-preference';
+import { DataQuality } from './data-quality';
 import { ForecastingPreference } from './forecasting-preference';
 import { TerminalLog, type TerminalStep } from './terminal';
 
@@ -20,7 +21,7 @@ export type CardStatusMap = Partial<Record<CardId, StatusType>>;
 
 const CARD_DEFAULTS: Record<CardId, StatusType> = {
   terminal:    'menunggu',
-  dataConfig:  'berhasil',
+  dataConfig:  'menunggu',
   dataQuality: 'menunggu',
   forecasting: 'kosong',
   clustering:  'kosong',
@@ -45,6 +46,8 @@ interface FilledStateViewProps {
    * @example cardStatuses={{ terminal: 'berhasil', dataQuality: 'gagal' }}
    */
   cardStatuses?: CardStatusMap;
+  onConfirmMapping?: () => void;
+  onReloadMapping?: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -58,7 +61,13 @@ export function FilledStateView({
   setDataConfig,
   terminalLogs,
   cardStatuses,
+  onConfirmMapping,
+  onReloadMapping,
 }: FilledStateViewProps) {
+  const [activeAccordion, setActiveAccordion] = useState<'config' | 'quality' | null>(null);
+  const [hasInteractedForecasting, setHasInteractedForecasting] = useState(false);
+  const [hasInteractedClustering, setHasInteractedClustering] = useState(false);
+
   const statuses = resolveStatuses(cardStatuses);
 
   const filteredTableData = useMemo(() => {
@@ -75,6 +84,22 @@ export function FilledStateView({
     });
   }, [tableData, dataConfig]);
 
+  const finalDataQualityStatus = filteredTableData.length > 0 ? 'berhasil' : statuses.dataQuality;
+  
+  useEffect(() => {
+    if (forecastAggressiveness !== 50) setHasInteractedForecasting(true);
+  }, [forecastAggressiveness]);
+
+  useEffect(() => {
+    if (clusteringConfig.mode !== 'auto' || clusteringConfig.clusterCount !== 3) {
+      setHasInteractedClustering(true);
+    }
+  }, [clusteringConfig]);
+
+  const finalForecastingStatus = hasInteractedForecasting ? 'berhasil' : statuses.forecasting;
+  const finalClusteringStatus = hasInteractedClustering ? 'berhasil' : statuses.clustering;
+
+  console.log(dataConfig)
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 w-full gap-3 flex-1 min-h-0 min-w-0 overflow-hidden h-full">
 
@@ -110,28 +135,36 @@ export function FilledStateView({
           innerClassName="p-3 flex flex-col h-full min-h-0"
           collapsible
           defaultOpen={false}
+          open={activeAccordion === 'config'}
+          onOpenChange={(open) => setActiveAccordion(open ? 'config' : null)}
         >
-          <DataConfiguration config={dataConfig} onChange={setDataConfig} />
+          <DataConfiguration 
+            config={dataConfig} 
+            onChange={setDataConfig} 
+            onConfirm={onConfirmMapping}
+            onReload={onReloadMapping}
+            isProcessing={statuses.dataConfig === 'menunggu'}
+          />
         </AnalysisCard>
 
         {/* Data Quality — collapsible, closed by default */}
         <AnalysisCard
           title="Cek Kualitas Data"
-          status={statuses.dataQuality}
+          status={finalDataQualityStatus}
           className="shrink-0"
           collapsible
           defaultOpen={false}
+          open={activeAccordion === 'quality'}
+          onOpenChange={(open) => setActiveAccordion(open ? 'quality' : null)}
         >
-          <div className="h-full text-neutral-400 flex items-center justify-center">
-            Quality Metrics Placeholder
-          </div>
+          <DataQuality data={filteredTableData} />
         </AnalysisCard>
 
         {/* Preferences row */}
         <div className="flex gap-4 shrink-0">
           <AnalysisCard
             title="Preferensi Forecasting"
-            status={statuses.forecasting}
+            status={finalForecastingStatus}
             className="flex-1 truncate justify-center"
             defaultOpen
           >
@@ -145,7 +178,7 @@ export function FilledStateView({
 
           <AnalysisCard
             title="Preferensi Clustering"
-            status={statuses.clustering}
+            status={finalClusteringStatus}
             className="flex-1 truncate justify-center"
             defaultOpen
           >

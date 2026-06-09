@@ -5,15 +5,17 @@ from app.schemas.features import Feature
 class DatasetMetadataRequest(BaseModel):
     dataset_id: int
     model_type: str  # "forecasting", "clustering", atau "both"
+    force_reload: bool = False
     
 class OpenRouterMappingResponse(BaseModel):
     status: str
     task: str
-    suggested_mapping: Feature
+    suggested_mapping: Optional[Feature] = None
 
 class PreprocessRequest(BaseModel):
     dataset_id: int
     model_type: str  # "forecasting", "clustering", atau "both"
+    # force_reload: bool = False
 
 
 class PreprocessResponse(BaseModel):

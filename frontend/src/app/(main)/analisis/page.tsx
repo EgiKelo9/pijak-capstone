@@ -5,7 +5,7 @@ import * as React from 'react';
 import { DateRange } from 'react-day-picker';
 
 import { FileUploadDemo } from '@/components/file-upload-demo';
-import { analyzeColumns, getDataset, mockLogin, uploadDataset } from '@/lib/middle-man';
+import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset } from '@/lib/middle-man';
 import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
@@ -43,6 +43,7 @@ export default function AnalysisEmptyState() {
   });
   const [terminalLogs, setTerminalLogs] = React.useState<TerminalStep[]>([]);
   const [dataConfigStatus, setDataConfigStatus] = React.useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
+  const [rawFeatureMapping, setRawFeatureMapping] = React.useState<any | null>(null);
 
   // Mengambil datasetId dari session storage saat pertama kali dimuat (jika ada)
   React.useEffect(() => {
@@ -67,10 +68,6 @@ export default function AnalysisEmptyState() {
     };
   }, []);
 
-  // TODO: [TEMPORARY DEV ONLY]
-  // Remove this line once the actual login page is implemented.
-  useTemporaryMockLogin();
-
   // Memoize the config for stable references if passed to useEffects later
   const analysisConfig = React.useMemo<AnalysisConfig>(() => ({
     mode,
@@ -92,19 +89,44 @@ export default function AnalysisEmptyState() {
   }, [analysisConfig]);
 
   // Fungsi orkestrasi Pipeline ML (Dipanggil otomatis setelah upload sukses)
-  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string) => {
+  const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string, forceReload: boolean = false) => {
     // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
     setTerminalLogs([
-      { stepId: 'init', text: 'system_ready: memulai pipeline otomatis...', status: 'info' },
-      { stepId: 'analyze_col', text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...`, status: 'loading' }
+      { stepId: 'init', text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
+      { stepId: 'analyze_col', text: forceReload ? `[OpenRouter] Menganalisis ulang metadata dataset #${datasetId}...` : `Memeriksa konfigurasi kolom dataset #${datasetId}...`, status: 'loading' }
     ]);
     setDataConfigStatus('menunggu');
 
     try {
-      const result = await analyzeColumns(datasetId, currentMode);
+      let mapping: any = null;
 
-      if (result.status === 'success' && result.suggested_mapping) {
-        const mapping = result.suggested_mapping;
+      // 1. Coba fetch metadata dari database terlebih dahulu jika bukan force reload
+      if (!forceReload) {
+        try {
+          const existingMetadata = await getDatasetFeatureMetadata(datasetId);
+          if (existingMetadata && Object.keys(existingMetadata).length > 0) {
+            mapping = existingMetadata;
+          }
+        } catch (err) {
+          console.warn("[Dashboard] Gagal memuat metadata dari database, beralih ke analisis ML...");
+        }
+      }
+
+      // 2. Jika tidak ada di database, panggil layanan ML OpenRouter
+      if (!mapping) {
+        setTerminalLogs((prev) => prev.map(log => 
+          log.stepId === 'analyze_col' ? { ...log, text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...` } : log
+        ));
+        
+        const result = await analyzeColumns(datasetId, currentMode, forceReload);
+        if (result.status === 'success' && result.suggested_mapping) {
+          mapping = result.suggested_mapping;
+        } else {
+          throw new Error("Layanan OpenRouter gagal memetakan kolom.");
+        }
+      }
+
+      setRawFeatureMapping(mapping); // Store the full raw mapping from the API
         
         setDataConfig((prev) => {
           let dateCol = prev.dateColumn;
@@ -138,14 +160,9 @@ export default function AnalysisEmptyState() {
           };
         });
         setDataConfigStatus('berhasil');
-      } else {
-        setDataConfigStatus('gagal');
-      }
-
-      // 2. Post-calling: Sukses - Ubah status log analyze_col menjadi success
-      setTerminalLogs((prev) => prev.map(log => 
-        log.stepId === 'analyze_col' ? { ...log, text: '[OpenRouter] Pemetaan kolom berhasil dianalisis.', status: 'success' } : log
-      ));
+        setTerminalLogs((prev) => prev.map(log => 
+          log.stepId === 'analyze_col' ? { ...log, text: 'Konfigurasi kolom berhasil dimuat.', status: 'success' } : log
+        ));
 
       // 3. Pre-calling Langkah 2 (Jika Anda perlu memanggil endpoint clean data terpisah)
       // setTerminalLogs((prev) => [...prev, { stepId: 'data_clean', text: 'Memulai pembersihan data...', status: 'loading' }]);
@@ -153,6 +170,7 @@ export default function AnalysisEmptyState() {
 
     } catch (error: any) {
       // 4. Post-calling: Gagal - Ubah status log yang loading menjadi error
+      setRawFeatureMapping(null); // Clear raw mapping on critical error
       setTerminalLogs((prev) => prev.map(log => 
         log.status === 'loading' ? { ...log, text: `Pipeline Error: ${error.message}`, status: 'error' } : log
       ));
@@ -172,6 +190,47 @@ export default function AnalysisEmptyState() {
       alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
   }, [analysisConfig.mode, runPreprocessingPipeline]);
+
+  const handleReloadMapping = React.useCallback(() => {
+    if (activeDatasetId !== -1) {
+      runPreprocessingPipeline(activeDatasetId, mode, true);
+    }
+  }, [activeDatasetId, mode, runPreprocessingPipeline]);
+
+  const handleConfirmMapping = React.useCallback(async () => {
+    if (activeDatasetId === -1 || !rawFeatureMapping) {
+      alert("Tidak ada data analisis untuk disimpan. Coba muat ulang atau jalankan analisis terlebih dahulu.");
+      return;
+    }
+    
+    const uniqueStepId = `confirm_col-${Date.now()}`;
+    try {
+      setTerminalLogs((prev) => [...prev, { stepId: uniqueStepId, text: 'Menyimpan konfigurasi kolom ke database...', status: 'loading' }]);
+      
+      // Buat salinan dari mapping mentah yang disimpan di state
+      const updatedMapping = JSON.parse(JSON.stringify(rawFeatureMapping));
+
+      // Timpa (aggregate) field yang dikontrol oleh UI berdasarkan state `dataConfig` saat ini
+      // Ini memastikan field lain yang tidak ditampilkan di UI (misal: col_to_numerical) tetap ada
+      updatedMapping.col_date_time = dataConfig.dateColumn || null;
+      updatedMapping.col_target = dataConfig.targetColumn || null;
+      updatedMapping.cols_to_drop = dataConfig.availableColumns.filter(
+          c => c !== dataConfig.dateColumn && c !== dataConfig.targetColumn && !dataConfig.includedColumns.includes(c)
+      );
+
+      await updateDatasetFeatureMetadata(activeDatasetId, updatedMapping);
+      console.log("Updated mapping to be saved:", updatedMapping); // For debugging
+      
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === uniqueStepId ? { ...log, text: 'Konfigurasi kolom berhasil disimpan.', status: 'success' } : log
+      ));
+      alert("Konfigurasi kolom berhasil disimpan!");
+    } catch (error: any) {
+      setTerminalLogs((prev) => prev.map(log => 
+        log.stepId === uniqueStepId ? { ...log, text: `Gagal menyimpan: ${error.message}`, status: 'error' } : log
+      ));
+    }
+  }, [activeDatasetId, dataConfig, rawFeatureMapping]);
 
   const handleRunAnalysis = React.useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
@@ -234,18 +293,20 @@ export default function AnalysisEmptyState() {
       return;
     }
 
-    const fetchDatasetInfo = async () => {
-      setIsLoadingDataset(true);
-      try {
-        const csvString = await getDataset(activeDatasetId);
-
-        let parsedData: any[] = [];
-        if (csvString) {
-          const lines = csvString.trim().split('\n');
-          if (lines.length > 0) {
+    const initDataAndPipeline = async () => {
+        setIsLoadingDataset(true);
+        try {
+          const csvString = await getDataset(activeDatasetId);
+  
+          let parsedData: any[] = [];
+          let cols: string[] = [];
+          if (csvString) {
+            const lines = csvString.trim().split('\n');
+            if (lines.length > 0) {
             // Regex ini memisahkan berdasarkan koma, kecuali jika koma tersebut ada di dalam tanda kutip ("")
             const csvRegex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
             const headers = lines[0].split(csvRegex).map((h: string) => h.trim().replace(/^"|"$/g, ''));
+            cols = headers;
             
             // Batasi hanya menampilkan 50 baris data pertama untuk menghemat RAM (Tampilan Preview)
             const maxRows = Math.min(lines.length, 51); // 1 header + 50 baris data
@@ -268,7 +329,6 @@ export default function AnalysisEmptyState() {
         
         // Ekstrak nama kolom untuk inisiasi Konfigurasi Data
         if (parsedData.length > 0) {
-          const cols = Object.keys(parsedData[0]);
           setDataConfig(prev => {
             if (prev.availableColumns.join(',') !== cols.join(',')) {
               return {
@@ -286,12 +346,13 @@ export default function AnalysisEmptyState() {
       } finally {
         setIsLoadingDataset(false);
       }
+
+      // SEKARANG kita jalankan pipeline setelah data (dan kolom) selesai di-parse!
+      // Ini mencegah LLM Mapping gagal mengkonfigurasi UI karena availableColumns sebelumnya masih kosong
+      runPreprocessingPipeline(activeDatasetId, mode);
     };
 
-    fetchDatasetInfo();
-
-    // Jalankan pipeline otomatis saat dataset dimuat (baik dari upload baru maupun session storage)
-    runPreprocessingPipeline(activeDatasetId, mode);
+    initDataAndPipeline();
   }, [activeDatasetId]);
 
   // ... fungsi ketika menerima payload dari backend ...
@@ -336,6 +397,8 @@ export default function AnalysisEmptyState() {
             setDataConfig={setDataConfig}
             terminalLogs={terminalLogs}
             cardStatuses={{ dataConfig: dataConfigStatus }}
+            onConfirmMapping={handleConfirmMapping}
+            onReloadMapping={handleReloadMapping}
           />
         ) : (
           <EmptyStateView
@@ -355,33 +418,3 @@ export default function AnalysisEmptyState() {
     </div>
   );
 }
-
-// ============================================================================
-// TODO: [TEMPORARY DEV ONLY] REMOVE THIS ENTIRE SECTION ONCE LOGIN IS IMPLEMENTED
-// ============================================================================
-function useTemporaryMockLogin() {
-  React.useEffect(() => {
-    const fetchMockToken = async () => {
-      if (typeof window !== "undefined" && !localStorage.getItem("access_token")) {
-        try {
-          const email = process.env.NEXT_PUBLIC_MOCK_EMAIL;
-          const password = process.env.NEXT_PUBLIC_MOCK_PASSWORD;
-          
-          if (!email || !password) {
-            console.warn("Dev mode: Missing NEXT_PUBLIC_MOCK_EMAIL or NEXT_PUBLIC_MOCK_PASSWORD in environment variables.");
-            return;
-          }
-
-          const token = await mockLogin(email, password);
-          localStorage.setItem("access_token", token);
-          console.warn("Dev mode: Successfully fetched and injected access token from API.");
-        } catch (error) {
-          console.error("Dev mode: Error fetching mock token:", error);
-        }
-      }
-    };
-
-    fetchMockToken();
-  }, []);
-}
-// ============================================================================

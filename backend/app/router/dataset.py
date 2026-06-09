@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, fetch_dataset_feature_metadata
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -112,6 +112,34 @@ async def fetch_datasets_by_user(
         HTTPException: 422 if request validation fails.
     """
     return await fetch_datasets_bin_by_user(current_user, db)
+
+@router.get(
+    "/feature-metadata/{dataset_id}",
+    response_model=StandardResponse[Any],
+    responses={
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        403: {"model": StandardResponse[dict], "description": "Forbidden"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"}
+    }
+)
+async def get_dataset_feature_metadata(
+    dataset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch the feature metadata analysis for a specific dataset.
+
+    Args:
+        dataset_id (int): The ID of the dataset.
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user.
+
+    Returns:
+        StandardResponse[Any]: A JSON object containing the feature metadata, or null if none exists.
+    """
+    return await fetch_dataset_feature_metadata(dataset_id, current_user, db)
+
 
 @router.patch(
     "/feature-metadata-update/{dataset_id}",

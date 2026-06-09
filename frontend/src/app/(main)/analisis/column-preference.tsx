@@ -1,7 +1,8 @@
 // components/preferences/data-configuration.tsx
 'use client';
 
-import * as React from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -9,9 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Check, RefreshCw } from 'lucide-react';
+import * as React from 'react';
 
 export interface DataConfigState {
   availableColumns: string[];
@@ -23,6 +23,9 @@ export interface DataConfigState {
 interface DataConfigurationProps {
   config: DataConfigState;
   onChange: (newConfig: DataConfigState) => void;
+  onConfirm?: () => void;
+  onReload?: () => void;
+  isProcessing?: boolean;
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -31,7 +34,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-export function DataConfiguration({ config, onChange }: DataConfigurationProps) {
+export function DataConfiguration({ config, onChange, onConfirm, onReload, isProcessing }: DataConfigurationProps) {
   const handleDateChange = (val: string) => onChange({ ...config, dateColumn: val });
   const handleTargetChange = (val: string) => onChange({ ...config, targetColumn: val });
 
@@ -155,16 +158,34 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
           </div>
         </ScrollArea>
 
-        {/* Footer: count of selected features */}
-        {featureColumns.length > 0 && (
-          <div className="shrink-0 pt-1 border-t border-neutral-100">
-            <span className="text-[9px] text-neutral-400">
-              {config.includedColumns.filter((c) => featureColumns.includes(c)).length}
-              {' / '}
-              {featureColumns.length} kolom dipilih
-            </span>
+        {/* Footer: count of selected features + Actions */}
+        <div className="shrink-0 flex items-center justify-between pt-2 mt-1 border-t border-neutral-100">
+          <span className="text-[9px] text-neutral-400">
+            {featureColumns.length > 0 
+              ? `${config.includedColumns.filter((c) => featureColumns.includes(c)).length} / ${featureColumns.length} dipilih`
+              : '0 dipilih'}
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onReload}
+              disabled={isProcessing}
+              title="Muat Ulang Konfigurasi"
+              className="flex items-center justify-center size-6 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 active:scale-95 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className="size-3" />
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isProcessing}
+              title="Konfirmasi Konfigurasi"
+              className="flex items-center gap-1 h-6 px-2 rounded-md bg-[#2BBAEE] text-[9px] font-medium text-white hover:bg-[#1a9fd4] active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+            >
+              <Check className="size-3" />
+              Simpan
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

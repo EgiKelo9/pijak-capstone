@@ -26,7 +26,7 @@ import { DATA } from './sidebar-data';
 
 export function AppSidebarTopbar() {
   const pathname = usePathname();
-  const showActionButtons = pathname === '/dashboard';
+  const showActionButtons = pathname === '/analisis';
 
   // More robust breadcrumb: check exact match first, then prefix
   const currentPage = DATA.navMain.find(nav =>
