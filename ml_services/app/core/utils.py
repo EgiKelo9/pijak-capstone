@@ -317,7 +317,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 },
                 "stream": False,
                 "temperature": 0.0,
-                "max_output_tokens": 1670,
+                "max_output_tokens": 2670,
                 # "max_completion_tokens": 2670,
             }
             

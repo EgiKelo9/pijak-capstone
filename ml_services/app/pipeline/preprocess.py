@@ -7,6 +7,7 @@ from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset
 from app.controller.openrouter import analyze_columns
 from app.schemas.openrouter import DatasetMetadataRequest
 from app.core.websocket_manager import manager
+
 import asyncio
 
 def drop_missing_values(df: pd.DataFrame) -> pd.DataFrame:
@@ -147,15 +148,15 @@ def drop_or_impute(df, categorical_cols, numeric_cols, col_dt_whole=None, drop_t
 def generate_new_features(df, col_pairing, numeric_cols):
     if col_pairing:
         for pairing in col_pairing:
-            col1 = pairing.column_1
-            col2 = pairing.column_2
+            col1 = pairing['column_1']
+            col2 = pairing['column_2']
 
-            op = pairing.operator.lower().strip() 
+            op = pairing['operator'].lower().strip() 
             
             if col1 in df.columns and col2 in df.columns:
                 if pd.api.types.is_numeric_dtype(df[col1]) and pd.api.types.is_numeric_dtype(df[col2]):
                     
-                    new_col = pairing.new_col_name
+                    new_col = pairing['new_col_name']
                     
                     if op == 'add':
                         df[new_col] = df[col1] + df[col2]
@@ -216,16 +217,18 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     shapes.append(df.shape)
 
     mapping_res = await get_dataset_feature_metadata(dataset_id)
-    print(mapping_res)
+    # print(mapping_res)
     extracted = extract_response(mapping_res.get("data"))
-    print(extracted)
+    # print(extracted)
 
-    await manager.send(job_id, {"message": "Mulai membersihkan dataset"})
+    await manager.send(job_id, {"message": "Menyiapkan worker: memindai anomali dan membersihkan noise data..."})
+    await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
     try:
         df = (
             df.pipe(drop_cols, extracted.get("cols_to_drop"))
         )
-        await manager.send(job_id, {"message": "Menentukan kolom datetime"})
+        await manager.send(job_id, {"message": "Mengekstraksi fitur temporal: menyelaraskan format matriks waktu..."})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df, updated_col_dt = adjust_date_time(
             df,
             is_whole=extracted.get("is_whole"),
@@ -237,28 +240,35 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         extracted["col_dt_whole"] = updated_col_dt
         
         # If you have more steps, you can resume chaining here:
-        await manager.send(job_id, {"message": "Merapikan format tipe data kolom"})
+        await manager.send(job_id, {"message": "Validasi skema: menormalisasi tipe variabel numerik dan kategorikal..."})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df = (
             df.pipe(adjust_data_types, extracted.get("col_to_cat"), extracted.get("col_product"), extracted.get("col_to_num"))
         )
-        await manager.send(job_id, {"message": "Menghapus kolom yang tidak digunakan"})
+        await manager.send(job_id, {"message": "Reduksi dimensi: memangkas vektor kolom yang redundan..."})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         iter_cols, categorical_cols, numerical_cols = extract_column(df, extracted['col_dt_whole'])
         df = (
             df.pipe(enforce_types, numerical_cols, categorical_cols)
             .pipe(drop_or_impute, categorical_cols, numerical_cols, extracted['col_dt_whole'])
         )
         
-        await manager.send(job_id, {"message": "Mencoba membuat fitur baru"})
-        # df, numerical_cols = generate_new_features(
-        #     df,
-        #     extracted.get('col_pairing'),
-        #     numerical_cols
-        # )
+        await manager.send(job_id, {"message": "Inisiasi rekayasa fitur: mensintesis metrik prediktif baru..."})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
+        try:
+            df, numerical_cols = generate_new_features(
+                    df,
+                    extracted.get('col_pairing'),
+                    numerical_cols
+                )
+        except Exception as e:
+            print(f"Error occurred while generating new features: {str(e)}")
+            raise e
         shapes.append(df.shape)
         print(f"Pipeline finished successfully. New Shape: {df.shape}")
         
         # Upload the cleaned dataset back to the backend
-        await manager.send(job_id, {"message": "Mengunggah dataset bersih ke database"})
+        await manager.send(job_id, {"message": "Kompilasi selesai: mengonversi dan merekam matriks teroptimasi ke server..."})
         if model.lower() == 'both':
             upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
 

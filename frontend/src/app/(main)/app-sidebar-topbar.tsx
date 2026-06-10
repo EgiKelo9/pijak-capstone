@@ -22,6 +22,8 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
+import { fetchUserDatasets, runAnalysisPipeline } from '@/lib/middle-man';
+import { useTerminal } from './mainSidebar';
 import { DATA } from './sidebar-data';
 
 export function AppSidebarTopbar() {
@@ -36,21 +38,13 @@ export function AppSidebarTopbar() {
 
   const [datasets, setDatasets] = React.useState<any[]>([]);
   const [loadingDatasets, setLoadingDatasets] = React.useState(false);
+  const { setLogs: setTerminalLogs } = useTerminal();
 
   const fetchDatasets = async () => {
     setLoadingDatasets(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      // We use "me" here because your backend automatically determines the user via the Bearer token
-      const response = await fetch("http://localhost:5000/api/v1/datasets/user/me", {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      const result = await response.json();
-      if (response.ok && result.data) {
-        setDatasets(Array.isArray(result.data) ? result.data : result.data.datasets || []);
-      }
+      const data = await fetchUserDatasets();
+      setDatasets(data);
     } catch (error) {
       console.error("Failed to fetch datasets", error);
     } finally {
@@ -65,56 +59,81 @@ export function AppSidebarTopbar() {
 
   const job_id = '1b671a64-40d5-491e-99b0-da01ff1f3341'
   const analysis_start = async () => {
-    try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("access_token")
-          : null;
+    const ws_job_id = `ws-job-${Date.now()}`;
+    setTerminalLogs(prev => [...prev, { stepId: ws_job_id, text: 'Mencoba terhubung ke layanan analisis...', status: 'loading' }]);
+    
+    let currentWsStepId: string | null = null;
 
+    try {
       const ws = new WebSocket(
         `ws://localhost:8000/ml/v1/preprocess/ws/${job_id}`
       );
 
       ws.onopen = async () => {
-        console.log("WebSocket connected");
-
-        const response = await fetch(
-          "http://localhost:8000/ml/v1/preprocess/run",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token
-                ? { Authorization: `Bearer ${token}` }
-                : {}),
-            },
-            body: JSON.stringify({
-              job_id,
-              dataset_id: 1,
-              model_type: "cluster",
-            }),
-          }
-        );
-
-        console.log("Pipeline started");
-
-        const result = await response.text();
-        console.log("Pipeline response:", result);
+        setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: 'Koneksi ke layanan analisis berhasil.', status: 'success' } : log));
+        setTerminalLogs(prev => [...prev, { stepId: `pipeline-start-${Date.now()}`, text: 'Memulai pipeline pemrosesan data...', status: 'info' }]);
+        
+        await runAnalysisPipeline(job_id, 1, "cluster");
+      
+         // Dieksekusi ketika keseluruhan pipeline di backend selesai dan mengembalikan data
+        setTerminalLogs(prev => {
+          const updatedLogs = currentWsStepId
+            ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+            : prev;
+          return [...updatedLogs, { stepId: `pipeline-end-${Date.now()}`, text: 'Pipeline pemrosesan data selesai.', status: 'success' as const }];
+        });
       };
 
       ws.onmessage = (event) => {
-        console.log("WS message:", event.data);
+        try {
+          const message = JSON.parse(event.data);
+          const newStepId = `ws-msg-${Date.now()}`;
+
+          setTerminalLogs(prev => {
+            const updatedLogs = currentWsStepId
+              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+              : prev;
+            return [...updatedLogs, {
+              stepId: newStepId,
+              text: message.message || event.data,
+              status: 'loading' as const,
+            }];
+          });
+          currentWsStepId = newStepId;
+        } catch (e) {
+          const newRawStepId = `ws-msg-raw-${Date.now()}`;
+          setTerminalLogs(prev => {
+            const updatedLogs = currentWsStepId
+              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+              : prev;
+            return [...updatedLogs, {
+              stepId: newRawStepId,
+              text: event.data,
+              status: 'loading' as const,
+            }];
+          });
+          currentWsStepId = newRawStepId;
+        }
       };
 
       ws.onerror = (error) => {
         console.error("WS error:", error);
+        setTerminalLogs(prev => prev.map(log => (log.stepId === ws_job_id || log.stepId === currentWsStepId) && log.status === 'loading' ? { ...log, text: 'Sebuah langkah gagal dieksekusi.', status: 'error' } : log));
       };
 
       ws.onclose = () => {
-        console.log("WebSocket closed");
+        // Selesaikan log 'loading' terakhir jika koneksi ditutup
+        setTerminalLogs(prev => {
+          const updatedLogs = currentWsStepId
+            ? prev.map(log => (log.stepId === currentWsStepId && log.status === 'loading') ? { ...log, status: 'success' as const } : log)
+            : prev;
+          return [...updatedLogs, { stepId: `ws-close-${Date.now()}`, text: 'Koneksi ke layanan analisis ditutup.', status: 'info' as const }];
+        });
       };
     } catch (error) {
       console.error("Failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: `Gagal memulai koneksi: ${errorMessage}`, status: 'error' } : log));
     }
   };
 
