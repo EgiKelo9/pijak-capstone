@@ -28,18 +28,18 @@ FALLBACK_FEATURE = Feature(
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
     try:
-        # 1. Fetch dataset dari backend
+        # Fetch dataset dari backend
         df, _ = await get_dataset(req.dataset_id)
         
-        # 2. Build metadata dari DataFrame
+        # Build metadata dari DataFrame
         dataset_info = get_dataset_info(df)
 
-        # 3. Handle model_type map (Clustering, Forecasting, or Both)
+        # Handle model_type map (Clustering, Forecasting, or Both)
         task_str = req.model_type
         if task_str.lower() == "both":
             task_str = "Both"
 
-        # 4. Build prompt
+        # Build prompt
         prompt = f"""
             Please extract features(columns) from the following dataset.
             The user wants to do {task_str} option from the available service of Clustering and Forecasting.
@@ -47,7 +47,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             {dataset_info}
         """
                 
-        # 5. Kirim ke OpenRouter
+        # Kirim ke OpenRouter
         llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
         if getattr(llm_response, "error", False):

@@ -11,6 +11,7 @@ class ClusteringRunRequest(BaseModel):
     col_product: str
     col_fitur: list[str]
     data: list[dict[str, Any]]
+    n_clusters: Optional[int] = None  # None = sistem otomatis cari K optimal, int = user tentukan sendiri
 
 # ================================
 # RESPONSE SCHEMA

@@ -53,7 +53,8 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
                     "analysis_id": str(analysis_id),
                     "col_product": request.col_product,
                     "col_fitur": request.col_fitur,
-                    "data": request.data
+                    "data": request.data,
+                    "n_clusters": request.n_clusters  # ← terusin pilihan user ke ML service
                 },
                 timeout=120.0
             )

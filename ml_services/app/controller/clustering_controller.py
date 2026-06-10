@@ -1,3 +1,4 @@
+import traceback
 from app.pipeline.model_clustering import ClusteringPipeline
 from app.schemas.clustering_schema import (
     ClusteringRequest,
@@ -10,25 +11,24 @@ pipeline = ClusteringPipeline()
 async def run_clustering(request: ClusteringRequest) -> ClusteringResponse | ClusteringErrorResponse:
     """Controller utama untuk menjalankan clustering"""
     try:
-        # 1. Convert request schema  dict untuk pipeline
+        # Convert request schema 
         input_json = {
             "col_product": request.col_product,
             "col_fitur": request.col_fitur,
-            "data": request.data
+            "data": request.data,
+            "n_clusters": request.n_clusters
         }
-
-        # 2. Jalankan pipeline
+        # Jalankan pipeline
         result = await pipeline.run(input_json)
-
-        # 3. Return response sukses
+        # Return response sukses
         return ClusteringResponse(
             analysis_id=request.analysis_id,
             status="completed",
             result=result
         )
-
     except Exception as e:
-        # 4. Return response error
+        print(f"[CLUSTERING ERROR] {str(e)}")
+        traceback.print_exc()
         return ClusteringErrorResponse(
             analysis_id=request.analysis_id,
             status="failed",
