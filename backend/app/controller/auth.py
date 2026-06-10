@@ -54,7 +54,7 @@ async def login(user: UserLoginRequest, db: Session):
         code=200,
         error=False,
         message="Login successful",
-        data=UserLoginResponse(access_token=token, token_type="bearer")
+        data=UserLoginResponse(name=existing_user.name, email=existing_user.email, access_token=token, token_type="bearer")
     )
 
 async def logout(current_user: User):
