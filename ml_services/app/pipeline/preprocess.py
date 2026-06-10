@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 from typing import Tuple
-
+from pydantic import UUID5
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset
+from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
 from app.controller.openrouter import analyze_columns
 from app.schemas.openrouter import DatasetMetadataRequest
+from app.core.websocket_manager import manager
+import asyncio
 
 def drop_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     """Membersihkan raw data dari missing values"""
@@ -38,39 +40,6 @@ def prepare_forecasting_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ------------------------------------- Baroe --------------------------------------------
-
-def extract_response(response):
-    col_dt_whole = None
-    is_whole = False
-    col_date_time = getattr(response, "col_date_time", None)
-    
-    col_day, col_month, col_year = None, None, None
-    
-    if isinstance(col_date_time, str):
-        is_whole = True
-        col_dt_whole = col_date_time
-    elif col_date_time is not None:
-        if getattr(col_date_time, 'col_whole', None):
-            is_whole = True
-            col_dt_whole = col_date_time.col_whole
-        else:
-            col_day = getattr(col_date_time, 'col_day', None)
-            col_month = getattr(col_date_time, 'col_month', None)
-            col_year = getattr(col_date_time, 'col_year', None)
-
-    return {
-        "cols_to_drop": getattr(response, "cols_to_drop", []),
-        "col_product": getattr(response, "col_product", []),
-        "col_target": getattr(response, "col_target", None),
-        "col_to_cat": getattr(response, "col_to_categorical", []),
-        "col_to_num": getattr(response, "col_to_numerical", []),
-        "col_pairing": getattr(response, "new_feature_pairing", []),
-        "is_whole": is_whole,
-        "col_dt_whole": col_dt_whole,
-        "col_day": col_day,
-        "col_month": col_month,
-        "col_year": col_year
-    }
 
 def drop_cols(df: pd.DataFrame, cols_to_drop: list[str] | str | None = None) -> pd.DataFrame:
     if not cols_to_drop:
@@ -205,64 +174,99 @@ def generate_new_features(df, col_pairing, numeric_cols):
 
     return df, numeric_cols
 
-async def temp_pipeline(dataset_id:int, model: str):
+def extract_response(response):
+    col_dt_whole = None
+    is_whole = False
+
+    col_date_time = response.get("col_date_time")
+
+    col_day, col_month, col_year = None, None, None
+
+    if isinstance(col_date_time, str):
+        is_whole = True
+        col_dt_whole = col_date_time
+
+    elif isinstance(col_date_time, dict):
+        if col_date_time.get("col_whole"):
+            is_whole = True
+            col_dt_whole = col_date_time["col_whole"]
+        else:
+            col_day = col_date_time.get("col_day")
+            col_month = col_date_time.get("col_month")
+            col_year = col_date_time.get("col_year")
+
+    return {
+        "cols_to_drop": response.get("cols_to_drop", []),
+        "col_product": response.get("col_product", []),
+        "col_target": response.get("col_target"),
+        "col_to_cat": response.get("col_to_categorical", []),
+        "col_to_num": response.get("col_to_numerical", []),
+        "col_pairing": response.get("new_feature_pairing", []),
+        "is_whole": is_whole,
+        "col_dt_whole": col_dt_whole,
+        "col_day": col_day,
+        "col_month": col_month,
+        "col_year": col_year
+    }
+
+async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     shapes = []
     
     df, _ = await get_dataset(dataset_id)
     shapes.append(df.shape)
 
-    req = DatasetMetadataRequest(dataset_id=dataset_id, model_type=model)
-    mapping_res = await analyze_columns(req)
-    
-    if mapping_res.status == "error" or not mapping_res.suggested_mapping:
-        print(f"OpenRouter returned an error or fallback.")
-        return None
-        
-    xtracted = extract_response(mapping_res.suggested_mapping)
+    mapping_res = await get_dataset_feature_metadata(dataset_id)
+    print(mapping_res)
+    extracted = extract_response(mapping_res.get("data"))
+    print(extracted)
 
+    await manager.send(job_id, {"message": "Mulai membersihkan dataset"})
     try:
         df = (
-            df.pipe(drop_cols, xtracted.get("cols_to_drop"))
+            df.pipe(drop_cols, extracted.get("cols_to_drop"))
         )
-        
+        await manager.send(job_id, {"message": "Menentukan kolom datetime"})
         df, updated_col_dt = adjust_date_time(
             df,
-            is_whole=xtracted.get("is_whole"),
-            col_day=xtracted.get("col_day"),
-            col_month=xtracted.get("col_month"),
-            col_year=xtracted.get("col_year"),
-            col_dt_whole=xtracted.get("col_dt_whole")
+            is_whole=extracted.get("is_whole"),
+            col_day=extracted.get("col_day"),
+            col_month=extracted.get("col_month"),
+            col_year=extracted.get("col_year"),
+            col_dt_whole=extracted.get("col_dt_whole")
         )
-        xtracted["col_dt_whole"] = updated_col_dt
+        extracted["col_dt_whole"] = updated_col_dt
         
         # If you have more steps, you can resume chaining here:
+        await manager.send(job_id, {"message": "Merapikan format tipe data kolom"})
         df = (
-            df.pipe(adjust_data_types, xtracted.get("col_to_cat"), xtracted.get("col_product"), xtracted.get("col_to_num"))
+            df.pipe(adjust_data_types, extracted.get("col_to_cat"), extracted.get("col_product"), extracted.get("col_to_num"))
         )
-
-        iter_cols, categorical_cols, numerical_cols = extract_column(df, xtracted['col_dt_whole'])
+        await manager.send(job_id, {"message": "Menghapus kolom yang tidak digunakan"})
+        iter_cols, categorical_cols, numerical_cols = extract_column(df, extracted['col_dt_whole'])
         df = (
             df.pipe(enforce_types, numerical_cols, categorical_cols)
-            .pipe(drop_or_impute, categorical_cols, numerical_cols, xtracted['col_dt_whole'])
+            .pipe(drop_or_impute, categorical_cols, numerical_cols, extracted['col_dt_whole'])
         )
-
-        df, numerical_cols = generate_new_features(
-            df,
-            xtracted.get('col_pairing'),
-            numerical_cols
-        )
+        
+        await manager.send(job_id, {"message": "Mencoba membuat fitur baru"})
+        # df, numerical_cols = generate_new_features(
+        #     df,
+        #     extracted.get('col_pairing'),
+        #     numerical_cols
+        # )
         shapes.append(df.shape)
         print(f"Pipeline finished successfully. New Shape: {df.shape}")
         
         # Upload the cleaned dataset back to the backend
+        await manager.send(job_id, {"message": "Mengunggah dataset bersih ke database"})
         if model.lower() == 'both':
-            upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting')
+            upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
 
-            df = df.drop(columns=xtracted['col_dt_whole'])
-            upload_cluster = await upload_cleaned_dataset(df, dataset_id, 'Clustering')
+            df = df.drop(columns=extracted['col_dt_whole'])
+            upload_cluster = await upload_cleaned_dataset(df, dataset_id, 'Clustering', extracted)
             print(f"Upload successful: {upload_forecast, upload_cluster}")
         else:
-            upload_result = await upload_cleaned_dataset(df, dataset_id, model)
+            upload_result = await upload_cleaned_dataset(df, dataset_id, model, extracted)
             print(f"Upload successful: {upload_result}")
 
     except Exception as e:
@@ -270,3 +274,11 @@ async def temp_pipeline(dataset_id:int, model: str):
         raise e
         
     return shapes
+
+async def test_ws(job_id: str):
+    await manager.send(job_id, {"message": "skibidi"})
+    await asyncio.sleep(5)
+    await manager.send(job_id, {"message": "5 second has passed"})
+    await asyncio.sleep(3)
+    await manager.send(job_id, {"message": "3 second has passed"})
+    return

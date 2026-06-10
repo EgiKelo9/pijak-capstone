@@ -63,6 +63,61 @@ export function AppSidebarTopbar() {
     window.dispatchEvent(new Event('dataset_changed'));
   };
 
+  const job_id = '1b671a64-40d5-491e-99b0-da01ff1f3341'
+  const analysis_start = async () => {
+    try {
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("access_token")
+          : null;
+
+      const ws = new WebSocket(
+        `ws://localhost:8000/ml/v1/preprocess/ws/${job_id}`
+      );
+
+      ws.onopen = async () => {
+        console.log("WebSocket connected");
+
+        const response = await fetch(
+          "http://localhost:8000/ml/v1/preprocess/run",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token
+                ? { Authorization: `Bearer ${token}` }
+                : {}),
+            },
+            body: JSON.stringify({
+              job_id,
+              dataset_id: 1,
+              model_type: "cluster",
+            }),
+          }
+        );
+
+        console.log("Pipeline started");
+
+        const result = await response.text();
+        console.log("Pipeline response:", result);
+      };
+
+      ws.onmessage = (event) => {
+        console.log("WS message:", event.data);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WS error:", error);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket closed");
+      };
+    } catch (error) {
+      console.error("Failed:", error);
+    }
+  };
+
   return (
     <header className="flex h-14 md:h-16 shrink-0 items-center justify-between border-b border-black/10 px-4 md:px-5">
       {/* Left: trigger + breadcrumb */}
@@ -120,7 +175,7 @@ export function AppSidebarTopbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] px-3 md:px-4 transition-all hover:opacity-90 active:scale-95 shadow-sm duration-150">
+          <button onClick={analysis_start} className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] px-3 md:px-4 transition-all hover:opacity-90 active:scale-95 shadow-sm duration-150">
             <PlayCircle className="size-4 text-[#272727] shrink-0" /><span className="font-sans text-sm font-medium text-[#272727] hidden sm:inline-block whitespace-nowrap">Mulai Analisis</span>
           </button>
         </div>

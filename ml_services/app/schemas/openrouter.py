@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID5
 from typing import List, Optional
 from app.schemas.features import Feature
     
@@ -16,6 +16,7 @@ class PreprocessRequest(BaseModel):
     dataset_id: int
     model_type: str  # "forecasting", "clustering", atau "both"
     # force_reload: bool = False
+    job_id: str
 
 
 class PreprocessResponse(BaseModel):

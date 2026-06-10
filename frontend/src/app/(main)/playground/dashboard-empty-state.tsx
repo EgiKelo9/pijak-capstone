@@ -24,6 +24,7 @@ function EmptyStateView({ modeLabel, isReady, dateRange, onUpload, onRunAnalysis
   ];
 
   return (
+
     <div className="flex h-full flex-1 w-full flex-col items-center justify-center rounded-2xl border border-neutral-800/20 bg-white p-6 md:p-8">
       <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
 
