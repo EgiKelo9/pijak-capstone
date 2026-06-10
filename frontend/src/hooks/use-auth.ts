@@ -61,13 +61,14 @@ export const useAuth = () => {
     }
   }
 
-  const isLogin = async (email: string, password: string) => {
+  const isLogin = async (email: string, password: string, remember?: boolean) => {
     try {
       setError(null);
       setLoading(true);
 
       const response = await login(email, password);
       const data = response.data
+      console.log(data)
       const userData = {
         id: data.id,
         name: data.name,
@@ -77,10 +78,13 @@ export const useAuth = () => {
       };
       setUser(userData);
 
-      setCookie('access_token', userData.accessToken, 86400);
-      setCookie('token_type', userData.tokenType, 86400);
-      setCookie('name', userData.name, 86400);
-      setCookie('email', userData.email, 86400);
+      // const maxAge = remember ? 86_400 : 2_592_000;
+      const maxAge = 86_400;
+
+      setCookie('access_token', userData.accessToken, maxAge);
+      setCookie('token_type', userData.tokenType, maxAge);
+      setCookie('name', userData.name, maxAge);
+      setCookie('email', userData.email, maxAge);
 
       router.push('/dasbor');
     } catch (err) {
