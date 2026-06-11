@@ -59,20 +59,21 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
     onChange({ ...config, includedColumns: next });
   };
 
+  const validColumns = config.availableColumns.filter((col) => col && col.trim() !== '');
+
   return (
-    // h-full + overflow-hidden: fills the card's inner box exactly, nothing bleeds out
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden">
 
       {/* ── Dropdowns ── fixed height, never scrolls */}
       <div className="shrink-0 grid grid-cols-2 gap-2 pb-2.5 border-b border-neutral-100">
         <div className="flex flex-col gap-1">
           <SectionLabel>Tanggal</SectionLabel>
-          <Select value={config.dateColumn} onValueChange={handleDateChange}>
+          <Select value={config.dateColumn || undefined} onValueChange={handleDateChange}>
             <SelectTrigger className="h-7 text-xs border-neutral-200 bg-neutral-50/50 px-2">
               <SelectValue placeholder="Pilih kolom…" />
             </SelectTrigger>
             <SelectContent>
-              {config.availableColumns.map((col) => (
+              {validColumns.map((col) => (
                 <SelectItem key={col} value={col} className="text-xs">
                   {col}
                 </SelectItem>
@@ -83,12 +84,12 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
 
         <div className="flex flex-col gap-1">
           <SectionLabel>Target</SectionLabel>
-          <Select value={config.targetColumn} onValueChange={handleTargetChange}>
+          <Select value={config.targetColumn || undefined} onValueChange={handleTargetChange}>
             <SelectTrigger className="h-7 text-xs border-neutral-200 bg-neutral-50/50 px-2">
               <SelectValue placeholder="Pilih kolom…" />
             </SelectTrigger>
             <SelectContent>
-              {config.availableColumns.map((col) => (
+              {validColumns.map((col) => (
                 <SelectItem key={col} value={col} className="text-xs">
                   {col}
                 </SelectItem>
@@ -114,7 +115,7 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
           )}
         </div>
 
-        {/* Scrollable list — flex-1 + min-h-0 lets it shrink into remaining card space */}
+        {/* Scrollable list */}
         <ScrollArea className="flex-1 min-h-0 w-full">
           <div className="flex flex-col gap-0 pr-1">
             {featureColumns.length === 0 ? (
@@ -147,7 +148,6 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
                     >
                       {col}
                     </span>
-                    {/* Subtle checked indicator */}
                     {checked && (
                       <span className="ml-auto shrink-0 w-1 h-1 rounded-full bg-[#2BBAEE]" />
                     )}

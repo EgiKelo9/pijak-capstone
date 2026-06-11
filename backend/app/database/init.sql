@@ -143,7 +143,8 @@ INSERT INTO users (name, email, password) VALUES
     ('Budi Santoso', 'budi@example.com', crypt('BudiPass123', gen_salt('bf'))),
     ('Ani Rahayu',   'ani@example.com',  crypt('AniPass123', gen_salt('bf'))),
     ('Baraja Putra', 'baraja@example.com', crypt('password123', gen_salt('bf'))),
-    ('string', 'user@example.com', crypt('string', gen_salt('bf')));
+    ('string', 'user@example.com', crypt('string', gen_salt('bf'))),
+    ('Admin', 'admin@pijak.com', crypt('admin123', gen_salt('bf')));
 
 INSERT INTO ml_models (name, type, description) VALUES
     ('XGBoost', 'forecasting', 'Extreme Gradient Boosting for time-series forecasting'),

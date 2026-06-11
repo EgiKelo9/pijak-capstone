@@ -2,6 +2,7 @@ import json
 from app.core.config import get_settings
 from app.core.utils import generate_from_openrouter
 
+from app.core.utils import generate_from_openrouter
 settings = get_settings()
 
 async def get_insight_from_gemma(forecast_data: dict) -> str:
@@ -22,7 +23,9 @@ async def get_insight_from_gemma(forecast_data: dict) -> str:
         f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
     )
     result = await generate_from_openrouter(prompt)
-    return result.data["response"]
+    if result.error or not result.data:
+        return "Insight tidak tersedia saat ini. Coba lagi nanti."
+    return result.data.get("response", "Insight tidak tersedia.")
 
 async def get_insight_from_clustering(cluster_summary: dict) -> str:
     """Helper function to get clustering insight via OpenRouter."""
@@ -44,7 +47,9 @@ async def get_insight_from_clustering(cluster_summary: dict) -> str:
         f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
     )
     result = await generate_from_openrouter(prompt)
-    return result.data["response"]
+    if result.error or not result.data:
+        return "Insight tidak tersedia saat ini. Coba lagi nanti."
+    return result.data.get("response", "Insight tidak tersedia.")
 
 async def check_gemma_health() -> dict:
     """Health check via OpenRouter."""

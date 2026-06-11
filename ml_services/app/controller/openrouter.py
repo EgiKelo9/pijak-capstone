@@ -14,6 +14,17 @@ TASK_LABEL_MAP = {
     "clustering": "clustering produk",
 }
 
+FALLBACK_FEATURE = Feature(
+    cols_to_drop=None,
+    col_date_time=None,
+    col_product=None,
+    col_target=None,
+    col_to_numerical=None,
+    col_to_categorical=None,
+    new_feature_pairing=None,
+    reasonings="Fallback: gagal menganalisis kolom."
+)
+
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
     try:
@@ -38,20 +49,21 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         # print(dataset_info)  # Debug: Lihat metadata yang akan dikirim ke LLM
 
         # 3. Handle model_type map (Clustering, Forecasting, or Both)
+
+        # Handle model_type map (Clustering, Forecasting, or Both)
         task_str = req.model_type
         if task_str.lower() == "both":
             task_str = "Both"
 
-        # 4. Build prompt identik dengan gemini.py, ditambah instruksi skema JSON
+        # Build prompt
         prompt = f"""
             Please extract features(columns) from the following dataset.
             The user wants to do {task_str} option from the available service of Clustering and Forecasting.
             Dataset:
             {dataset_info}
         """
-        
-        print("Generated prompt for OpenRouter:", prompt, flush=True)  # Debug: Lihat prompt yang akan dikirim ke LLM
-        # 5. Kirim ke OpenRouter
+                
+        # Kirim ke OpenRouter
         llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
         if getattr(llm_response, "error", False):
@@ -59,8 +71,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             return OpenRouterMappingResponse(
                 status="error",
                 task=task_str,
-                # suggested_mapping=Feature()  # fallback empty
-                suggested_mapping=None
+                suggested_mapping=FALLBACK_FEATURE
             )
     
         raw_text = llm_response.data.get("response", "")
@@ -79,48 +90,31 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             task=task_str,
             suggested_mapping=mapping,
         )
-    except Exception as e:
-        print(f"=== CRITICAL ERROR in analyze_columns ===: {str(e)}", flush=True)
-        # Update metadata to error status
-        try:
-            from app.core.utils import call_backend_api
-            await call_backend_api(
-                "PATCH",
-                f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
-                json={"analyze_status": "error"}
-            )
-        except Exception as update_e:
-            print(f"Failed to update error status: {update_e}")
 
+    except Exception as e:
+        print(f"[analyze_columns] Error: {e}")
         return OpenRouterMappingResponse(
             status="error",
             task=req.model_type,
-            suggested_mapping=None
+            suggested_mapping=FALLBACK_FEATURE
         )
-    
-        
+
+
 async def get_insight_from_data(target_task: str, json_data: Any) -> str:
     """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
     prompt = f"""
     Kamu adalah Business Analyst non-teknis untuk wirausaha retail.
-
     Task Machine Learning saat ini: "{target_task}"
-
     Berdasarkan data prediksi berikut:
     {json.dumps(json_data, default=str)}
-
     Berikan insight bisnis yang konkret, singkat, dan mudah dipahami.
     Fokus pada stok, barang tak laku, peluang promo, dan tindakan prioritas yang relevan dengan task.
-
     Balas hanya dengan teks insight, tanpa markdown berlebihan.
     """
-
     try:
         insight_response = await generate_from_openrouter(prompt)
-
         if getattr(insight_response, "error", False):
             return f"OpenRouter error: {insight_response.message}"
-
         return insight_response.data.get("response", "") if insight_response.data else ""
 
     except Exception as e:

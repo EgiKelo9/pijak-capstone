@@ -12,7 +12,7 @@ export const DATA = {
       isActive: true,
       items: [
         { title: 'Forecasting', url: '/dasbor/forecasting' },
-        { title: 'Clustering', url: '/dasbor/clustering' },
+        { title: 'Clustering', url: '/clustering' },
       ],
     },
     {

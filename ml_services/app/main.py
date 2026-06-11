@@ -1,14 +1,23 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.base import StandardResponse
-from app.middleware import cors
 from app.router import openrouter, model, health, gemini, preprocess
 
 app = FastAPI(
     title="Beez - Pijak Capstone ML Service",
     description="API Capstone Project untuk Machine Learning & Generative AI Service (Port 8000)",
     version="1.0.0"
+)
+
+# CORS langsung di main
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 if not os.getenv("ENV"):
@@ -36,4 +45,4 @@ async def http_exception_handler(request, exc):
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Beez - Pijak Capstone ML Service. Akses /docs untuk melihat dokumentasi interaktif."}
+    return {"message": "Welcome to Beez - Pijak Capstone ML Service."}

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 
 # ================================
 # REQUEST SCHEMA
@@ -11,6 +11,7 @@ class ClusteringRequest(BaseModel):
     col_product: str
     col_fitur: list[str]
     data: list[dict[str, Any]]
+    n_clusters: Optional[int] = None  # None = sistem otomatis cari K optimal, int = user tentukan sendiri
 
 
 # ================================
@@ -26,8 +27,12 @@ class ProductClusterDetail(BaseModel):
 class ClusteringResult(BaseModel):
     """Hasil clustering yang dikembalikan pipeline"""
     cluster_amount: int
+    optimal_k: int
     silhouette_score: float
+    silhouette_list: list[float]
     wcss_score: float
+    wcss_list: list[float]
+    k_range: list[int]
     cluster_data: list[dict[str, Any]]
     insight_summary: str
 
