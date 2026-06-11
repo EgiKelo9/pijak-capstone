@@ -80,7 +80,8 @@ async def upload_bin(
     db: Session,
     is_cleaned: bool = False,
     ori_data_id: Optional[int] = None,
-    model: Optional[str] = None
+    model: Optional[str] = None,
+    feature_metadata: Optional[dict]= None
 ):
     # Workaround for Swagger UI automatically filling '0' and 'string'
     if ori_data_id == 0:
@@ -127,6 +128,7 @@ async def upload_bin(
                 dataset_name=file.filename,
                 dataset_file=utf8_bytes,
                 original_encoding=detected_encoding,
+                feature_metadata=feature_metadata,
                 is_cleaned=is_cleaned,
                 ori_data_id=ori_data_id,
                 model=model

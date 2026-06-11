@@ -3,7 +3,7 @@ import logging
 from io import BytesIO
 
 import pandas as pd
-
+import json
 from app.schemas.base import StandardResponse
 from app.schemas.features import Feature
 from app.core.config import get_settings
@@ -142,7 +142,7 @@ async def get_dataset_feature_metadata(dataset_id: int) -> dict | None:
         response = await call_backend_api("GET", f"/api/v1/datasets/feature-metadata/{dataset_id}")
         if response.status_code == 200:
             data = response.json()
-            return data.get("data")
+            return data
     except Exception as e:
         logger.warning(f"Could not fetch feature metadata for dataset {dataset_id}: {e}")
     return None
@@ -188,6 +188,7 @@ async def upload_cleaned_dataset(
     df: pd.DataFrame,
     original_dataset_id: int,
     model: str,
+    feature_metadata: dict
 ) -> dict:
     """
     Soft-delete record cleaned lama lalu serialisasi DataFrame ke CSV dan upload ke backend.
@@ -236,7 +237,8 @@ async def upload_cleaned_dataset(
     data = {
         'is_cleaned': 'true',
         'ori_data_id': str(original_dataset_id),
-        'model': model
+        'model': model,
+        'feature_metadata': json.dumps(feature_metadata)
     }
 
     response = await call_backend_api(
@@ -316,7 +318,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 },
                 "stream": False,
                 "temperature": 0.0,
-                "max_output_tokens": 1670,
+                "max_output_tokens": 2670,
                 # "max_completion_tokens": 2670,
             }
             

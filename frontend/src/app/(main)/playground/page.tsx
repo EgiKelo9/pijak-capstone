@@ -1,8 +1,11 @@
 'use client';
 
+import { format } from 'date-fns';
+import * as React from 'react';
+import { DateRange } from 'react-day-picker';
+
 import { FileUploadDemo } from '@/components/file-upload-demo';
 import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset } from '@/lib/middle-man';
-import { useTerminal } from '../mainSidebar';
 import { DataConfigState } from './column-preference';
 import { EmptyStateView } from './dashboard-empty-state';
 import { FilledStateView } from './dashboard-filled-state';
@@ -38,7 +41,7 @@ export default function AnalysisEmptyState() {
     targetColumn: '',
     includedColumns: []
   });
-  const { logs: terminalLogs, setLogs: setTerminalLogs } = useTerminal();
+  const [terminalLogs, setTerminalLogs] = React.useState<TerminalStep[]>([]);
   const [dataConfigStatus, setDataConfigStatus] = React.useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
   const [rawFeatureMapping, setRawFeatureMapping] = React.useState<any | null>(null);
 
@@ -88,9 +91,8 @@ export default function AnalysisEmptyState() {
   // Fungsi orkestrasi Pipeline ML (Dipanggil otomatis setelah upload sukses)
   const runPreprocessingPipeline = React.useCallback(async (datasetId: number, currentMode: string, forceReload: boolean = false) => {
     // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
-    setTerminalLogs((prev) => [
-      ...prev,
-      { stepId: `init-${Date.now()}`, text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
+    setTerminalLogs([
+      { stepId: 'init', text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
       { stepId: 'analyze_col', text: forceReload ? `[OpenRouter] Menganalisis ulang metadata dataset #${datasetId}...` : `Memeriksa konfigurasi kolom dataset #${datasetId}...`, status: 'loading' }
     ]);
     setDataConfigStatus('menunggu');
@@ -107,7 +109,6 @@ export default function AnalysisEmptyState() {
           }
         } catch (err) {
           console.warn("[Dashboard] Gagal memuat metadata dari database, beralih ke analisis ML...");
-          setTerminalLogs((prev) => [...prev, { stepId: `meta_warn-${Date.now()}`, text: 'Metadata tidak ditemukan di database, beralih ke layanan ML...', status: 'info' }]);
         }
       }
 
@@ -159,21 +160,9 @@ export default function AnalysisEmptyState() {
           };
         });
         setDataConfigStatus('berhasil');
-        setTerminalLogs((prev) => {
-          const logs = prev.map(log => 
-            log.stepId === 'analyze_col' ? { ...log, text: 'Konfigurasi kolom berhasil dimuat.', status: 'success' } : log
-          );
-          if (mapping.reasonings) {
-            logs.push({
-              stepId: `reasoning-${Date.now()}`,
-              text: `Keputusan AI: ${mapping.reasonings}`,
-              status: 'info',
-              collapsible: true,
-              defaultCollapsed: true
-            });
-          }
-          return logs;
-        });
+        setTerminalLogs((prev) => prev.map(log => 
+          log.stepId === 'analyze_col' ? { ...log, text: 'Konfigurasi kolom berhasil dimuat.', status: 'success' } : log
+        ));
 
       // 3. Pre-calling Langkah 2 (Jika Anda perlu memanggil endpoint clean data terpisah)
       // setTerminalLogs((prev) => [...prev, { stepId: 'data_clean', text: 'Memulai pembersihan data...', status: 'loading' }]);
@@ -190,17 +179,13 @@ export default function AnalysisEmptyState() {
   }, []);
 
   const handleUploadConfirm = React.useCallback(async (file: File) => {
-    const uploadStepId = `upload-${Date.now()}`;
     try {
-      setTerminalLogs((prev) => [...prev, { stepId: uploadStepId, text: `Mengunggah file ${file.name}...`, status: 'loading' }]);
       const data = await uploadDataset(file);
       console.log("[Dashboard] Upload Success. Dataset ID:", data.dataset_id);
-      setTerminalLogs((prev) => prev.map(log => log.stepId === uploadStepId ? { ...log, text: 'File berhasil diunggah.', status: 'success' } : log));
       setActiveDatasetId(data.dataset_id);
       setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
     } catch (error: any) {
       console.error("[Dashboard] Upload Error:", error);
-      setTerminalLogs((prev) => prev.map(log => log.stepId === uploadStepId ? { ...log, text: `Gagal mengunggah: ${error.message}`, status: 'error' } : log));
       const isAuthError = error.message === "Unauthorized";
       alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
@@ -310,8 +295,6 @@ export default function AnalysisEmptyState() {
 
     const initDataAndPipeline = async () => {
         setIsLoadingDataset(true);
-        const fetchStepId = `fetch-${activeDatasetId}`;
-        setTerminalLogs((prev) => [...prev, { stepId: fetchStepId, text: `Memuat dataset #${activeDatasetId} dari server...`, status: 'loading' }]);
         try {
           const csvString = await getDataset(activeDatasetId);
   
@@ -342,7 +325,6 @@ export default function AnalysisEmptyState() {
           }
         }
         console.log(`[Dashboard] Parsed ${parsedData.length} rows for preview`);
-        setTerminalLogs((prev) => prev.map(log => log.stepId === fetchStepId ? { ...log, text: `Dataset dimuat (${parsedData.length} baris diproses).`, status: 'success' } : log));
         setDatasetData(parsedData);
         
         // Ekstrak nama kolom untuk inisiasi Konfigurasi Data
@@ -359,9 +341,8 @@ export default function AnalysisEmptyState() {
             return prev;
           });
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("[Dashboard] Fetch Dataset Error:", error);
-        setTerminalLogs((prev) => prev.map(log => log.stepId === fetchStepId ? { ...log, text: `Gagal memuat dataset: ${error.message}`, status: 'error' } : log));
       } finally {
         setIsLoadingDataset(false);
       }

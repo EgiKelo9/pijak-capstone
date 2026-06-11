@@ -1,11 +1,13 @@
 import logging
 from typing import Any, Dict
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.schemas.base import StandardResponse
-from app.pipeline.preprocess import temp_pipeline
+from app.pipeline.preprocess import temp_pipeline, test_ws
 from app.schemas.openrouter import PreprocessRequest, PreprocessResponse
 from app.schemas.features import Feature
-from app.core.utils import get_dataset_feature_metadata, call_backend_api
+from app.core.websocket_manager import manager
+from pydantic import UUID5
+# from app.schemas.model import TestRun
 
 router = APIRouter(prefix="/preprocess")
 logger = logging.getLogger("uvicorn.error")
@@ -54,24 +56,26 @@ async def run_temp_pipeline_bg(dataset_id: int, model: str):
 )
 async def generate_preprocess(request: PreprocessRequest, background_tasks: BackgroundTasks):
     """
-    Endpoint untuk menjalankan seluruh pipeline preprocessing dalam background.
-    """
-    existing_metadata = await get_dataset_feature_metadata(request.dataset_id) or {}
-    existing_metadata["preprocess_status"] = "processing"
-    
-    try:
-        await call_backend_api(
-            "PATCH",
-            f"/api/v1/datasets/feature-metadata-update/{request.dataset_id}",
-            json=existing_metadata
-        )
-    except Exception as e:
-        logger.error(f"Failed to set processing status: {e}")
+    Endpoint untuk menjalankan seluruh pipeline preprocessing, berdasarkan dataset_id tertentu, Keluaran akan langsung disimpan pada database, namun akan diberikan beberapa informasi untuk logging.
 
-    background_tasks.add_task(run_temp_pipeline_bg, request.dataset_id, request.model_type)
+    Args:
+        request (PreprocessRequest): Request body yang berisi dataset id, serta pendekatan preprocessing yang diinginkan (Cluster/Forecast/Both).
+
+    Returns:
+        GemmaInsightResponse: Logging hasil preprocessing.
+    """
+    insight = await temp_pipeline(request.dataset_id, request.model_type, request.job_id)
+    if type(insight) is Feature:
+        return
+    else:
+        return f"idk: {insight}"
     
-    # Return immediately, the frontend will poll getDatasetFeatureMetadata
-    return PreprocessResponse(
-        insight=Feature(**existing_metadata) if existing_metadata and "cols_to_drop" in existing_metadata else Feature(cols_to_drop=None, col_target=None),
-        dataset_id=request.dataset_id
-    )
+@router.websocket("/ws/{job_id}")
+async def websocket_endpoint(websocket: WebSocket, job_id: str):
+    await manager.connect(job_id, websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(job_id)
