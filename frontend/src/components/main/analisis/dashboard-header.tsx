@@ -109,7 +109,7 @@ function DashboardHeader({
             <Button
               variant="outline"
               className={cn(
-                'w-full justify-between rounded-xl border-neutral-800/20 bg-linear-to-b from-white to-[#2BBAEE]/10 px-4 h-11 md:h-12 text-left text-sm font-medium hover:bg-[#2BBAEE]/5 transition-all',
+                'w-full justify-between rounded-xl border-neutral-800/20 bg-gradient-to-b from-white to-[#2BBAEE]/10 px-4 h-11 md:h-12 text-left text-sm font-medium transition-all duration-200 ease-out hover:to-[#2BBAEE]/20 hover:shadow-md hover:-translate-y-0.5 active:scale-95',
                 !date && 'text-neutral-800/60',
               )}
             >

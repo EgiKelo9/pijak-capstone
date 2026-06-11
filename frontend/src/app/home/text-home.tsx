@@ -1,4 +1,3 @@
-import Image from "next/image"
 
 export default function TextHome() {
     return (
@@ -7,10 +6,10 @@ export default function TextHome() {
                 <span>Bawa </span>
                 <span className="inline-flex items-center translate-y-1.5 md:translate-y-3 -mx-1">
                     <div className="relative h-10 w-10 md:h-24 md:w-24 -rotate-12 z-10">
-                        <Image src="/icons8/icons8-shop-100.png" alt="Shop" fill className="object-contain" />
+                        <img src="/icons8/icons8-shop-100.png" alt="Shop" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                     <div className="relative h-10 w-10 md:h-24 md:w-24 rotate-12 -ml-5 md:-ml-10">
-                        <Image src="/icons8/icons8-decision-100.png" alt="Decision" fill className="object-contain" />
+                        <img src="/icons8/icons8-decision-100.png" alt="Decision" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                 </span>
                 <span> naik level,</span>
@@ -20,13 +19,13 @@ export default function TextHome() {
                 <span>tinggalkan batasan </span>
                 <span className="inline-flex items-center translate-y-1.5 md:translate-y-3 -mx-1">
                     <div className="relative h-10 w-10 md:h-24 md:w-24 -rotate-12 z-20">
-                        <Image src="/icons8/icons8-dice-100.png" alt="Dice" fill className="object-contain" />
+                        <img src="/icons8/icons8-dice-100.png" alt="Dice" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                     <div className="relative h-10 w-10 md:h-24 md:w-24 -ml-5 md:-ml-10 z-10">
-                        <Image src="/icons8/icons8-book-100.png" alt="Book" fill className="object-contain" />
+                        <img src="/icons8/icons8-book-100.png" alt="Book" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                     <div className="relative h-10 w-10 md:h-24 md:w-24 rotate-12 -ml-5 md:-ml-12">
-                        <Image src="/icons8/icons8-time-100.png" alt="Time" fill className="object-contain" />
+                        <img src="/icons8/icons8-time-100.png" alt="Time" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                 </span>
                 <span>.</span>
@@ -36,10 +35,10 @@ export default function TextHome() {
                 <span>Karena ada </span>
                 <span className="inline-flex items-center translate-y-1.5 md:translate-y-3 -mx-1">
                     <div className="relative h-10 w-10 md:h-24 md:w-24 -rotate-12 z-10">
-                        <Image src="/icons8/icons8-treasure-100.png" alt="Shop" fill className="object-contain" />
+                        <img src="/icons8/icons8-treasure-100.png" alt="Shop" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                     <div className="relative h-10 w-10 md:h-24 md:w-24 rotate-12 -ml-5 md:-ml-10">
-                        <Image src="/icons8/icons8-improvement-100.png" alt="Decision" fill className="object-contain" />
+                        <img src="/icons8/icons8-improvement-100.png" alt="Decision" width={96} height={96} fetchPriority="high" decoding="async" className="w-full h-full object-contain" />
                     </div>
                 </span>
                 <span> di setiap transaksi.</span>
