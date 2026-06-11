@@ -16,6 +16,8 @@ interface AnalysisCardProps {
   collapsible?: boolean;
   /** Initial open state when collapsible. Default: true */
   defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const statusConfig = {
@@ -57,14 +59,18 @@ export function AnalysisCard({
   innerClassName,
   collapsible = false,
   defaultOpen = true,
+  open,
+  onOpenChange,
 }: AnalysisCardProps) {
   const config = status !== 'none' ? statusConfig[status] : null;
-  const [isOpen, setIsOpen] = React.useState(defaultOpen);
-  // 'auto' while expanded (allows natural growth); px number while animating
+
+  const isControlled = open !== undefined;
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+  const isOpen = isControlled ? open : internalOpen;
+
   const [shellHeight, setShellHeight] = React.useState<number | 'auto'>(
     defaultOpen ? 'auto' : 0
   );
-  // Tracks whether we are mid-transition to suppress redundant onTransitionEnd calls
   const animating = React.useRef(false);
   const shellRef = React.useRef<HTMLDivElement>(null);
 
@@ -86,28 +92,34 @@ export function AnalysisCard({
     return () => ro.disconnect();
   }, [collapsible, children]);
 
+  const prevOpen = React.useRef(isOpen);
+
+  React.useEffect(() => {
+    if (isOpen !== prevOpen.current) {
+      animating.current = true;
+      if (isOpen) {
+        setShellHeight(naturalHeight);
+      } else {
+        const currentHeight = shellRef.current?.getBoundingClientRect().height || naturalHeight;
+        setShellHeight(currentHeight);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            setShellHeight(0);
+          })
+        );
+      }
+      prevOpen.current = isOpen;
+    }
+  }, [isOpen, naturalHeight]);
+
   // ── Toggle ─────────────────────────────────────────────────────────────────
   const toggle = () => {
     if (!collapsible || animating.current) return;
-    animating.current = true;
-
-    if (isOpen) {
-      // Collapse: freeze to px first so the browser has a from-value, then
-      // set to 0 in the next paint.
-      // Use the actual rendered height if constrained by flexbox, falling back to naturalHeight
-      const currentHeight = shellRef.current?.getBoundingClientRect().height || naturalHeight;
-      setShellHeight(currentHeight);
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          setIsOpen(false);
-          setShellHeight(0);
-        })
-      );
-    } else {
-      // Expand: go from 0 → naturalHeight px, then 'auto' when done
-      setIsOpen(true);
-      setShellHeight(naturalHeight);
+    const nextState = !isOpen;
+    if (!isControlled) {
+      setInternalOpen(nextState);
     }
+    onOpenChange?.(nextState);
   };
 
   const handleTransitionEnd = () => {

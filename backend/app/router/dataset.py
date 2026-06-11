@@ -1,11 +1,12 @@
 
+import json
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse, ProcessDatasetRequest
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -26,6 +27,7 @@ async def upload_dataset(
     is_cleaned: bool = Form(False),
     ori_data_id: Optional[int] = Form(None),
     model: Optional[str] = Form(None),
+    feature_metadata: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -46,7 +48,14 @@ async def upload_dataset(
         HTTPException: 500 if the file cannot be saved or dataset metadata fails to persist.
         HTTPException: 422 if request validation fails.
     """
-    return await upload_bin(file, current_user, db, is_cleaned, ori_data_id, model)
+    parsed_metadata = None
+    if feature_metadata:
+        try:
+            parsed_metadata = json.loads(feature_metadata)
+        except json.JSONDecodeError:
+            pass
+
+    return await upload_bin(file, current_user, db, is_cleaned, ori_data_id, model, parsed_metadata)
 
 @router.get(
     "/{dataset_id}",
@@ -112,6 +121,34 @@ async def fetch_datasets_by_user(
         HTTPException: 422 if request validation fails.
     """
     return await fetch_datasets_bin_by_user(current_user, db)
+
+@router.get(
+    "/feature-metadata/{dataset_id}",
+    response_model=StandardResponse[Any],
+    responses={
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        403: {"model": StandardResponse[dict], "description": "Forbidden"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"}
+    }
+)
+async def get_dataset_feature_metadata(
+    dataset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch the feature metadata analysis for a specific dataset.
+
+    Args:
+        dataset_id (int): The ID of the dataset.
+        db (Session, optional): Database session injected by FastAPI.
+        current_user (User, optional): Currently authenticated user.
+
+    Returns:
+        StandardResponse[Any]: A JSON object containing the feature metadata, or null if none exists.
+    """
+    return await fetch_dataset_feature_metadata(dataset_id, current_user, db)
+
 
 @router.patch(
     "/feature-metadata-update/{dataset_id}",
@@ -204,3 +241,44 @@ async def get_analysis_history_by_user(
         HTTPException: 500 if the analysis history cannot be fetched.
     """
     return await fetch_analysis_history_by_user(current_user, db)
+
+@router.post(
+    "/analyze-columns",
+    response_model=StandardResponse[Dict[str, Any]],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
+    }
+)
+async def analyze_columns(
+    request: ProcessDatasetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint untuk menjalankan analyze-columns ke ML Services.
+    """
+    return await analyze_dataset_columns(request.dataset_id, request.model_type, current_user, db, request.force_reload)
+
+@router.post(
+    "/preprocess",
+    response_model=StandardResponse[Dict[str, Any]],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
+    }
+)
+async def run_preprocessing(
+    request: ProcessDatasetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Endpoint untuk menjalankan preprocessing ke ML Services.
+    """
+    return await preprocess_dataset_run(request.dataset_id, request.model_type, current_user, db)
+

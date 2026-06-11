@@ -3,7 +3,7 @@ import logging
 from io import BytesIO
 
 import pandas as pd
-
+import json
 from app.schemas.base import StandardResponse
 from app.schemas.features import Feature
 from app.core.config import get_settings
@@ -134,6 +134,19 @@ async def update_dataset_feature_metadata(dataset_id:int, feature: Feature):
     
     return response.json()
 
+async def get_dataset_feature_metadata(dataset_id: int) -> dict | None:
+    """
+    Mengambil feature metadata yang sudah ada di database.
+    """
+    try:
+        response = await call_backend_api("GET", f"/api/v1/datasets/feature-metadata/{dataset_id}")
+        if response.status_code == 200:
+            data = response.json()
+            return data
+    except Exception as e:
+        logger.warning(f"Could not fetch feature metadata for dataset {dataset_id}: {e}")
+    return None
+
 async def get_dataset(dataset_id: int) -> tuple[pd.DataFrame, str]:
     """
     Fetch dataset dari backend API dan kembalikan sebagai pandas DataFrame
@@ -175,6 +188,7 @@ async def upload_cleaned_dataset(
     df: pd.DataFrame,
     original_dataset_id: int,
     model: str,
+    feature_metadata: dict
 ) -> dict:
     """
     Soft-delete record cleaned lama lalu serialisasi DataFrame ke CSV dan upload ke backend.
@@ -223,7 +237,8 @@ async def upload_cleaned_dataset(
     data = {
         'is_cleaned': 'true',
         'ori_data_id': str(original_dataset_id),
-        'model': model
+        'model': model,
+        'feature_metadata': json.dumps(feature_metadata)
     }
 
     response = await call_backend_api(
@@ -256,7 +271,8 @@ def get_dataset_info(df: pd.DataFrame) -> dict:
         "shape": df.shape,
         "dtypes": df.dtypes.astype(str).to_dict(),
         "head": df.head().to_dict(orient="records"),
-        "missing_values": df.isnull().sum().to_dict()
+        "missing_values": df.isnull().sum().to_dict(),
+        "unique_values": df.nunique().to_dict()
     }
 
 
@@ -287,20 +303,27 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
+                "structured_outputs": True,
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "feature_extraction",
-                        "strict": True,
+                        # "strict": True,
+                        "strict": False,
                         "schema": Feature.model_json_schema()
                     }
                 },
+                'reasoning': {
+                    'effort': 'low'
+                },
                 "stream": False,
                 "temperature": 0.0,
+                "max_output_tokens": 2670,
+                # "max_completion_tokens": 2670,
             }
             
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
-        print(payload)
+        print(payload, flush=True)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=settings.OPEN_ROUTER_BASE_URL,
@@ -308,6 +331,8 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 json=payload,
                 timeout=60.0
             )
+
+            print(f"Received response from OpenRouter: status_code={response.status_code}, response_text={response.text}", flush=True)
             
             logger.info("Received response from OpenRouter: status_code=%s, response_text=%s", response.status_code, response.text)
             response.raise_for_status()
@@ -324,6 +349,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
             
     except Exception as e:
         logger.error("Error generating response from OpenRouter: %s", str(e))
+        print(f"OpenRouter exception occurred: {str(e)}", flush=True)
         return StandardResponse(
             code=500,
             error=True,

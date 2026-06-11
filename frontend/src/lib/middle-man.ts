@@ -67,21 +67,47 @@ export async function getAnalysisHistory() {
   return result.data;
 }
 
-export async function analyzeColumns(datasetId: number, modelType: string) {
+export async function analyzeColumns(datasetId: number, modelType: string, forceReload: boolean = false) {
   const response = await fetchMLWithAuth("/openrouter/analyze-columns", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ dataset_id: datasetId, model_type: modelType }),
+    body: JSON.stringify({ dataset_id: datasetId, model_type: modelType, force_reload: forceReload }),
   });
 
   const catchRes = await response.json();
+  console.log(catchRes);
   if (!response.ok) {
     throw new Error(`API Error: Gagal menghubungi ML Services`);
   }
 
   return catchRes.data;
+}
+
+export async function getDatasetFeatureMetadata(datasetId: number) {
+  const response = await fetchWithAuth(`/datasets/feature-metadata/${datasetId}`);
+  
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Failed to fetch feature metadata");
+  }
+  
+  return result.data;
+}
+
+export async function updateDatasetFeatureMetadata(datasetId: number, featureMapping: any) {
+  const response = await fetchWithAuth(`/datasets/feature-metadata-update/${datasetId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(featureMapping),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Failed to update feature metadata");
+  }
+  return result.data;
 }
 
 export async function uploadDataset(file: File) {
@@ -143,3 +169,42 @@ export async function mockLogin(email: string, password: string) {
     throw new Error("Failed to fetch mock token");
   }
 }
+
+export const fetchUserDatasets = async () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const response = await fetch("http://localhost:5000/api/v1/datasets/user/me", {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  
+  const result = await response.json();
+  
+  if (response.ok && result.data) {
+    return Array.isArray(result.data) ? result.data : result.data.datasets || [];
+  }
+  
+  throw new Error(result.message || "Failed to fetch datasets");
+};
+
+export const runAnalysisPipeline = async (jobId: string, datasetId: number, modelType: string) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const response = await fetch("http://localhost:8000/ml/v1/preprocess/run", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      job_id: jobId,
+      dataset_id: datasetId,
+      model_type: modelType,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to start analysis pipeline");
+  }
+
+  return await response.text();
+};

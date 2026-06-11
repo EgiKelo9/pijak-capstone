@@ -38,8 +38,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
-      <body className={`${sfPro.variable} ${fontSerif.variable} ${fontMono.variable} font-sans antialiased`}>
+    <html lang="id" suppressHydrationWarning>
+      <body className={`${sfPro.variable} ${fontSerif.variable} ${fontMono.variable} font-sans antialiased`} suppressHydrationWarning>
         {children}
       </body>
     </html>

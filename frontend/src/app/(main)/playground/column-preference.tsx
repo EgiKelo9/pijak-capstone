@@ -1,7 +1,8 @@
 // components/preferences/data-configuration.tsx
 'use client';
 
-import * as React from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -9,9 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Check, RefreshCw } from 'lucide-react';
+import * as React from 'react';
 
 export interface DataConfigState {
   availableColumns: string[];
@@ -23,6 +23,9 @@ export interface DataConfigState {
 interface DataConfigurationProps {
   config: DataConfigState;
   onChange: (newConfig: DataConfigState) => void;
+  onConfirm?: () => void;
+  onReload?: () => void;
+  isProcessing?: boolean;
 }
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
@@ -31,7 +34,7 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   </span>
 );
 
-export function DataConfiguration({ config, onChange }: DataConfigurationProps) {
+export function DataConfiguration({ config, onChange, onConfirm, onReload, isProcessing }: DataConfigurationProps) {
   const handleDateChange = (val: string) => onChange({ ...config, dateColumn: val });
   const handleTargetChange = (val: string) => onChange({ ...config, targetColumn: val });
 
@@ -56,20 +59,21 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
     onChange({ ...config, includedColumns: next });
   };
 
+  const validColumns = config.availableColumns.filter((col) => col && col.trim() !== '');
+
   return (
-    // h-full + overflow-hidden: fills the card's inner box exactly, nothing bleeds out
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden">
 
       {/* ── Dropdowns ── fixed height, never scrolls */}
       <div className="shrink-0 grid grid-cols-2 gap-2 pb-2.5 border-b border-neutral-100">
         <div className="flex flex-col gap-1">
           <SectionLabel>Tanggal</SectionLabel>
-          <Select value={config.dateColumn} onValueChange={handleDateChange}>
+          <Select value={config.dateColumn || undefined} onValueChange={handleDateChange}>
             <SelectTrigger className="h-7 text-xs border-neutral-200 bg-neutral-50/50 px-2">
               <SelectValue placeholder="Pilih kolom…" />
             </SelectTrigger>
             <SelectContent>
-              {config.availableColumns.map((col) => (
+              {validColumns.map((col) => (
                 <SelectItem key={col} value={col} className="text-xs">
                   {col}
                 </SelectItem>
@@ -80,12 +84,12 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
 
         <div className="flex flex-col gap-1">
           <SectionLabel>Target</SectionLabel>
-          <Select value={config.targetColumn} onValueChange={handleTargetChange}>
+          <Select value={config.targetColumn || undefined} onValueChange={handleTargetChange}>
             <SelectTrigger className="h-7 text-xs border-neutral-200 bg-neutral-50/50 px-2">
               <SelectValue placeholder="Pilih kolom…" />
             </SelectTrigger>
             <SelectContent>
-              {config.availableColumns.map((col) => (
+              {validColumns.map((col) => (
                 <SelectItem key={col} value={col} className="text-xs">
                   {col}
                 </SelectItem>
@@ -111,7 +115,7 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
           )}
         </div>
 
-        {/* Scrollable list — flex-1 + min-h-0 lets it shrink into remaining card space */}
+        {/* Scrollable list */}
         <ScrollArea className="flex-1 min-h-0 w-full">
           <div className="flex flex-col gap-0 pr-1">
             {featureColumns.length === 0 ? (
@@ -144,7 +148,6 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
                     >
                       {col}
                     </span>
-                    {/* Subtle checked indicator */}
                     {checked && (
                       <span className="ml-auto shrink-0 w-1 h-1 rounded-full bg-[#2BBAEE]" />
                     )}
@@ -155,16 +158,34 @@ export function DataConfiguration({ config, onChange }: DataConfigurationProps) 
           </div>
         </ScrollArea>
 
-        {/* Footer: count of selected features */}
-        {featureColumns.length > 0 && (
-          <div className="shrink-0 pt-1 border-t border-neutral-100">
-            <span className="text-[9px] text-neutral-400">
-              {config.includedColumns.filter((c) => featureColumns.includes(c)).length}
-              {' / '}
-              {featureColumns.length} kolom dipilih
-            </span>
+        {/* Footer: count of selected features + Actions */}
+        <div className="shrink-0 flex items-center justify-between pt-2 mt-1 border-t border-neutral-100">
+          <span className="text-[9px] text-neutral-400">
+            {featureColumns.length > 0 
+              ? `${config.includedColumns.filter((c) => featureColumns.includes(c)).length} / ${featureColumns.length} dipilih`
+              : '0 dipilih'}
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onReload}
+              disabled={isProcessing}
+              title="Muat Ulang Konfigurasi"
+              className="flex items-center justify-center size-6 rounded-md border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 active:scale-95 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className="size-3" />
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isProcessing}
+              title="Konfirmasi Konfigurasi"
+              className="flex items-center gap-1 h-6 px-2 rounded-md bg-[#2BBAEE] text-[9px] font-medium text-white hover:bg-[#1a9fd4] active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+            >
+              <Check className="size-3" />
+              Simpan
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

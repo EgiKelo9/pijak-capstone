@@ -22,11 +22,13 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
+import { fetchUserDatasets, runAnalysisPipeline } from '@/lib/middle-man';
+import { useTerminal } from '@/components/main/layout/main-sidebar';
 import { DATA } from './sidebar-data';
 
 export function AppSidebarTopbar() {
   const pathname = usePathname();
-  const showActionButtons = pathname === '/dashboard';
+  const showActionButtons = pathname === '/analisis';
 
   // More robust breadcrumb: check exact match first, then prefix
   const currentPage = DATA.navMain.find(nav =>
@@ -36,21 +38,13 @@ export function AppSidebarTopbar() {
 
   const [datasets, setDatasets] = React.useState<any[]>([]);
   const [loadingDatasets, setLoadingDatasets] = React.useState(false);
+  const { setLogs: setTerminalLogs } = useTerminal();
 
   const fetchDatasets = async () => {
     setLoadingDatasets(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      // We use "me" here because your backend automatically determines the user via the Bearer token
-      const response = await fetch("http://localhost:5000/api/v1/datasets/user/me", {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      const result = await response.json();
-      if (response.ok && result.data) {
-        setDatasets(Array.isArray(result.data) ? result.data : result.data.datasets || []);
-      }
+      const data = await fetchUserDatasets();
+      setDatasets(data);
     } catch (error) {
       console.error("Failed to fetch datasets", error);
     } finally {
@@ -61,6 +55,86 @@ export function AppSidebarTopbar() {
   const handleDatasetSelect = (datasetId: number) => {
     sessionStorage.setItem('pijak_active_dataset_id', datasetId.toString());
     window.dispatchEvent(new Event('dataset_changed'));
+  };
+
+  const job_id = '1b671a64-40d5-491e-99b0-da01ff1f3341'
+  const analysis_start = async () => {
+    const ws_job_id = `ws-job-${Date.now()}`;
+    setTerminalLogs(prev => [...prev, { stepId: ws_job_id, text: 'Mencoba terhubung ke layanan analisis...', status: 'loading' }]);
+    
+    let currentWsStepId: string | null = null;
+
+    try {
+      const ws = new WebSocket(
+        `ws://localhost:8000/ml/v1/preprocess/ws/${job_id}`
+      );
+
+      ws.onopen = async () => {
+        setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: 'Koneksi ke layanan analisis berhasil.', status: 'success' } : log));
+        setTerminalLogs(prev => [...prev, { stepId: `pipeline-start-${Date.now()}`, text: 'Memulai pipeline pemrosesan data...', status: 'info' }]);
+        
+        await runAnalysisPipeline(job_id, 1, "cluster");
+      
+         // Dieksekusi ketika keseluruhan pipeline di backend selesai dan mengembalikan data
+        setTerminalLogs(prev => {
+          const updatedLogs = currentWsStepId
+            ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+            : prev;
+          return [...updatedLogs, { stepId: `pipeline-end-${Date.now()}`, text: 'Pipeline pemrosesan data selesai.', status: 'success' as const }];
+        });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          const newStepId = `ws-msg-${Date.now()}`;
+
+          setTerminalLogs(prev => {
+            const updatedLogs = currentWsStepId
+              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+              : prev;
+            return [...updatedLogs, {
+              stepId: newStepId,
+              text: message.message || event.data,
+              status: 'loading' as const,
+            }];
+          });
+          currentWsStepId = newStepId;
+        } catch (e) {
+          const newRawStepId = `ws-msg-raw-${Date.now()}`;
+          setTerminalLogs(prev => {
+            const updatedLogs = currentWsStepId
+              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
+              : prev;
+            return [...updatedLogs, {
+              stepId: newRawStepId,
+              text: event.data,
+              status: 'loading' as const,
+            }];
+          });
+          currentWsStepId = newRawStepId;
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WS error:", error);
+        setTerminalLogs(prev => prev.map(log => (log.stepId === ws_job_id || log.stepId === currentWsStepId) && log.status === 'loading' ? { ...log, text: 'Sebuah langkah gagal dieksekusi.', status: 'error' } : log));
+      };
+
+      ws.onclose = () => {
+        // Selesaikan log 'loading' terakhir jika koneksi ditutup
+        setTerminalLogs(prev => {
+          const updatedLogs = currentWsStepId
+            ? prev.map(log => (log.stepId === currentWsStepId && log.status === 'loading') ? { ...log, status: 'success' as const } : log)
+            : prev;
+          return [...updatedLogs, { stepId: `ws-close-${Date.now()}`, text: 'Koneksi ke layanan analisis ditutup.', status: 'info' as const }];
+        });
+      };
+    } catch (error) {
+      console.error("Failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: `Gagal memulai koneksi: ${errorMessage}`, status: 'error' } : log));
+    }
   };
 
   return (
@@ -120,7 +194,7 @@ export function AppSidebarTopbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] px-3 md:px-4 transition-all hover:opacity-90 active:scale-95 shadow-sm duration-150">
+          <button onClick={analysis_start} className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] px-3 md:px-4 transition-all hover:opacity-90 active:scale-95 shadow-sm duration-150">
             <PlayCircle className="size-4 text-[#272727] shrink-0" /><span className="font-sans text-sm font-medium text-[#272727] hidden sm:inline-block whitespace-nowrap">Mulai Analisis</span>
           </button>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import PixelBlast from "@/components/PixelBlast";
+import PixelBlast from "@/components/pixel-blast";
 
 export function HeroBackground() {
   return (

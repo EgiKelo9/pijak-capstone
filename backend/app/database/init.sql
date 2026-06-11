@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS analysis_history CASCADE;
 DROP TABLE IF EXISTS ml_models CASCADE;
 DROP TABLE IF EXISTS datasets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TYPE IF EXISTS process_status CASCADE;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -62,7 +63,7 @@ CREATE TABLE datasets_bin (
     dataset_name    VARCHAR(255) NOT NULL,
     dataset_file    BYTEA NOT NULL,
     original_encoding VARCHAR(50),
-    feature_metadata  JSONB,
+    feature_metadata  JSONB DEFAULT NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at      TIMESTAMP NULL
@@ -142,7 +143,8 @@ INSERT INTO users (name, email, password) VALUES
     ('Budi Santoso', 'budi@example.com', crypt('BudiPass123', gen_salt('bf'))),
     ('Ani Rahayu',   'ani@example.com',  crypt('AniPass123', gen_salt('bf'))),
     ('Baraja Putra', 'baraja@example.com', crypt('password123', gen_salt('bf'))),
-    ('string', 'user@example.com', crypt('string', gen_salt('bf')));
+    ('string', 'user@example.com', crypt('string', gen_salt('bf'))),
+    ('Admin', 'admin@pijak.com', crypt('admin123', gen_salt('bf')));
 
 INSERT INTO ml_models (name, type, description) VALUES
     ('XGBoost', 'forecasting', 'Extreme Gradient Boosting for time-series forecasting'),
@@ -167,13 +169,13 @@ INSERT INTO analysis_history (user_id, dataset_id, model_id, status) VALUES
     (4, 3, 4, 'gagal'),
     (4, 1, 1, 'berhasil');
 
-INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_value, mae, mape, mse, rmse, r2, trend_data, feature_importances, insight_summary) VALUES
-    (1, 0.85, 12.5, 10.2, 5.5, 150.0, 12.2, 0.88, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', '[]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
-    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
-    (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
-    (6, 0.92, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-01-01", "value": 200}]', '[]', 'Terdapat tren kenaikan penjualan 15% untuk kategori elektronik di bulan depan.'),
-    (8, 0.78, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-02-01", "value": 180}]', '[]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
-    (10, 0.88, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-03-01", "value": 210}]', '[]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
+INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_value, mae, mape, mse, rmse, r2, trend_data, insight_summary) VALUES
+    (1, 0.85, 12.5, 10.2, 5.5, 150.0, 12.2, 0.88, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', 'Trend penjualan diperkirakan naik 5% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
+    (3, NULL, '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
+    (4, NULL, '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
+    (6, 0.92, '[{"date": "2024-01-01", "value": 200}]', 'Terdapat tren kenaikan penjualan 15% untuk kategori elektronik di bulan depan.'),
+    (8, 0.78, '[{"date": "2024-02-01", "value": 180}]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
+    (10, 0.88, '[{"date": "2024-03-01", "value": 210}]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
 
 INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary) VALUES
     (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.'),
