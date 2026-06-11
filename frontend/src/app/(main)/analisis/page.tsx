@@ -42,7 +42,7 @@ export default function AnalysisEmptyState() {
     targetColumn: '',
     includedColumns: []
   });
-  const { logs: terminalLogs, setLogs: setTerminalLogs } = useTerminal();
+  const { logs: terminalLogs, setLogs: setTerminalLogs, setIsAnalysisReady } = useTerminal();
   const [dataConfigStatus, setDataConfigStatus] = React.useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
   const [rawFeatureMapping, setRawFeatureMapping] = React.useState<any | null>(null);
 
@@ -289,7 +289,27 @@ export default function AnalysisEmptyState() {
     }
   }, [mode]);
 
-  const isReady = !!date?.from && !!date?.to;
+  const [hasInteractedForecasting, setHasInteractedForecasting] = React.useState(false);
+  const [hasInteractedClustering, setHasInteractedClustering] = React.useState(false);
+
+  React.useEffect(() => {
+    if (forecastAggressiveness !== 50) setHasInteractedForecasting(true);
+  }, [forecastAggressiveness]);
+
+  React.useEffect(() => {
+    if (clusteringConfig.mode !== 'auto' || clusteringConfig.clusterCount !== 3) {
+      setHasInteractedClustering(true);
+    }
+  }, [clusteringConfig]);
+
+  const isPreferencesReady = (mode === 'forecasting' && hasInteractedForecasting) || (mode === 'clustering' && hasInteractedClustering) || (mode === 'both' && hasInteractedForecasting && hasInteractedClustering);
+
+  const isReady = !!date?.from && !!date?.to && activeDatasetId !== -1 && isPreferencesReady;
+
+  // Sinkronisasi isReady lokal dengan Context agar Topbar dapat mengaksesnya
+  React.useEffect(() => {
+    setIsAnalysisReady(isReady);
+  }, [isReady, setIsAnalysisReady]);
 
   // Centralized state monitor to track behavior updates in real-time
   React.useEffect(() => {
@@ -343,6 +363,54 @@ export default function AnalysisEmptyState() {
               });
               parsedData.push(obj);
             }
+            
+            // [AUTO-FILL] Ekstraksi rentang waktu secara efisien dari keseluruhan data
+            let minDate: Date | null = null;
+            let maxDate: Date | null = null;
+            let dateColIdx = -1;
+            
+            // 1. Moduler: Cari index kolom tanggal dengan sampel hingga 5 baris pertama
+            for (let r = 1; r < Math.min(lines.length, 6); r++) {
+              if (!lines[r].trim()) continue;
+              const sampleValues = lines[r].split(csvRegex).map((v: string) => v.trim().replace(/^"|"$/g, ''));
+              for (let j = 0; j < sampleValues.length; j++) {
+                const val = sampleValues[j];
+                // Cek agar bukan murni angka (spt nominal harga/ID) dan Valid Date
+                if (val && isNaN(Number(val)) && !isNaN(new Date(val).getTime())) {
+                  dateColIdx = j;
+                  break;
+                }
+              }
+              if (dateColIdx !== -1) break;
+            }
+            
+            // 2. Terapkan pencarian ke seluruh data (original dataset)
+            if (dateColIdx !== -1) {
+              for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim()) continue;
+                
+                let dateStr = "";
+                // Optimasi fast-path: Jika baris tanpa kutip ganda, split(',') murni jauh lebih kilat
+                if (!line.includes('"')) {
+                  const fastValues = line.split(',');
+                  dateStr = fastValues[dateColIdx] ? fastValues[dateColIdx].trim() : "";
+                } else {
+                  const safeValues = line.split(csvRegex);
+                  dateStr = safeValues[dateColIdx] ? safeValues[dateColIdx].trim().replace(/^"|"$/g, '') : "";
+                }
+                  
+                if (dateStr) {
+                  const d = new Date(dateStr);
+                  if (!isNaN(d.getTime())) {
+                    if (!minDate || d < minDate) minDate = d;
+                    if (!maxDate || d > maxDate) maxDate = d;
+                  }
+                }
+              }
+            }
+            
+            if (minDate && maxDate) setDate({ from: minDate, to: maxDate });
           }
         }
         console.log(`[Dashboard] Parsed ${parsedData.length} rows for preview`);

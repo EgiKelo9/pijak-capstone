@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
 import { fetchUserDatasets, runAnalysisPipeline } from '@/lib/middle-man';
+import { cn } from '@/lib/utils';
 import { useTerminal } from './mainSidebar';
 import { DATA } from './sidebar-data';
 
@@ -38,7 +39,7 @@ export function AppSidebarTopbar() {
 
   const [datasets, setDatasets] = React.useState<any[]>([]);
   const [loadingDatasets, setLoadingDatasets] = React.useState(false);
-  const { setLogs: setTerminalLogs } = useTerminal();
+  const { setLogs: setTerminalLogs, isAnalysisReady } = useTerminal();
 
   const fetchDatasets = async () => {
     setLoadingDatasets(true);
@@ -161,10 +162,10 @@ export function AppSidebarTopbar() {
         <div className="flex items-center gap-2 md:gap-3">
           <DropdownMenu onOpenChange={(open) => { if (open) fetchDatasets(); }}>
             <DropdownMenuTrigger asChild>
-              <button className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/15 bg-gradient-to-b from-[#2BBAEE]/20 to-transparent px-3 md:px-4 transition-all hover:bg-[#2BBAEE]/10 active:scale-95 duration-150">
+              <button className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/15 bg-gradient-to-b from-[#2BBAEE]/10 to-transparent px-3 md:px-4 transition-all duration-200 ease-out hover:from-[#2BBAEE]/30 hover:shadow-md hover:-translate-y-0.5 active:scale-95 group">
                 <FileSpreadsheet className="size-4 text-black shrink-0" />
                 <span className="font-sans text-sm font-medium text-black hidden sm:inline-block whitespace-nowrap">Ganti CSV</span>
-                <ChevronDown className="size-4 text-black/50 shrink-0" />
+                <ChevronDown className="size-4 text-black/50 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 rounded-xl">
@@ -194,8 +195,19 @@ export function AppSidebarTopbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <button onClick={analysis_start} className="flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] px-3 md:px-4 transition-all hover:opacity-90 active:scale-95 shadow-sm duration-150">
-            <PlayCircle className="size-4 text-[#272727] shrink-0" /><span className="font-sans text-sm font-medium text-[#272727] hidden sm:inline-block whitespace-nowrap">Mulai Analisis</span>
+          <button 
+            onClick={analysis_start} 
+            disabled={!isAnalysisReady}
+            title={!isAnalysisReady ? 'Pilih rentang tanggal di menu utama terlebih dahulu' : undefined}
+            className={cn(
+              "flex h-9 md:h-10 items-center justify-center gap-2 rounded-lg border px-3 md:px-4 transition-all duration-200 ease-out whitespace-nowrap",
+              isAnalysisReady 
+                ? "border-black/10 bg-gradient-to-b from-[#90FDF2] to-[#2BBAEE] hover:opacity-90 hover:shadow-md hover:-translate-y-0.5 active:scale-95 shadow-sm text-[#272727]"
+                : "border-neutral-800/10 bg-neutral-100 text-neutral-800/30 cursor-not-allowed"
+            )}
+          >
+            <PlayCircle className={cn("size-4 shrink-0", isAnalysisReady ? "text-[#272727]" : "text-neutral-800/30")} />
+            <span className="font-sans text-sm font-medium hidden sm:inline-block">Mulai Analisis</span>
           </button>
         </div>
       )}
