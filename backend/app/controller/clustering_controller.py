@@ -38,7 +38,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
             user_id=user_id,
             dataset_id=request.dataset_id,
             model_id=ml_model.id,
-            status="processing"
+            status="menunggu"
         )
         session.add(analysis)
         session.flush()
@@ -66,7 +66,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
             analysis = session.query(AnalysisHistory).filter(
                 AnalysisHistory.id == analysis_id
             ).first()
-            analysis.status = "failed"
+            analysis.status = "gagal"
         raise HTTPException(status_code=502, detail=f"ML service error: {str(e)}")
 
     # 5. Simpan hasil ke clustering_results
@@ -86,7 +86,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
         analysis = session.query(AnalysisHistory).filter(
             AnalysisHistory.id == analysis_id
         ).first()
-        analysis.status = "completed"
+        analysis.status = "berhasil"
 
     return StandardResponse(
         code=200,
@@ -94,7 +94,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
         message="Clustering berhasil dijalankan",
         data={
             "analysis_id": analysis_id,
-            "status": "completed",
+            "status": "berhasil",
             "result": ml_result
         }
     )

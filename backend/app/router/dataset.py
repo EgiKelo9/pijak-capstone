@@ -91,6 +91,24 @@ async def fetch_dataset(
     return await fetch_dataset_bin(dataset_id, current_user, db)
 
 @router.get(
+    "/user/me",
+    response_model=StandardResponse[DatasetFetchByUserResponse],
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request - Invalid File"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"}
+    }
+)
+async def fetch_datasets_by_current_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Fetch semua dataset original milik user yang sedang login.
+    Alias dari /user/{id} yang lebih semantik (token-based, tidak perlu path param).
+    """
+    return await fetch_datasets_bin_by_user(current_user, db)
+
+@router.get(
     "/user/{current_user_id}",
     response_model=StandardResponse[DatasetFetchByUserResponse],
     responses={
@@ -280,5 +298,5 @@ async def run_preprocessing(
     """
     Endpoint untuk menjalankan preprocessing ke ML Services.
     """
-    return await preprocess_dataset_run(request.dataset_id, request.model_type, current_user, db)
+    return await preprocess_dataset_run(request.dataset_id, request.model_type, current_user, db, request.job_id)
 

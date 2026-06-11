@@ -416,17 +416,18 @@ async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user
             if analyze_response.status_code != 200:
                 raise HTTPException(status_code=analyze_response.status_code, detail=f"Gagal saat analyze-columns: {analyze_response.text}")
 
+            ml_data = analyze_response.json()
             return StandardResponse(
-                code=200,
-                error=False,
-                message="Berhasil menjalankan analyze-columns",
-                data=analyze_response.json()
+                code=ml_data.get("code", analyze_response.status_code),
+                error=ml_data.get("error", False),
+                message=ml_data.get("message", "Berhasil menjalankan analyze-columns"),
+                data=ml_data.get("data", ml_data)
             )
             
     except httpx.RequestError as e:
         raise HTTPException(status_code=500, detail=f"Gagal menghubungi ML Services: {str(e)}")
 
-async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user: User, db: Session):
+async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user: User, db: Session, job_id: str | None = None):
     """Memanggil endpoint run preprocessing di ml_services."""
     transaction_manager = TransactionManager(db)
     
@@ -446,16 +447,20 @@ async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user:
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             preprocess_payload = {"dataset_id": dataset_id, "model_type": model_type}
+            if job_id:
+                preprocess_payload["job_id"] = job_id
+            
             preprocess_response = await client.post(f"{ml_url}/ml/v1/preprocess/run", json=preprocess_payload)
 
             if preprocess_response.status_code != 200:
                 raise HTTPException(status_code=preprocess_response.status_code, detail=f"Gagal saat run preprocessing: {preprocess_response.text}")
 
+            ml_data = preprocess_response.json()
             return StandardResponse(
-                code=200,
-                error=False,
-                message="Berhasil menjalankan preprocessing",
-                data=preprocess_response.json()
+                code=ml_data.get("code", preprocess_response.status_code),
+                error=ml_data.get("error", False),
+                message=ml_data.get("message", "Berhasil menjalankan preprocessing"),
+                data=ml_data.get("data", ml_data)
             )
             
     except httpx.RequestError as e:

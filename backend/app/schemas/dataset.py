@@ -38,3 +38,4 @@ class ProcessDatasetRequest(BaseModel):
     dataset_id: int
     model_type: str
     force_reload: bool = False
+    job_id: str | None = None

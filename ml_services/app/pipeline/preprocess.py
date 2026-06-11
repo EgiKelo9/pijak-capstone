@@ -219,7 +219,7 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
 
     mapping_res = await get_dataset_feature_metadata(dataset_id)
     # print(mapping_res)
-    extracted = extract_response(mapping_res.get("data"))
+    extracted = extract_response(mapping_res or {})
     # print(extracted)
 
     await manager.send(job_id, {"message": "Menyiapkan worker: memindai anomali dan membersihkan noise data..."})
@@ -283,7 +283,7 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             cleaned_dataset_id = upload_result.get("data", {}).get("dataset_id") if isinstance(upload_result, dict) else None
 
         # Update the mapping with the new datetime column if changed
-        mapping_data = mapping_res.get("data", {})
+        mapping_data = mapping_res or {}
         if "col_date_time" in mapping_data:
             if isinstance(mapping_data["col_date_time"], str):
                 mapping_data["col_date_time"] = extracted["col_dt_whole"]
@@ -295,7 +295,7 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         print(f"Pipeline failed during transformation: {str(e)}")
         raise e
         
-    return shapes
+    return shapes, cleaned_dataset_id
 
 async def test_ws(job_id: str):
     await manager.send(job_id, {"message": "skibidi"})

@@ -4,7 +4,7 @@ from app.core.config import get_settings
 from app.core.utils import generate_from_openrouter
 from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info, update_dataset_feature_metadata, get_dataset_feature_metadata
+from app.core.utils import get_dataset, get_dataset_info, update_dataset_feature_metadata, get_dataset_feature_metadata, call_backend_api
 
 settings = get_settings()
 LLM_MODEL = settings.LLM_MODEL
@@ -46,11 +46,8 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         df, _ = await get_dataset(req.dataset_id)
         # 2. Build metadata dari DataFrame
         dataset_info = get_dataset_info(df)
-        # print(dataset_info)  # Debug: Lihat metadata yang akan dikirim ke LLM
 
         # 3. Handle model_type map (Clustering, Forecasting, or Both)
-
-        # Handle model_type map (Clustering, Forecasting, or Both)
         task_str = req.model_type
         if task_str.lower() == "both":
             task_str = "Both"
@@ -68,6 +65,15 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         
         if getattr(llm_response, "error", False):
             print(f"OpenRouter returned an error: {llm_response.message}", flush=True)
+            # Update status ke error agar frontend polling bisa berhenti
+            try:
+                await call_backend_api(
+                    "PATCH",
+                    f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+                    json={"analyze_status": "error"}
+                )
+            except Exception as patch_err:
+                print(f"Failed to update error status: {patch_err}", flush=True)
             return OpenRouterMappingResponse(
                 status="error",
                 task=task_str,
@@ -75,15 +81,16 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             )
     
         raw_text = llm_response.data.get("response", "")
+        print(f"Raw LLM response: {raw_text[:200]}", flush=True)
 
-        # print("Raw LLM response:", raw_text, flush=True)
+        if not raw_text or raw_text.strip() == "error":
+            raise ValueError(f"LLM returned empty or error response: '{raw_text}'")
+
         clean_json = raw_text.replace("```json", "").replace("```", "").strip()
-        # print("Clean JSON:", clean_json, flush=True)
         parsed = json.loads(clean_json)
-        # print("Parsed JSON:", parsed, flush=True)
         
         mapping = Feature(**parsed)
-        feature_update_response = await update_dataset_feature_metadata(req.dataset_id, mapping)
+        await update_dataset_feature_metadata(req.dataset_id, mapping)
 
         return OpenRouterMappingResponse(
             status="success",
@@ -92,7 +99,16 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         )
 
     except Exception as e:
-        print(f"[analyze_columns] Error: {e}")
+        print(f"[analyze_columns] Error: {e}", flush=True)
+        # PENTING: Update status ke error agar polling frontend bisa berhenti
+        try:
+            await call_backend_api(
+                "PATCH",
+                f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+                json={"analyze_status": "error"}
+            )
+        except Exception as patch_err:
+            print(f"Failed to update error status: {patch_err}", flush=True)
         return OpenRouterMappingResponse(
             status="error",
             task=req.model_type,

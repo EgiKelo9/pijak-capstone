@@ -4,20 +4,12 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.base import StandardResponse
 from app.router import openrouter, model, health, gemini, preprocess
+from app.middleware import cors
 
 app = FastAPI(
     title="Beez - Pijak Capstone ML Service",
     description="API Capstone Project untuk Machine Learning & Generative AI Service (Port 8000)",
     version="1.0.0"
-)
-
-# CORS langsung di main
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3001"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 if not os.getenv("ENV"):

@@ -142,7 +142,7 @@ async def get_dataset_feature_metadata(dataset_id: int) -> dict | None:
         response = await call_backend_api("GET", f"/api/v1/datasets/feature-metadata/{dataset_id}")
         if response.status_code == 200:
             data = response.json()
-            return data
+            return data.get("data")
     except Exception as e:
         logger.warning(f"Could not fetch feature metadata for dataset {dataset_id}: {e}")
     return None
@@ -303,23 +303,17 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
-                "structured_outputs": True,
                 "response_format": {
                     "type": "json_schema",
                     "json_schema": {
                         "name": "feature_extraction",
-                        # "strict": True,
                         "strict": False,
                         "schema": Feature.model_json_schema()
                     }
                 },
-                'reasoning': {
-                    'effort': 'low'
-                },
                 "stream": False,
                 "temperature": 0.0,
-                "max_output_tokens": 2670,
-                # "max_completion_tokens": 2670,
+                "max_tokens": 2670,
             }
             
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
@@ -329,7 +323,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 url=settings.OPEN_ROUTER_BASE_URL,
                 headers=headers,
                 json=payload,
-                timeout=60.0
+                timeout=120.0  # Diperpanjang menjadi 120 detik untuk model reasoning
             )
 
             print(f"Received response from OpenRouter: status_code={response.status_code}, response_text={response.text}", flush=True)
