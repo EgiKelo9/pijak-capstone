@@ -1,10 +1,7 @@
 'use client';
 
 import * as React from 'react';
-
-interface DataQualityProps {
-  data: any[];
-}
+import { DataQualityProps } from '@/types';
 
 function DonutChart({ percentage, strokeColor, title, subtitle }: {
   percentage: number;

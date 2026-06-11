@@ -1,20 +1,11 @@
-// components/preferences/clustering-preference.tsx
 'use client';
+
 import * as React from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-
-interface ClusteringConfig {
-  mode: 'auto' | 'manual';
-  clusterCount: number;
-}
-
-interface ClusteringPreferenceProps {
-  config: ClusteringConfig;
-  onChange: (config: ClusteringConfig) => void;
-}
+import { ClusteringConfig, ClusteringPreferenceProps } from '@/types';
 
 export function ClusteringPreference({ config, onChange }: ClusteringPreferenceProps) {
   const isAuto = config.mode === 'auto';
@@ -30,13 +21,11 @@ export function ClusteringPreference({ config, onChange }: ClusteringPreferenceP
     onChange({ ...config, clusterCount: val });
   };
 
-  // Clicking the number input activates manual mode automatically
   const handleInputFocus = () => {
     if (isAuto) handleModeChange('manual');
   };
 
   return (
-    // h-full matches the forecasting card height in a side-by-side layout
     <div className="flex h-full w-full flex-col justify-center">
       <RadioGroup
         value={config.mode}
@@ -54,7 +43,7 @@ export function ClusteringPreference({ config, onChange }: ClusteringPreferenceP
           </Label>
         </div>
 
-        {/* Manual — inline flex, won't wrap or overflow */}
+        {/* Manual */}
         <div className="flex items-center gap-2.5">
           <RadioGroupItem value="manual" id="r-manual" className="shrink-0" />
           <Label
@@ -69,12 +58,10 @@ export function ClusteringPreference({ config, onChange }: ClusteringPreferenceP
               value={config.clusterCount}
               onChange={handleCountChange}
               onFocus={handleInputFocus}
-              // Stop label's htmlFor from double-triggering the radio
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 'w-12 h-7 text-center text-sm px-1 py-0 rounded-md border',
                 'transition-opacity duration-150',
-                // Visually dim when auto; still focusable to auto-switch mode
                 isAuto ? 'opacity-40' : 'opacity-100'
               )}
             />

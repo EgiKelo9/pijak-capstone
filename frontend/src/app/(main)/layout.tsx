@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { AppSidebarLayout } from "./main-sidebar";
+import { AppSidebarLayout } from "@/components/main/layout/main-sidebar";
 
 export default async function LandingPageLayout({
   children,

@@ -13,10 +13,10 @@ import { Button } from "@/components/ui/button";
 import LoadingCarousel from "@/components/ui/loading-carousel";
 import { TextHoverEffect } from "@/components/ui/text-hover-effect";
 import { IconSparklesFilled } from "@tabler/icons-react";
-import { CtaBackground, HeroBackground, HomeBackground } from "./bgForHome";
-import { BentoFeature } from "./featureBento";
-import TeamSection from "./teamsContainer";
-import TextHome from "./textHome";
+import { CtaBackground, HeroBackground, HomeBackground } from "./bg-for-home";
+import { BentoFeature } from "./feature-bento";
+import TeamSection from "./teams-container";
+import TextHome from "./text-home";
 import Link from "next/link";
 
 export default function LandingPage() {

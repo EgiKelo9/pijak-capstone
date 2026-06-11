@@ -1,20 +1,10 @@
-// 'use client';
-
 import {
   FileUp,
   Presentation
 } from 'lucide-react';
-import { DateRange } from 'react-day-picker';
-
+import { EmptyStateViewProps } from '@/types';
 import { cn } from '@/lib/utils';
 
-interface EmptyStateViewProps {
-  modeLabel: string;
-  isReady: boolean;
-  dateRange: DateRange | undefined;
-  onUpload: () => void;
-  onRunAnalysis: () => void;
-}
 
 function EmptyStateView({ modeLabel, isReady, dateRange, onUpload, onRunAnalysis }: EmptyStateViewProps) {
   const steps = [

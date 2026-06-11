@@ -57,14 +57,13 @@ export function AppSidebarFooter() {
                 {/* Avatar ring — tighter than before */}
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-[#2BBAEE] p-1 transition-all duration-200 group-hover/btn:scale-105 group-hover/btn:shadow-md">
                   <Avatar className="size-11 rounded-full">
-                    <AvatarImage src={user?.name} alt={user?.name} className="object-cover" />
                     <AvatarFallback className="text-white text-base font-bold bg-[#1a9fd4]">
                       {getInitials(user?.name ?? fallbackUser.name)}
                     </AvatarFallback>
                   </Avatar>
                 </div>
                 <div className="grid flex-1 text-left leading-tight ml-2 group-data-[collapsible=icon]:hidden min-w-0">
-                  <span className="font-sans truncate font-medium text-lg text-black">{user?.name}</span>
+                  <span className="font-sans truncate font-medium text-lg text-black">{user?.name ?? fallbackUser.name}</span>
                   <span className="font-sans truncate text-xs text-black/50 mt-0.5">{user?.email}</span>
                 </div>
                 <ChevronsUpDown className="justify-self-end size-4 text-black/40 shrink-0 group-data-[collapsible=icon]:hidden" />

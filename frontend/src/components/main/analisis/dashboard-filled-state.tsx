@@ -4,7 +4,8 @@ import { DynamicDataTable } from '@/components/dynamic-data-table';
 import { AnalysisCard, StatusType } from '@/components/main-card';
 import { useEffect, useMemo, useState } from 'react';
 import { ClusteringPreference } from './clustering-preference';
-import { DataConfigState, DataConfiguration } from './column-preference';
+import { DataConfigState } from '@/types';
+import { DataConfiguration } from './column-preference';
 import { DataQuality } from './data-quality';
 import { ForecastingPreference } from './forecasting-preference';
 import { TerminalLog, type TerminalStep } from './terminal';
@@ -99,7 +100,6 @@ export function FilledStateView({
   const finalForecastingStatus = hasInteractedForecasting ? 'berhasil' : statuses.forecasting;
   const finalClusteringStatus = hasInteractedClustering ? 'berhasil' : statuses.clustering;
 
-  console.log(dataConfig)
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 w-full gap-3 flex-1 min-h-0 min-w-0 overflow-hidden h-full">
 
@@ -111,7 +111,7 @@ export function FilledStateView({
       </div>
 
       {/* ── Right: Config & Status Cards ─────────────────────────────────── */}
-      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 mb-2 overflow-hidden">
+      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 mb-2 overflow-y-scroll">
 
         {/* Terminal — non-collapsible, flex-1 to fill remaining height */}
         <AnalysisCard

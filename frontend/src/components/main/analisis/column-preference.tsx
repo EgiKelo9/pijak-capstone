@@ -1,4 +1,3 @@
-// components/preferences/data-configuration.tsx
 'use client';
 
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,21 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Check, RefreshCw } from 'lucide-react';
 import * as React from 'react';
-
-export interface DataConfigState {
-  availableColumns: string[];
-  dateColumn: string;
-  targetColumn: string;
-  includedColumns: string[];
-}
-
-interface DataConfigurationProps {
-  config: DataConfigState;
-  onChange: (newConfig: DataConfigState) => void;
-  onConfirm?: () => void;
-  onReload?: () => void;
-  isProcessing?: boolean;
-}
+import { DataConfigurationProps } from '@/types';
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[9px] font-semibold text-neutral-400 uppercase tracking-widest leading-none">
@@ -60,7 +45,6 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
   };
 
   return (
-    // h-full + overflow-hidden: fills the card's inner box exactly, nothing bleeds out
     <div className="flex h-full w-full flex-col gap-0 overflow-hidden">
 
       {/* ── Dropdowns ── fixed height, never scrolls */}
@@ -107,7 +91,7 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
           {featureColumns.length > 0 && (
             <button
               onClick={handleToggleAll}
-              className="text-[9px] font-medium text-[#2BBAEE] hover:text-[#1a9fd4] transition-colors leading-none"
+              className="text-xs font-medium text-[#2BBAEE] hover:text-[#1a9fd4] transition-colors leading-none"
             >
               {allChecked ? 'Hapus semua' : 'Pilih semua'}
             </button>
@@ -160,7 +144,7 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
 
         {/* Footer: count of selected features + Actions */}
         <div className="shrink-0 flex items-center justify-between pt-2 mt-1 border-t border-neutral-100">
-          <span className="text-[9px] text-neutral-400">
+          <span className="text-xs text-neutral-400">
             {featureColumns.length > 0 
               ? `${config.includedColumns.filter((c) => featureColumns.includes(c)).length} / ${featureColumns.length} dipilih`
               : '0 dipilih'}
@@ -179,7 +163,7 @@ export function DataConfiguration({ config, onChange, onConfirm, onReload, isPro
               onClick={onConfirm}
               disabled={isProcessing}
               title="Konfirmasi Konfigurasi"
-              className="flex items-center gap-1 h-6 px-2 rounded-md bg-[#2BBAEE] text-[9px] font-medium text-white hover:bg-[#1a9fd4] active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+              className="flex items-center gap-1 h-6 px-2 rounded-md bg-[#2BBAEE] text-xs font-medium text-white hover:bg-[#1a9fd4] active:scale-95 transition-all disabled:opacity-50 shadow-sm"
             >
               <Check className="size-3" />
               Simpan

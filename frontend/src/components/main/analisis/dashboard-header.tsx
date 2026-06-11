@@ -1,5 +1,3 @@
-// 'use client';
-
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import {
@@ -23,8 +21,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-
-type AnalysisMode = 'forecasting' | 'clustering' | 'both';
+import { type AnalysisMode } from '@/types';
 
 function DashboardHeader({
   mode,
