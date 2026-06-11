@@ -21,7 +21,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         if not req.force_reload:
             try:
                 existing_metadata = await get_dataset_feature_metadata(req.dataset_id)
-                if existing_metadata:
+                if existing_metadata and existing_metadata.get("analyze_status") not in ["processing", "error"]:
                     print(f"Loaded existing feature metadata from DB for dataset {req.dataset_id}", flush=True)
                     return OpenRouterMappingResponse(
                         status="success",
@@ -81,18 +81,22 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         )
     except Exception as e:
         print(f"=== CRITICAL ERROR in analyze_columns ===: {str(e)}", flush=True)
-        # Fallback ke empty feature jika parsing gagal
-        # try:
-        #     fallback_mapping = Feature()
-        # except:
-        #     fallback_mapping = None
+        # Update metadata to error status
+        try:
+            from app.core.utils import call_backend_api
+            await call_backend_api(
+                "PATCH",
+                f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+                json={"analyze_status": "error"}
+            )
+        except Exception as update_e:
+            print(f"Failed to update error status: {update_e}")
 
         return OpenRouterMappingResponse(
             status="error",
             task=req.model_type,
-            # suggested_mapping=fallback_mapping
             suggested_mapping=None
-        )        
+        )
     
         
 async def get_insight_from_data(target_task: str, json_data: Any) -> str:

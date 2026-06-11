@@ -269,7 +269,8 @@ def get_dataset_info(df: pd.DataFrame) -> dict:
         "shape": df.shape,
         "dtypes": df.dtypes.astype(str).to_dict(),
         "head": df.head().to_dict(orient="records"),
-        "missing_values": df.isnull().sum().to_dict()
+        "missing_values": df.isnull().sum().to_dict(),
+        "unique_values": df.nunique().to_dict()
     }
 
 

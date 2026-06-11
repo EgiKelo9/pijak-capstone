@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
 from typing import Tuple
-
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset
+from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
 from app.controller.openrouter import analyze_columns
 from app.schemas.openrouter import DatasetMetadataRequest
 
@@ -210,15 +209,30 @@ async def temp_pipeline(dataset_id:int, model: str):
     
     df, _ = await get_dataset(dataset_id)
     shapes.append(df.shape)
-
-    req = DatasetMetadataRequest(dataset_id=dataset_id, model_type=model)
-    mapping_res = await analyze_columns(req)
+    existing_metadata = await get_dataset_feature_metadata(dataset_id)
     
-    if mapping_res.status == "error" or not mapping_res.suggested_mapping:
-        print(f"OpenRouter returned an error or fallback.")
-        return None
+    if not existing_metadata:
+        print(f"No existing feature metadata found for dataset {dataset_id}.")
+        return None, None
         
-    xtracted = extract_response(mapping_res.suggested_mapping)
+    try:
+        # Prevent validation errors if frontend saves col_date_time as string
+        if isinstance(existing_metadata.get("col_date_time"), str):
+            existing_metadata["col_date_time"] = {
+                "is_whole": True,
+                "col_whole": existing_metadata["col_date_time"]
+            }
+            
+        for field in Feature.model_fields.keys():
+            if field not in existing_metadata:
+                existing_metadata[field] = None
+                
+        mapping = Feature(**existing_metadata)
+    except Exception as e:
+        print(f"Failed to parse metadata in temp_pipeline: {e}")
+        return None, None
+        
+    xtracted = extract_response(mapping)
 
     try:
         df = (
@@ -255,18 +269,29 @@ async def temp_pipeline(dataset_id:int, model: str):
         print(f"Pipeline finished successfully. New Shape: {df.shape}")
         
         # Upload the cleaned dataset back to the backend
+        cleaned_dataset_id = None
         if model.lower() == 'both':
             upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting')
 
             df = df.drop(columns=xtracted['col_dt_whole'])
             upload_cluster = await upload_cleaned_dataset(df, dataset_id, 'Clustering')
             print(f"Upload successful: {upload_forecast, upload_cluster}")
+            cleaned_dataset_id = upload_forecast.get("data", {}).get("dataset_id") if isinstance(upload_forecast, dict) else None
         else:
             upload_result = await upload_cleaned_dataset(df, dataset_id, model)
             print(f"Upload successful: {upload_result}")
+            cleaned_dataset_id = upload_result.get("data", {}).get("dataset_id") if isinstance(upload_result, dict) else None
 
+        # Update the mapping with the new datetime column if changed
+        if hasattr(mapping, 'col_date_time'):
+            if isinstance(mapping.col_date_time, str):
+                mapping.col_date_time = xtracted["col_dt_whole"]
+            else:
+                if hasattr(mapping.col_date_time, 'col_whole'):
+                    mapping.col_date_time.col_whole = xtracted["col_dt_whole"]
+                
     except Exception as e:
         print(f"Pipeline failed during transformation: {str(e)}")
         raise e
         
-    return shapes
+    return mapping, cleaned_dataset_id

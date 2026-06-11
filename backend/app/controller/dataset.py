@@ -389,7 +389,7 @@ async def fetch_analysis_history_by_user(current_user: User, db: Session):
     data=history_data
 )
 
-async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user: User, db: Session):
+async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user: User, db: Session, force_reload: bool = False):
     """Memanggil endpoint analyze-columns di ml_services."""
     transaction_manager = TransactionManager(db)
     
@@ -408,7 +408,7 @@ async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
-            analyze_payload = {"dataset_id": dataset_id, "model_type": model_type}
+            analyze_payload = {"dataset_id": dataset_id, "model_type": model_type, "force_reload": force_reload}
             analyze_response = await client.post(f"{ml_url}/ml/v1/openrouter/analyze-columns", json=analyze_payload)
             
             if analyze_response.status_code != 200:

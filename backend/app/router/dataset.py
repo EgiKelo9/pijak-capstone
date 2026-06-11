@@ -234,7 +234,7 @@ async def get_analysis_history_by_user(
     return await fetch_analysis_history_by_user(current_user, db)
 
 @router.post(
-    "/analyze-columns/{dataset_id}",
+    "/analyze-columns",
     response_model=StandardResponse[Dict[str, Any]],
     responses={
         400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
@@ -244,7 +244,6 @@ async def get_analysis_history_by_user(
     }
 )
 async def analyze_columns(
-    dataset_id: int,
     request: ProcessDatasetRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -252,10 +251,10 @@ async def analyze_columns(
     """
     Endpoint untuk menjalankan analyze-columns ke ML Services.
     """
-    return await analyze_dataset_columns(dataset_id, request.model_type, current_user, db)
+    return await analyze_dataset_columns(request.dataset_id, request.model_type, current_user, db, request.force_reload)
 
 @router.post(
-    "/preprocess/{dataset_id}",
+    "/preprocess",
     response_model=StandardResponse[Dict[str, Any]],
     responses={
         400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
@@ -265,7 +264,6 @@ async def analyze_columns(
     }
 )
 async def run_preprocessing(
-    dataset_id: int,
     request: ProcessDatasetRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -273,5 +271,5 @@ async def run_preprocessing(
     """
     Endpoint untuk menjalankan preprocessing ke ML Services.
     """
-    return await preprocess_dataset_run(dataset_id, request.model_type, current_user, db)
+    return await preprocess_dataset_run(request.dataset_id, request.model_type, current_user, db)
 
