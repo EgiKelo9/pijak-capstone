@@ -6,6 +6,7 @@ import { runForecasting } from '@/services/forecasting';
 import { useRouter } from 'next/navigation';
 import type { AnalysisMode, AnalysisConfig, TerminalStep } from '@/types';
 import { DataConfigState } from '@/types';
+import { useTerminal } from '@/components/main/layout/main-sidebar';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -52,9 +53,9 @@ export function useAnalysis() {
     targetColumn: '',
     includedColumns: []
   });
-  const [terminalLogs, setTerminalLogs] = useState<TerminalStep[]>([]);
   const [dataConfigStatus, setDataConfigStatus] = useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
   const [rawFeatureMapping, setRawFeatureMapping] = useState<any | null>(null);
+  const { logs: terminalLogs, setLogs: setTerminalLogs } = useTerminal();
 
   useEffect(() => {
     const storedId = sessionStorage.getItem('pijak_active_dataset_id');

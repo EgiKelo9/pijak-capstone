@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
 import { fetchUserDatasets, runAnalysisPipeline } from '@/lib/middle-man';
-import { useTerminal } from './mainSidebar';
+import { useTerminal } from '@/components/main/layout/main-sidebar';
 import { DATA } from './sidebar-data';
 
 export function AppSidebarTopbar() {

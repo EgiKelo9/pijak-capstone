@@ -283,12 +283,13 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             cleaned_dataset_id = upload_result.get("data", {}).get("dataset_id") if isinstance(upload_result, dict) else None
 
         # Update the mapping with the new datetime column if changed
-        if hasattr(mapping, 'col_date_time'):
-            if isinstance(mapping.col_date_time, str):
-                mapping.col_date_time = xtracted["col_dt_whole"]
-            else:
-                if hasattr(mapping.col_date_time, 'col_whole'):
-                    mapping.col_date_time.col_whole = xtracted["col_dt_whole"]
+        mapping_data = mapping_res.get("data", {})
+        if "col_date_time" in mapping_data:
+            if isinstance(mapping_data["col_date_time"], str):
+                mapping_data["col_date_time"] = extracted["col_dt_whole"]
+            elif isinstance(mapping_data["col_date_time"], dict):
+                if "col_whole" in mapping_data["col_date_time"]:
+                    mapping_data["col_date_time"]["col_whole"] = extracted["col_dt_whole"]
                 
     except Exception as e:
         print(f"Pipeline failed during transformation: {str(e)}")

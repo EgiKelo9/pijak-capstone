@@ -7,7 +7,7 @@ import {
 } from '@/components/animate-ui/components/radix/sidebar';
 import { getStrictContext } from '@/lib/get-strict-context';
 import * as React from 'react';
-import type { TerminalStep } from './analisis/terminal';
+import type { TerminalStep } from '@/types';
 import { AppSidebarFooter } from './app-sidebar-footer';
 import { AppSidebarHeader } from './app-sidebar-header';
 import { AppSidebarNav } from './app-sidebar-nav';

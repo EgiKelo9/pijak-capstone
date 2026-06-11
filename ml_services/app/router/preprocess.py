@@ -54,7 +54,7 @@ async def run_temp_pipeline_bg(dataset_id: int, model: str):
         401: {"model": StandardResponse[dict], "description": "Unauthorized"}
     }
 )
-async def generate_preprocess(request: PreprocessRequest, background_tasks: BackgroundTasks):
+async def generate_preprocess(request: PreprocessRequest):
     """
     Endpoint untuk menjalankan seluruh pipeline preprocessing, berdasarkan dataset_id tertentu, Keluaran akan langsung disimpan pada database, namun akan diberikan beberapa informasi untuk logging.
 
