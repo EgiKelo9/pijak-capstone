@@ -53,9 +53,12 @@ export function useAnalysis() {
     targetColumn: '',
     includedColumns: []
   });
+  const { logs: terminalLogs, setLogs: setTerminalLogs, setIsAnalysisReady } = useTerminal();
   const [dataConfigStatus, setDataConfigStatus] = useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
   const [rawFeatureMapping, setRawFeatureMapping] = useState<any | null>(null);
-  const { logs: terminalLogs, setLogs: setTerminalLogs } = useTerminal();
+
+  const [hasInteractedForecasting, setHasInteractedForecasting] = useState(false);
+  const [hasInteractedClustering, setHasInteractedClustering] = useState(false);
 
   useEffect(() => {
     const storedId = sessionStorage.getItem('pijak_active_dataset_id');
@@ -70,6 +73,7 @@ export function useAnalysis() {
       }
     };
     const openUploadModalEvent = () => setIsFileUploadOpen(true);
+
     window.addEventListener('dataset_changed', handleDatasetChanged);
     window.addEventListener('open_upload_modal', openUploadModalEvent);
     return () => {
@@ -77,6 +81,7 @@ export function useAnalysis() {
       window.removeEventListener('open_upload_modal', openUploadModalEvent);
     };
   }, []);
+
   const analysisConfig = useMemo<AnalysisConfig>(() => ({
     mode,
     dateRange: date,
@@ -90,92 +95,101 @@ export function useAnalysis() {
 
   const handleOpenUploadModal = useCallback(() => {
     setIsFileUploadOpen(true);
-  }, []);
+  }, [analysisConfig]);
 
   const runPreprocessingPipeline = useCallback(async (datasetId: number, currentMode: string, forceReload: boolean = false) => {
-    setTerminalLogs([
-      { stepId: 'init', text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
-      { stepId: 'analyze_col', text: forceReload ? `[OpenRouter] Menganalisis ulang metadata dataset #${datasetId}...` : `Memeriksa konfigurasi kolom dataset #${datasetId}...`, status: 'loading' }
+    const analyzeStepId = `analyze_col-${Date.now()}`;
+    // 1. Pre-calling: Tambahkan log Inisialisasi ke Terminal
+    setTerminalLogs((prev) => [
+      ...prev,
+      { stepId: `init-${Date.now()}`, text: forceReload ? 'system_ready: memuat ulang analisis fitur...' : 'system_ready: memulai pipeline otomatis...', status: 'info' },
+      { stepId: analyzeStepId, text: forceReload ? `[OpenRouter] Menganalisis ulang metadata dataset #${datasetId}...` : `Memeriksa konfigurasi kolom dataset #${datasetId}...`, status: 'loading' }
     ]);
     setDataConfigStatus('menunggu');
 
     try {
       let mapping: any = null;
-      let shouldAnalyze = true;
 
+      // 1. Coba fetch metadata dari database terlebih dahulu jika bukan force reload
       if (!forceReload) {
         try {
           const existingMetadata = await getDatasetFeatureMetadata(datasetId);
           if (existingMetadata && Object.keys(existingMetadata).length > 0) {
-            if (existingMetadata.analyze_status === 'processing') {
-              mapping = await pollAnalyzeColumns(datasetId);
-              shouldAnalyze = false;
-            } else if (existingMetadata.analyze_status !== 'error') {
-              mapping = existingMetadata;
-              shouldAnalyze = false;
-            }
+            mapping = existingMetadata;
           }
         } catch (err) {
           console.warn("[Dashboard] Gagal memuat metadata dari database, beralih ke analisis ML...");
+          setTerminalLogs((prev) => [...prev, { stepId: `meta_warn-${Date.now()}`, text: 'Metadata tidak ditemukan di database, beralih ke layanan ML...', status: 'info' }]);
         }
       }
 
-      if (shouldAnalyze) {
+      // 2. Jika tidak ada di database, panggil layanan ML OpenRouter
+      if (!mapping) {
         setTerminalLogs((prev) => prev.map(log => 
-          log.stepId === 'analyze_col' ? { ...log, text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...` } : log
+          log.stepId === analyzeStepId ? { ...log, text: `[OpenRouter] Menganalisis metadata dataset #${datasetId}...` } : log
         ));
         
-        const response = await analyzeColumns(datasetId, currentMode, forceReload);
-        const result = response.data;
+        const result = await analyzeColumns(datasetId, currentMode, forceReload);
         if (result.status === 'success' && result.suggested_mapping) {
           mapping = result.suggested_mapping;
-        } else if (result.status === 'processing') {
-          mapping = await pollAnalyzeColumns(datasetId);
         } else {
           throw new Error("Layanan OpenRouter gagal memetakan kolom.");
         }
       }
 
-      setRawFeatureMapping(mapping);
+      setRawFeatureMapping(mapping); // Store the full raw mapping from the API
         
-        setDataConfig((prev) => {
-          let dateCol = prev.dateColumn;
-          if (typeof mapping.col_date_time === 'string') {
-            if (prev.availableColumns.includes(mapping.col_date_time)) dateCol = mapping.col_date_time;
-          } else if (mapping.col_date_time?.col_whole) {
-            const extractedDate = Array.isArray(mapping.col_date_time.col_whole) 
-              ? mapping.col_date_time.col_whole[0] 
-              : mapping.col_date_time.col_whole;
-            if (extractedDate && prev.availableColumns.includes(extractedDate)) dateCol = extractedDate;
-          }
+      setDataConfig((prev) => {
+        let dateCol = prev.dateColumn;
+        if (typeof mapping.col_date_time === 'string') {
+          if (prev.availableColumns.includes(mapping.col_date_time)) dateCol = mapping.col_date_time;
+        } else if (mapping.col_date_time?.col_whole) {
+          const extractedDate = Array.isArray(mapping.col_date_time.col_whole) 
+            ? mapping.col_date_time.col_whole[0] 
+            : mapping.col_date_time.col_whole;
+          if (extractedDate && prev.availableColumns.includes(extractedDate)) dateCol = extractedDate;
+        }
 
-          let targetCol = prev.targetColumn;
-          if (mapping.col_target && prev.availableColumns.includes(mapping.col_target)) {
-            targetCol = mapping.col_target;
-          }
+        let targetCol = prev.targetColumn;
+        if (mapping.col_target && prev.availableColumns.includes(mapping.col_target)) {
+          targetCol = mapping.col_target;
+        }
 
-          let colsToDrop: string[] = [];
-          if (Array.isArray(mapping.cols_to_drop)) colsToDrop = mapping.cols_to_drop;
-          else if (typeof mapping.cols_to_drop === 'string') colsToDrop = [mapping.cols_to_drop];
+        let colsToDrop: string[] = [];
+        if (Array.isArray(mapping.cols_to_drop)) colsToDrop = mapping.cols_to_drop;
+        else if (typeof mapping.cols_to_drop === 'string') colsToDrop = [mapping.cols_to_drop];
 
-          const includedCols = prev.availableColumns.filter(
-            (col) => col !== dateCol && col !== targetCol && !colsToDrop.includes(col)
-          );
+        const includedCols = prev.availableColumns.filter(
+          (col) => col !== dateCol && col !== targetCol && !colsToDrop.includes(col)
+        );
 
-          return {
-            ...prev,
-            dateColumn: dateCol,
-            targetColumn: targetCol,
-            includedColumns: includedCols,
-          };
-        });
-        setDataConfigStatus('berhasil');
-        setTerminalLogs((prev) => prev.map(log => 
-          log.stepId === 'analyze_col' ? { ...log, text: 'Konfigurasi kolom berhasil dimuat.', status: 'success' } : log
-        ));
+        return {
+          ...prev,
+          dateColumn: dateCol,
+          targetColumn: targetCol,
+          includedColumns: includedCols,
+        };
+      });
+      setDataConfigStatus('berhasil');
+      setTerminalLogs((prev) => {
+        const logs = prev.map(log => 
+          log.stepId === analyzeStepId ? { ...log, text: 'Konfigurasi kolom berhasil dimuat.', status: 'success' as const } : log
+        );
+        if (mapping.reasonings) {
+          logs.push({
+            stepId: `reasoning-${Date.now()}`,
+            text: `Keputusan AI: ${mapping.reasonings}`,
+            status: 'info' as const,
+            collapsible: true,
+            defaultCollapsed: true
+          });
+        }
+        return logs;
+      });
 
     } catch (error: any) {
-      setRawFeatureMapping(null);
+      // Post-calling: Gagal - Ubah status log yang loading menjadi error
+      setRawFeatureMapping(null); // Clear raw mapping on critical error
       setTerminalLogs((prev) => prev.map(log => 
         log.status === 'loading' ? { ...log, text: `Pipeline Error: ${error.message}`, status: 'error' } : log
       ));
@@ -184,15 +198,19 @@ export function useAnalysis() {
   }, []);
 
   const handleUploadConfirm = useCallback(async (file: File) => {
+    const uploadStepId = `upload-${Date.now()}`;
     try {
+      setTerminalLogs((prev) => [...prev, { stepId: uploadStepId, text: `Mengunggah file ${file.name}...`, status: 'loading' }]);
       const data = await uploadDataset(file);
+      setTerminalLogs((prev) => prev.map(log => log.stepId === uploadStepId ? { ...log, text: 'File berhasil diunggah.', status: 'success' } : log));
       setActiveDatasetId(data.dataset_id);
       setIsFileUploadOpen(false);
     } catch (error: any) {
+      setTerminalLogs((prev) => prev.map(log => log.stepId === uploadStepId ? { ...log, text: `Gagal mengunggah: ${error.message}`, status: 'error' } : log));
       const isAuthError = error.message === "Unauthorized";
       alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
-  }, []);
+  }, [analysisConfig.mode, runPreprocessingPipeline]);
 
   const handleReloadMapping = useCallback(() => {
     if (activeDatasetId !== -1) {
@@ -309,55 +327,29 @@ export function useAnalysis() {
     };
   }, [handleRunAnalysis]);
 
-  const isReady = !!date?.from && !!date?.to;
-
-  // Auto-set date range based on dataset and selected date column
   useEffect(() => {
-    if (activeDatasetId === -1 || !dataConfig.dateColumn) return;
+    if (forecastAggressiveness !== 50) setHasInteractedForecasting(true);
+  }, [forecastAggressiveness]);
 
-    const computeDateRange = async () => {
-      try {
-        const csvString = await getDataset(activeDatasetId);
-        if (!csvString) return;
+  useEffect(() => {
+    if (clusteringConfig.mode !== 'auto' || clusteringConfig.clusterCount !== 3) {
+      setHasInteractedClustering(true);
+    }
+  }, [clusteringConfig]);
 
-        const lines = csvString.trim().split('\n');
-        if (lines.length < 2) return;
+  const isPreferencesReady = (mode === 'forecasting' && hasInteractedForecasting) || 
+                             (mode === 'clustering' && hasInteractedClustering) || 
+                             (mode === 'both' && hasInteractedForecasting && hasInteractedClustering);
 
-        const csvRegex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
-        const headers = lines[0].split(csvRegex).map((h: string) => h.trim().replace(/^"|"$/g, ''));
-        const dateColIndex = headers.indexOf(dataConfig.dateColumn);
+  const isReady = !!date?.from && !!date?.to && activeDatasetId !== -1 && isPreferencesReady;
 
-        if (dateColIndex === -1) return;
+  useEffect(() => {
+    setIsAnalysisReady(isReady);
+  }, [isReady, setIsAnalysisReady]);
 
-        let minDate: Date | null = null;
-        let maxDate: Date | null = null;
-
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i];
-          if (!line.trim()) continue;
-          
-          const values = line.split(csvRegex);
-          const dateStr = values[dateColIndex]?.trim().replace(/^"|"$/g, '');
-          if (!dateStr) continue;
-
-          // Parse using Date
-          const dateObj = new Date(dateStr);
-          if (isNaN(dateObj.getTime())) continue;
-
-          if (!minDate || dateObj < minDate) minDate = dateObj;
-          if (!maxDate || dateObj > maxDate) maxDate = dateObj;
-        }
-
-        if (minDate && maxDate) {
-          setDate({ from: minDate, to: maxDate });
-        }
-      } catch (error) {
-        console.error("[Dashboard] Failed to compute date range:", error);
-      }
-    };
-
-    computeDateRange();
-  }, [activeDatasetId, dataConfig.dateColumn]);
+  useEffect(() => {
+    console.debug('[Dashboard] State updated:', { isReady, mode, date });
+  }, [isReady, mode, date]);
 
   useEffect(() => {
     if (activeDatasetId !== -1) {
@@ -374,15 +366,18 @@ export function useAnalysis() {
     }
 
     const initDataAndPipeline = async () => {
-        setIsLoadingDataset(true);
-        try {
-          const csvString = await getDataset(activeDatasetId);
-  
-          let parsedData: any[] = [];
-          let cols: string[] = [];
-          if (csvString) {
-            const lines = csvString.trim().split('\n');
-            if (lines.length > 0) {
+      setIsLoadingDataset(true);
+      const fetchStepId = `fetch-${activeDatasetId}-${Date.now()}`;
+      setTerminalLogs((prev: TerminalStep[]) => [...prev, { stepId: fetchStepId, text: `Memuat dataset #${activeDatasetId} dari server...`, status: 'loading' }]);
+      
+      try {
+        const csvString = await getDataset(activeDatasetId);
+
+        let parsedData: any[] = [];
+        let cols: string[] = [];
+        if (csvString) {
+          const lines = csvString.trim().split('\n');
+          if (lines.length > 0) {
             const csvRegex = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
             const headers = lines[0].split(csvRegex).map((h: string) => h.trim().replace(/^"|"$/g, ''));
             cols = headers;
@@ -400,8 +395,59 @@ export function useAnalysis() {
               });
               parsedData.push(obj);
             }
+
+            // [AUTO-FILL] Ekstraksi rentang waktu secara efisien dari keseluruhan data
+            let minDate: Date | null = null;
+            let maxDate: Date | null = null;
+            let dateColIdx = -1;
+            
+            // 1. Moduler: Cari index kolom tanggal dengan sampel hingga 5 baris pertama
+            for (let r = 1; r < Math.min(lines.length, 6); r++) {
+              if (!lines[r].trim()) continue;
+              const sampleValues = lines[r].split(csvRegex).map((v: string) => v.trim().replace(/^"|"$/g, ''));
+              for (let j = 0; j < sampleValues.length; j++) {
+                const val = sampleValues[j];
+                // Cek agar bukan murni angka (spt nominal harga/ID) dan Valid Date
+                if (val && isNaN(Number(val)) && !isNaN(new Date(val).getTime())) {
+                  dateColIdx = j;
+                  break;
+                }
+              }
+              if (dateColIdx !== -1) break;
+            }
+            
+            // 2. Terapkan pencarian ke seluruh data (original dataset)
+            if (dateColIdx !== -1) {
+              for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim()) continue;
+                
+                let dateStr = "";
+                // Optimasi fast-path: Jika baris tanpa kutip ganda, split(',') murni jauh lebih kilat
+                if (!line.includes('"')) {
+                  const fastValues = line.split(',');
+                  dateStr = fastValues[dateColIdx] ? fastValues[dateColIdx].trim() : "";
+                } else {
+                  const safeValues = line.split(csvRegex);
+                  dateStr = safeValues[dateColIdx] ? safeValues[dateColIdx].trim().replace(/^"|"$/g, '') : "";
+                }
+                  
+                if (dateStr) {
+                  const d = new Date(dateStr);
+                  if (!isNaN(d.getTime())) {
+                    if (!minDate || d < minDate) minDate = d;
+                    if (!maxDate || d > maxDate) maxDate = d;
+                  }
+                }
+              }
+            }
+            
+            if (minDate && maxDate) setDate({ from: minDate, to: maxDate });
           }
         }
+        
+        console.log(`[Dashboard] Parsed ${parsedData.length} rows for preview`);
+        setTerminalLogs((prev: TerminalStep[]) => prev.map((log: TerminalStep) => log.stepId === fetchStepId ? { ...log, text: `Dataset dimuat (${parsedData.length} baris diproses).`, status: 'success' } : log));
         setDatasetData(parsedData);
         
         if (parsedData.length > 0) {
@@ -419,6 +465,7 @@ export function useAnalysis() {
         }
       } catch (error) {
         console.error("[Dashboard] Fetch Dataset Error:", error);
+        setTerminalLogs((prev: TerminalStep[]) => prev.map((log: TerminalStep) => log.stepId === fetchStepId ? { ...log, text: `Gagal memuat dataset: ${(error as any).message}`, status: 'error' } : log));
       } finally {
         setIsLoadingDataset(false);
       }
@@ -427,7 +474,7 @@ export function useAnalysis() {
     };
 
     initDataAndPipeline();
-  }, [activeDatasetId, mode, runPreprocessingPipeline]);
+  }, [activeDatasetId, mode, runPreprocessingPipeline, setTerminalLogs]);
 
   const modeLabel = useMemo(() => {
     switch (mode) {
@@ -437,6 +484,22 @@ export function useAnalysis() {
       default: return 'Forecasting & Clustering';
     }
   }, [mode]);
+
+  const handleBackendMessage = useCallback((incomingPayload: string) => {
+    const newLog = JSON.parse(incomingPayload) as TerminalStep;
+
+    setTerminalLogs((prevLogs) => {
+      const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
+      
+      if (existingLogIndex !== -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[existingLogIndex] = newLog;
+        return updatedLogs;
+      }
+
+      return [...prevLogs, newLog];
+    });
+  }, [setTerminalLogs]);
 
   return {
     date, setDate,
@@ -453,6 +516,7 @@ export function useAnalysis() {
     handleUploadConfirm,
     handleReloadMapping,
     handleConfirmMapping,
-    handleRunAnalysis
+    handleRunAnalysis,
+    handleBackendMessage
   };
 }

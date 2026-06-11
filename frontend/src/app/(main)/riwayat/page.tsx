@@ -4,7 +4,7 @@ import { PerformanceBarChart } from "@/components/bar-chart";
 import { DynamicDataTable, type AnalysisRow } from "@/components/customized/table/table-11";
 import { StatusDonutChart } from "@/components/donut-chart";
 import { AnalysisCard } from "@/components/main-card";
-import { getAnalysisHistory } from "@/lib/middle-man";
+import { getAnalysisHistory } from "@/services/analysis";
 import * as React from "react";
 
 export default function History() {

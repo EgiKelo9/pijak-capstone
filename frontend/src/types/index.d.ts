@@ -38,6 +38,8 @@ export interface TerminalStep {
   stepId: string;
   text: string;
   status: 'loading' | 'success' | 'error' | 'info';
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 export interface TerminalLogProps {
@@ -61,6 +63,13 @@ export interface DataConfigurationProps {
   onConfirm?: () => void;
   onReload?: () => void;
   isProcessing?: boolean;
+}
+
+export interface ProcessDatasetRequest {
+  dataset_id: number;
+  model_type: string;
+  force_reload?: boolean;
+  job_id?: string;
 }
 
 export interface TrendDataPoint {

@@ -17,6 +17,8 @@ import { AppSidebarTopbar } from './app-sidebar-topbar';
 interface ITerminalContext {
   logs: TerminalStep[];
   setLogs: React.Dispatch<React.SetStateAction<TerminalStep[]>>;
+  isAnalysisReady: boolean;
+  setIsAnalysisReady: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export const [TerminalContextProvider, useTerminal] =
@@ -24,7 +26,8 @@ export const [TerminalContextProvider, useTerminal] =
 
 function TerminalAwareAppSidebarLayout({ children, defaultOpen = true }: { children: React.ReactNode; defaultOpen?: boolean }) {
   const [logs, setLogs] = React.useState<TerminalStep[]>([]);
-  const contextValue = { logs, setLogs };
+  const [isAnalysisReady, setIsAnalysisReady] = React.useState(false);
+  const contextValue = { logs, setLogs, isAnalysisReady, setIsAnalysisReady };
 
   return (
     <TerminalContextProvider value={contextValue}>

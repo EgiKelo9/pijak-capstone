@@ -22,7 +22,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
-import { fetchUserDatasets, runAnalysisPipeline } from '@/lib/middle-man';
+import { fetchUserDatasets } from '@/services/analysis';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
 import { DATA } from './sidebar-data';
 
@@ -57,84 +57,10 @@ export function AppSidebarTopbar() {
     window.dispatchEvent(new Event('dataset_changed'));
   };
 
-  const job_id = '1b671a64-40d5-491e-99b0-da01ff1f3341'
-  const analysis_start = async () => {
-    const ws_job_id = `ws-job-${Date.now()}`;
-    setTerminalLogs(prev => [...prev, { stepId: ws_job_id, text: 'Mencoba terhubung ke layanan analisis...', status: 'loading' }]);
-    
-    let currentWsStepId: string | null = null;
-
-    try {
-      const ws = new WebSocket(
-        `ws://localhost:8000/ml/v1/preprocess/ws/${job_id}`
-      );
-
-      ws.onopen = async () => {
-        setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: 'Koneksi ke layanan analisis berhasil.', status: 'success' } : log));
-        setTerminalLogs(prev => [...prev, { stepId: `pipeline-start-${Date.now()}`, text: 'Memulai pipeline pemrosesan data...', status: 'info' }]);
-        
-        await runAnalysisPipeline(job_id, 1, "cluster");
-      
-         // Dieksekusi ketika keseluruhan pipeline di backend selesai dan mengembalikan data
-        setTerminalLogs(prev => {
-          const updatedLogs = currentWsStepId
-            ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
-            : prev;
-          return [...updatedLogs, { stepId: `pipeline-end-${Date.now()}`, text: 'Pipeline pemrosesan data selesai.', status: 'success' as const }];
-        });
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          const newStepId = `ws-msg-${Date.now()}`;
-
-          setTerminalLogs(prev => {
-            const updatedLogs = currentWsStepId
-              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
-              : prev;
-            return [...updatedLogs, {
-              stepId: newStepId,
-              text: message.message || event.data,
-              status: 'loading' as const,
-            }];
-          });
-          currentWsStepId = newStepId;
-        } catch (e) {
-          const newRawStepId = `ws-msg-raw-${Date.now()}`;
-          setTerminalLogs(prev => {
-            const updatedLogs = currentWsStepId
-              ? prev.map(log => log.stepId === currentWsStepId ? { ...log, status: 'success' as const } : log)
-              : prev;
-            return [...updatedLogs, {
-              stepId: newRawStepId,
-              text: event.data,
-              status: 'loading' as const,
-            }];
-          });
-          currentWsStepId = newRawStepId;
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error("WS error:", error);
-        setTerminalLogs(prev => prev.map(log => (log.stepId === ws_job_id || log.stepId === currentWsStepId) && log.status === 'loading' ? { ...log, text: 'Sebuah langkah gagal dieksekusi.', status: 'error' } : log));
-      };
-
-      ws.onclose = () => {
-        // Selesaikan log 'loading' terakhir jika koneksi ditutup
-        setTerminalLogs(prev => {
-          const updatedLogs = currentWsStepId
-            ? prev.map(log => (log.stepId === currentWsStepId && log.status === 'loading') ? { ...log, status: 'success' as const } : log)
-            : prev;
-          return [...updatedLogs, { stepId: `ws-close-${Date.now()}`, text: 'Koneksi ke layanan analisis ditutup.', status: 'info' as const }];
-        });
-      };
-    } catch (error) {
-      console.error("Failed:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setTerminalLogs(prev => prev.map(log => log.stepId === ws_job_id ? { ...log, text: `Gagal memulai koneksi: ${errorMessage}`, status: 'error' } : log));
-    }
+  const analysis_start = () => {
+    // Trigger event ke useAnalysis hook yang menangani full pipeline (preprocess + forecasting)
+    // melalui backend — tidak perlu WebSocket atau URL ML service langsung
+    window.dispatchEvent(new Event('run_analysis_pipeline'));
   };
 
   return (
