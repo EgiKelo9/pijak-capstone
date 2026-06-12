@@ -28,19 +28,24 @@ FALLBACK_FEATURE = Feature(
 async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
     """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
     try:
-        # 0. Cek DB jika sudah ada dan tidak sedang force reload
+        # 0. Cek DB jika sudah ada dan tidak sedang force reload.
+        # PENTING: Harus skip jika analyze_status adalah "processing" atau "error"
+        # agar background task ini tidak crash saat mencoba Feature(**{"analyze_status": "processing"})
         if not req.force_reload:
             try:
                 existing_metadata = await get_dataset_feature_metadata(req.dataset_id)
-                if existing_metadata and existing_metadata.get("analyze_status") not in ["processing", "error"]:
-                    print(f"Loaded existing feature metadata from DB for dataset {req.dataset_id}", flush=True)
+                existing_status = existing_metadata.get("analyze_status") if existing_metadata else None
+                if existing_metadata and existing_status not in ["processing", "error", None]:
+                    print(f"[analyze_columns] Loaded existing feature metadata from DB for dataset {req.dataset_id}", flush=True)
+                    # Hapus analyze_status sebelum dimasukkan ke Feature agar tidak crash
+                    cleaned_metadata = {k: v for k, v in existing_metadata.items() if k != "analyze_status"}
                     return OpenRouterMappingResponse(
                         status="success",
                         task=req.model_type,
-                        suggested_mapping=Feature(**existing_metadata),
+                        suggested_mapping=Feature(**cleaned_metadata),
                     )
             except Exception as e:
-                print(f"Failed to use existing feature metadata: {e}", flush=True)
+                print(f"[analyze_columns] Failed to use existing feature metadata: {e}", flush=True)
 
         # 1. Fetch dataset dari backend
         df, _ = await get_dataset(req.dataset_id)
@@ -64,33 +69,25 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
         llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
         if getattr(llm_response, "error", False):
-            print(f"OpenRouter returned an error: {llm_response.message}", flush=True)
-            # Update status ke error agar frontend polling bisa berhenti
-            try:
-                await call_backend_api(
-                    "PATCH",
-                    f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
-                    json={"analyze_status": "error"}
-                )
-            except Exception as patch_err:
-                print(f"Failed to update error status: {patch_err}", flush=True)
-            return OpenRouterMappingResponse(
-                status="error",
-                task=task_str,
-                suggested_mapping=FALLBACK_FEATURE
-            )
+            print(f"[analyze_columns] OpenRouter returned an error: {llm_response.message}", flush=True)
+            raise Exception(f"OpenRouter error: {llm_response.message}")
     
         raw_text = llm_response.data.get("response", "")
-        print(f"Raw LLM response: {raw_text[:200]}", flush=True)
-
-        if not raw_text or raw_text.strip() == "error":
-            raise ValueError(f"LLM returned empty or error response: '{raw_text}'")
-
         clean_json = raw_text.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(clean_json)
         
         mapping = Feature(**parsed)
-        await update_dataset_feature_metadata(req.dataset_id, mapping)
+
+        # Simpan hasil analisis ke DB dengan analyze_status: "done"
+        # agar polling frontend bisa berhenti dan mendeteksi keberhasilan
+        mapping_dict = mapping.model_dump()
+        mapping_dict["analyze_status"] = "done"
+        await call_backend_api(
+            "PATCH",
+            f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+            json=mapping_dict
+        )
+        print(f"[analyze_columns] Successfully saved feature metadata for dataset {req.dataset_id}", flush=True)
 
         return OpenRouterMappingResponse(
             status="success",
@@ -108,7 +105,7 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
                 json={"analyze_status": "error"}
             )
         except Exception as patch_err:
-            print(f"Failed to update error status: {patch_err}", flush=True)
+            print(f"[analyze_columns] Failed to update error status: {patch_err}", flush=True)
         return OpenRouterMappingResponse(
             status="error",
             task=req.model_type,

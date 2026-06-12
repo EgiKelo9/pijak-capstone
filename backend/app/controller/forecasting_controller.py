@@ -26,7 +26,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
     dataset = db.query(Dataset_Bin).filter(
         Dataset_Bin.id == request.dataset_id,
         Dataset_Bin.is_cleaned == True,
-        Dataset_Bin.model == "forecasting",
+        Dataset_Bin.model == "Forecasting",
         Dataset_Bin.deleted_at == None
     ).first()
     if not dataset:

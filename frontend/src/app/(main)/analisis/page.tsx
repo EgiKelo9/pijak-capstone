@@ -6,23 +6,26 @@ import { FilledStateView } from '@/components/main/analisis/dashboard-filled-sta
 import { DashboardHeader } from '@/components/main/analisis/dashboard-header';
 import { useAnalysis } from '@/hooks/use-analysis';
 
-export default function AnalysisEmptyState() {
+export default function AnalysisPage() {
   const {
+    mode, setMode,
     date, setDate,
     isOpen, setIsOpen,
-    mode, setMode, modeLabel,
-    isFileUploadOpen, setIsFileUploadOpen,
-    activeDatasetId, datasetData,
+    activeDatasetId,
+    datasetData,
     forecastAggressiveness, setForecastAggressiveness,
     clusteringConfig, setClusteringConfig,
-    dataConfig, setDataConfig, dataConfigStatus,
+    dataConfig, setDataConfig,
     terminalLogs,
+    dataConfigStatus,
+    handleConfirmMapping,
+    handleReloadMapping,
+    modeLabel,
     isReady,
     handleOpenUploadModal,
-    handleUploadConfirm,
-    handleReloadMapping,
-    handleConfirmMapping,
-    handleRunAnalysis
+    handleRunAnalysis,
+    isFileUploadOpen, setIsFileUploadOpen,
+    handleUploadConfirm
   } = useAnalysis();
 
   return (

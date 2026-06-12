@@ -3,7 +3,18 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import * as React from 'react';
-import { TerminalStep, TerminalLogProps } from '@/types';
+
+export interface TerminalStep {
+  stepId: string;
+  text: string;
+  status: 'loading' | 'success' | 'error' | 'info';
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+}
+
+interface TerminalLogProps {
+  logs: TerminalStep[];
+}
 
 // CSS mask-image approach: the fade is a paint effect ON the scroll container itself,
 // so it cannot be clipped by any parent's overflow-hidden. Works regardless of how

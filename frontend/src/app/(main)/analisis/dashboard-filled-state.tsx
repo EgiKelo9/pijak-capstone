@@ -3,12 +3,21 @@
 import { DynamicDataTable } from '@/components/dynamic-data-table';
 import { AnalysisCard, StatusType } from '@/components/main-card';
 import { useEffect, useMemo, useState } from 'react';
-import { ClusteringPreference } from '@/components/main/analisis/clustering-preference';
-import { DataConfiguration } from '@/components/main/analisis/column-preference';
-import { DataQuality } from '@/components/main/analisis/data-quality';
-import { ForecastingPreference } from '@/components/main/analisis/forecasting-preference';
-import { TerminalLog } from '@/components/main/analisis/terminal';
-import { CardId, CardStatusMap, FilledStateViewProps } from '@/types';
+import { ClusteringPreference } from './clustering-preference';
+import { DataConfigState, DataConfiguration } from './column-preference';
+import { DataQuality } from './data-quality';
+import { ForecastingPreference } from './forecasting-preference';
+import { TerminalLog, type TerminalStep } from './terminal';
+
+// ── Card status map ─────────────────────────────────────────────────────────
+export type CardId =
+  | 'terminal'
+  | 'dataConfig'
+  | 'dataQuality'
+  | 'forecasting'
+  | 'clustering';
+
+export type CardStatusMap = Partial<Record<CardId, StatusType>>;
 
 const CARD_DEFAULTS: Record<CardId, StatusType> = {
   terminal:    'menunggu',
@@ -20,6 +29,25 @@ const CARD_DEFAULTS: Record<CardId, StatusType> = {
 
 function resolveStatuses(overrides?: CardStatusMap): Record<CardId, StatusType> {
   return { ...CARD_DEFAULTS, ...overrides };
+}
+
+// ── Props ───────────────────────────────────────────────────────────────────
+interface FilledStateViewProps {
+  tableData: any;
+  forecastAggressiveness: number;
+  setForecastAggressiveness: (val: number) => void;
+  clusteringConfig: { mode: 'auto' | 'manual'; clusterCount: number };
+  setClusteringConfig: (config: { mode: 'auto' | 'manual'; clusterCount: number }) => void;
+  dataConfig: DataConfigState;
+  setDataConfig: (config: DataConfigState) => void;
+  terminalLogs: TerminalStep[];
+  /**
+   * Override the status badge on any card.
+   * @example cardStatuses={{ terminal: 'berhasil', dataQuality: 'gagal' }}
+   */
+  cardStatuses?: CardStatusMap;
+  onConfirmMapping?: () => void;
+  onReloadMapping?: () => void;
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -59,7 +87,7 @@ export function FilledStateView({
   const finalDataQualityStatus = filteredTableData.length > 0 ? 'berhasil' : statuses.dataQuality;
   
   useEffect(() => {
-    if (forecastAggressiveness !== 'balance') setHasInteractedForecasting(true);
+    if (forecastAggressiveness !== 50) setHasInteractedForecasting(true);
   }, [forecastAggressiveness]);
 
   useEffect(() => {

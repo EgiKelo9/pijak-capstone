@@ -15,13 +15,12 @@ class OpenRouterMappingResponse(BaseModel):
 class PreprocessRequest(BaseModel):
     dataset_id: int
     model_type: str  # "forecasting", "clustering", atau "both"
-    force_reload: bool = False
-    job_id: Optional[str] = None
+    # force_reload: bool = False
+    job_id: str
 
 
 class PreprocessResponse(BaseModel):
     insight: Feature
-    dataset_id: Optional[int] = None
 
 class OpenRouterInsightRequest(BaseModel):
     target_task: str

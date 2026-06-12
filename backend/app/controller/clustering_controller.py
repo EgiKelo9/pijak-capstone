@@ -5,7 +5,7 @@ from app.shared.transaction_manager import TransactionManager
 from app.models.analysis_history import AnalysisHistory
 from app.models.clustering_result import ClusteringResult
 from app.models.ml_model import MLModel
-from app.models.dataset import Dataset
+from app.models.dataset import Dataset_Bin
 from app.schemas.clustering_schema import ClusteringRunRequest
 from app.schemas.base import StandardResponse
 from app.core.config import get_settings
@@ -17,9 +17,11 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
     transaction_manager = TransactionManager(db)
 
     # 1. Cek dataset exists
-    dataset = db.query(Dataset).filter(
-        Dataset.id == request.dataset_id,
-        Dataset.deleted_at == None
+    dataset = db.query(Dataset_Bin).filter(
+        Dataset_Bin.id == request.dataset_id,
+        Dataset_Bin.is_cleaned == True,
+        Dataset_Bin.model == "Clustering",
+        Dataset_Bin.deleted_at == None
     ).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset tidak ditemukan")
