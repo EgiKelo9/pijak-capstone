@@ -11,7 +11,7 @@ export const DATA = {
       icon: '/icons8/icons8-doughnut-chart-100.png',
       isActive: true,
       items: [
-        { title: 'Forecasting', url: '/dasbor/forecasting' },
+        { title: 'Forecasting', url: '/forecasting' },
         { title: 'Clustering', url: '/clustering' },
       ],
     },

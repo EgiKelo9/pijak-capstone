@@ -18,6 +18,7 @@ class ForecastingResult(Base):
     r2 = Column(Float, nullable=True)
     trend_data = Column(JSONB, nullable=False)
     feature_importances = Column(JSONB, nullable=True)
+    metrics = Column(JSONB, nullable=True)
     insight_summary = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)

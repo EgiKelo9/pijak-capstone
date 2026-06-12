@@ -185,6 +185,10 @@ class XGBoostForecastingPipeline:
         agg: str = "sum",
         fill_missing: float = 0.0,
     ) -> tuple[pd.DataFrame, list[str]]:
+        # Normalisasi alias frekuensi yang deprecated di pandas ≥ 2.2
+        _FREQ_ALIAS_MAP = {"M": "ME", "Q": "QE", "Y": "YE", "A": "YE"}
+        freq = _FREQ_ALIAS_MAP.get(freq.upper().split("-")[0], freq)
+
         df = data.copy()
         df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
         df[target_column] = pd.to_numeric(df[target_column], errors="coerce")

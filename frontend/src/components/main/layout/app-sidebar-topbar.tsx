@@ -26,6 +26,7 @@ import { fetchUserDatasets, runAnalysisPipeline, getDatasetFeatureMetadata } fro
 import { cn } from '@/lib/utils';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
 import { DATA } from './sidebar-data';
+import { useAuth } from '@/hooks/use-auth';
 
 export function AppSidebarTopbar() {
   const pathname = usePathname();
@@ -40,6 +41,13 @@ export function AppSidebarTopbar() {
   const [datasets, setDatasets] = React.useState<any[]>([]);
   const [loadingDatasets, setLoadingDatasets] = React.useState(false);
   const { setLogs: setTerminalLogs, isAnalysisReady } = useTerminal();
+
+  const { user, isLogout } = useAuth();
+  
+  const fallbackUser = {
+    name: "Guest",
+    email: "guest@example.com",
+  }
 
   const fetchDatasets = async () => {
     setLoadingDatasets(true);
@@ -102,7 +110,7 @@ export function AppSidebarTopbar() {
         <Breadcrumb>
           <BreadcrumbList className="text-sm">
             <BreadcrumbItem>
-              <BreadcrumbLink href="#" className="font-medium text-[#A3A4A6] hover:text-black transition-colors">{DATA.user.name}</BreadcrumbLink>
+              <BreadcrumbLink href="#" className="font-medium text-[#A3A4A6] hover:text-black transition-colors">{user?.name ?? fallbackUser.name}</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

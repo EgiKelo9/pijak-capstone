@@ -10,14 +10,11 @@ export interface ForecastingRunPayload {
   col_date: string;
   col_target: string;
   col_regressors: string[];
-  horizon: number;
-  freq: string;
+  forecasting_mode?: 'conservative' | 'balanced' | 'aggressive';
 }
 
 export const runForecasting = async (payload: ForecastingRunPayload): Promise<ForecastingRunResponse> => {
   const response = await axiosInstance.post('/forecasting/run', payload);
-  // The backend wraps responses in StandardResponse. 
-  // `axiosInstance` handles data extraction if properly configured, but let's assume it returns { data: { code, error, message, data } }
   return response.data.data;
 };
 

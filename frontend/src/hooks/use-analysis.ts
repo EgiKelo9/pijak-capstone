@@ -363,14 +363,21 @@ export function useAnalysis() {
               { stepId: `forecast-direct-start-${Date.now()}`, text: 'Sistem memicu model forecasting: memulai proses training XGBoost...', status: 'loading' as const }
             ]);
 
-            await runForecasting({
+            const forecastPayload = {
               dataset_id: cleanedForecastId,
               col_date: colDate,
               col_target: colTarget,
               col_regressors: colRegressors.filter((c: string) => c !== colDate && c !== colTarget),
-              horizon: 8,
-              freq: 'W'
-            });
+              forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
+            };
+            await runForecasting(forecastPayload);
+            // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
+            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
+              dataset_id: forecastPayload.dataset_id,
+              col_date: forecastPayload.col_date,
+              col_target: forecastPayload.col_target,
+              col_regressors: forecastPayload.col_regressors,
+            }));
 
             setTerminalLogs((prev) => [
               ...prev.map(l => l.status === 'loading' ? { ...l, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const } : l)
@@ -711,15 +718,22 @@ export function useAnalysis() {
           (c: string) => c && c !== colDate && c !== colTarget
         );
 
-        runForecasting({
+        const forecastPayloadWs = {
           dataset_id: cleanedForecastId,
           col_date: colDate,
           col_target: colTarget,
           col_regressors: validRegressors,
-          horizon: 30,
-          freq: 'D'  // pastikan konsisten, atau buat dinamis dari state
-        })
+          forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
+        };
+        runForecasting(forecastPayloadWs)
           .then(() => {
+            // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
+            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
+              dataset_id: forecastPayloadWs.dataset_id,
+              col_date: forecastPayloadWs.col_date,
+              col_target: forecastPayloadWs.col_target,
+              col_regressors: forecastPayloadWs.col_regressors,
+            }));
             setTerminalLogs((prev) => [
               ...prev,
               { stepId: `forecast-auto-done-${Date.now()}`, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const }

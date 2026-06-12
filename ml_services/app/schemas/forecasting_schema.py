@@ -15,6 +15,9 @@ class ForecastingRequest(BaseModel):
     - col_date       → Feature.col_date_time.col_whole (sudah di-merge oleh preprocessing)
     - col_regressors → kolom numerik hasil preprocessing (selain target & date)
     - data           → data cleaned yang sudah disimpan/diteruskan dari backend
+
+    Catatan: horizon dan freq tidak perlu dikirim dari frontend karena sudah di-hardcode
+    di ML service (daily=30, weekly=10, monthly=3).
     """
     analysis_id: str
     dataset_id: int
@@ -22,8 +25,6 @@ class ForecastingRequest(BaseModel):
     col_product: Optional[str] = None
     col_target: str
     col_regressors: list[str]      # boleh kosong [], model fallback ke lag-only mode
-    horizon: int                   # jumlah periode ke depan yang ingin diprediksi
-    freq: str                      # frekuensi data: "W" = weekly, "D" = daily, "M" = monthly
     callback_url: str              # URL untuk callback setelah background task selesai
     forecasting_mode: Literal["conservative", "balanced", "aggressive"] = "balanced"  # mode forecasting
 
@@ -34,7 +35,8 @@ class ForecastingRequest(BaseModel):
 
 class TrendDataPoint(BaseModel):
     date: str
-    value: float
+    actual_value: Optional[float] = None      # nilai historis asli (null untuk titik prediksi)
+    predicted_value: Optional[float] = None   # nilai prediksi (null untuk titik historis)
 
 
 class FeatureDetail(BaseModel):
@@ -44,6 +46,7 @@ class FeatureDetail(BaseModel):
     max: float
     min: float
     influence: float
+    is_categorical: bool = False  # True jika berasal dari one-hot encoding, False jika numerik asli
 
 
 class ForecastingMetrics(BaseModel):
@@ -59,9 +62,9 @@ class ForecastingMetrics(BaseModel):
 
 class ForecastingResult(BaseModel):
     """Hasil forecasting yang dikembalikan pipeline"""
-    metrics: ForecastingMetrics
-    trend_data: list[TrendDataPoint]
-    feature_importances: list[FeatureDetail]
+    metrics: dict[str, ForecastingMetrics]
+    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...]}
+    feature_importances: dict[str, list[FeatureDetail]]
     insight_summary: str
 
 

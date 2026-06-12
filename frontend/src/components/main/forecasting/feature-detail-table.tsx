@@ -7,7 +7,22 @@ interface FeatureDetailTableProps {
   features?: FeatureDetail[];
 }
 
+/**
+ * Mengurutkan fitur: numerik (abs influence desc) di atas, lalu kategorik (abs influence desc).
+ */
+function sortedFeatures(features: FeatureDetail[]): FeatureDetail[] {
+  const numerics = features
+    .filter((f) => !f.is_categorical)
+    .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence));
+  const categoricals = features
+    .filter((f) => f.is_categorical)
+    .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence));
+  return [...numerics, ...categoricals];
+}
+
 export function FeatureDetailTable({ features = [] }: FeatureDetailTableProps) {
+  const sorted = sortedFeatures(features);
+
   return (
     <AnalysisCard title="Detail Fitur" className="flex flex-col h-full overflow-hidden" innerClassName="p-0 overflow-auto">
       <div className="w-full overflow-x-auto">
@@ -15,28 +30,43 @@ export function FeatureDetailTable({ features = [] }: FeatureDetailTableProps) {
           <thead className="text-neutral-500 uppercase bg-neutral-50 border-b border-neutral-100">
             <tr>
               <th className="px-4 py-3 font-medium">Nama Fitur</th>
+              <th className="px-4 py-3 font-medium">Tipe</th>
               <th className="px-4 py-3 font-medium">Modus</th>
               <th className="px-4 py-3 font-medium">Rata-rata</th>
-              <th className="px-4 py-3 font-medium">Maksimum</th>
-              <th className="px-4 py-3 font-medium">Minimum</th>
+              <th className="px-4 py-3 font-medium">Maks</th>
+              <th className="px-4 py-3 font-medium">Min</th>
               <th className="px-4 py-3 font-medium text-right">Pengaruh</th>
             </tr>
           </thead>
           <tbody>
-            {features.length > 0 ? (
-              features.map((f, i) => {
+            {sorted.length > 0 ? (
+              sorted.map((f, i) => {
                 const isPercentage = Math.abs(f.influence) > 1;
                 const displayInfluence = isPercentage ? f.influence : f.influence * 100;
+                const isCat = f.is_categorical ?? false;
                 return (
                   <tr key={i} className="bg-white border-b border-neutral-50 hover:bg-neutral-50">
-                    <td className="px-4 py-2.5 font-medium text-neutral-700 whitespace-nowrap">{f.name}</td>
+                    <td className="px-4 py-2.5 font-medium text-neutral-700 whitespace-nowrap max-w-[120px] truncate">
+                      {f.name}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          isCat
+                            ? 'bg-indigo-50 text-indigo-500'
+                            : 'bg-sky-50 text-sky-600'
+                        }`}
+                      >
+                        {isCat ? 'Kategorik' : 'Numerik'}
+                      </span>
+                    </td>
                     <td className="px-4 py-2.5">{f.mode.toFixed(1)}</td>
                     <td className="px-4 py-2.5">{f.mean.toFixed(1)}</td>
                     <td className="px-4 py-2.5">{f.max.toFixed(1)}</td>
                     <td className="px-4 py-2.5">{f.min.toFixed(1)}</td>
                     <td className="px-4 py-2.5 text-right font-medium">
-                      <span className={f.influence >= 0 ? "text-sky-500" : "text-neutral-400"}>
-                        {displayInfluence.toFixed(1)}%
+                      <span className={displayInfluence >= 0 ? 'text-sky-500' : 'text-rose-400'}>
+                        {displayInfluence >= 0 ? '+' : ''}{displayInfluence.toFixed(1)}%
                       </span>
                     </td>
                   </tr>
@@ -44,7 +74,7 @@ export function FeatureDetailTable({ features = [] }: FeatureDetailTableProps) {
               })
             ) : (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-400">
                   Belum ada data
                 </td>
               </tr>

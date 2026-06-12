@@ -9,23 +9,22 @@ from app.schemas.base import StandardResponse
 class ForecastingRunRequest(BaseModel):
     """Request body untuk menjalankan forecasting.
 
-    Field-field ini diteruskan langsung ke ML service:
-    - dataset_id     → ID dataset yang digunakan (untuk validasi di backend)
-    - col_date       → nama kolom tanggal di dataset
-    - col_product    → nama kolom produk di dataset
-    - col_target     → nama kolom target (qty/sales) yang akan diprediksi
-    - col_regressors → kolom fitur pendukung (boleh kosong [])
-    - horizon        → jumlah periode ke depan yang ingin diprediksi
-    - freq           → frekuensi data: "D"=daily, "W"=weekly, "M"=monthly
+    Field-field ini mencerminkan output Feature dari /preprocess/run:
+    - col_product    → Feature.col_product
+    - col_target     → Feature.col_target
+    - col_date       → Feature.col_date_time.col_whole (sudah di-merge oleh preprocessing)
+    - col_regressors → kolom numerik hasil preprocessing (selain target & date)
+    - data           → data cleaned yang sudah disimpan/diteruskan dari backend
+
+    Catatan: horizon dan freq tidak perlu dikirim dari frontend karena sudah di-hardcode
+    di ML service (daily=30, weekly=10, monthly=3).
     """
     dataset_id: int
     col_date: str
     col_product: Optional[str] = None
     col_target: str
     col_regressors: list[str]
-    horizon: int
-    freq: str
-    forecasting_mode: Literal["conservative", "balanced", "aggressive"] = "balanced"  # mode forecasting
+    forecasting_mode: Literal["conservative", "balanced", "aggressive"] = "balanced"
 
 
 # ================================
@@ -34,7 +33,8 @@ class ForecastingRunRequest(BaseModel):
 
 class TrendDataPoint(BaseModel):
     date: str
-    value: float
+    actual_value: Optional[float] = None      # nilai historis asli (null untuk titik prediksi)
+    predicted_value: Optional[float] = None   # nilai prediksi (null untuk titik historis)
 
 
 class FeatureDetail(BaseModel):
@@ -54,14 +54,14 @@ class ForecastingMetrics(BaseModel):
     mse: float
     rmse: float
     r2: float
-    forecasting_mode: str = "balanced"  # mode yang digunakan saat training
+    forecasting_mode: str = "balanced"
 
 
 class ForecastingResultData(BaseModel):
     """Hasil keseluruhan forecasting dari ML service."""
-    metrics: ForecastingMetrics
-    trend_data: list[TrendDataPoint]
-    feature_importances: list[FeatureDetail]
+    metrics: dict[str, ForecastingMetrics]        # {"daily": ..., "weekly": ...}
+    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...]}
+    feature_importances: dict[str, list[FeatureDetail]]
     insight_summary: str
 
 

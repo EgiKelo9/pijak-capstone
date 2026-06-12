@@ -18,11 +18,14 @@ export default function ForecastingDashboardPage() {
     data, 
     isLoading, 
     error,
+    isRerunning,
     timeFilter, setTimeFilter,
-    aggType, setAggType,
     aggressiveness, setAggressiveness,
-    refetch
+    rerun
   } = useForecasting();
+
+  const currentMetrics = data?.metrics?.[timeFilter] || data?.metrics?.['weekly'] || undefined;
+  const currentFeatures = data?.feature_importances?.[timeFilter] || data?.feature_importances?.['weekly'] || undefined;
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center text-neutral-500">Memuat data forecasting...</div>;
@@ -71,13 +74,13 @@ export default function ForecastingDashboardPage() {
           {/* Row 1: Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px] min-h-[220px] shrink-0">
             <div className="lg:col-span-3 h-full min-h-0">
-              <ConfidenceCard metrics={data?.metrics} />
+              <ConfidenceCard metrics={currentMetrics} />
             </div>
             <div className="lg:col-span-4 h-full min-h-0">
-              <FeatureInfluenceChart features={data?.feature_importances} />
+              <FeatureInfluenceChart features={currentFeatures} />
             </div>
             <div className="lg:col-span-5 h-full min-h-0">
-              <FeatureDetailTable features={data?.feature_importances} />
+              <FeatureDetailTable features={currentFeatures} />
             </div>
           </div>
 
@@ -87,15 +90,13 @@ export default function ForecastingDashboardPage() {
               data={data?.trend_data} 
               timeFilter={timeFilter} 
               setTimeFilter={setTimeFilter}
-              aggType={aggType}
-              setAggType={setAggType}
             />
           </div>
 
           {/* Row 3: Heatmap */}
-          <div className="w-full h-[220px] shrink-0">
+          {/* <div className="w-full h-[220px] shrink-0">
             <HistoricalHeatmap data={data?.trend_data} />
-          </div>
+          </div> */}
         </div>
 
         {/* Tab: Pengujian */}
@@ -104,13 +105,14 @@ export default function ForecastingDashboardPage() {
           {/* Row 1: Metrics & Config */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[220px] min-h-[200px] shrink-0">
             <div className="h-full min-h-0">
-              <MetricsCard metrics={data?.metrics} />
+              <MetricsCard metrics={currentMetrics} />
             </div>
             <div className="h-full min-h-0">
               <AggressivenessControl 
                 value={aggressiveness} 
                 onChange={setAggressiveness} 
-                onApply={() => refetch()} 
+                onApply={rerun}
+                isLoading={isRerunning}
               />
             </div>
           </div>
@@ -119,9 +121,8 @@ export default function ForecastingDashboardPage() {
           <div className="w-full h-[400px] shrink-0">
             <ForecastingChart 
               data={data?.trend_data} 
-              timeFilter="monthly"
-              setTimeFilter={() => {}} // no-op since it's fixed
-              isFixedFilter={true}
+              timeFilter={timeFilter} 
+              setTimeFilter={setTimeFilter}
             />
           </div>
         </div>

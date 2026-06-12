@@ -117,7 +117,8 @@ export interface FilledStateViewProps {
 
 export interface TrendDataPoint {
   date: string;
-  value: number;
+  actual_value?: number | null;    // nilai historis asli (null untuk titik prediksi)
+  predicted_value?: number | null; // nilai prediksi (null untuk titik historis)
 }
 
 export interface FeatureDetail {
@@ -127,6 +128,7 @@ export interface FeatureDetail {
   max: number;
   min: number;
   influence: number;
+  is_categorical?: boolean; // true jika berasal dari one-hot encoding
 }
 
 export interface ForecastingMetrics {
@@ -139,10 +141,12 @@ export interface ForecastingMetrics {
   r2: number;
 }
 
+export type FreqKey = 'daily' | 'weekly';
+
 export interface ForecastingResultData {
-  metrics: ForecastingMetrics;
-  trend_data: TrendDataPoint[];
-  feature_importances: FeatureDetail[];
+  metrics: Record<FreqKey, ForecastingMetrics>;
+  trend_data: Record<FreqKey, TrendDataPoint[]>; // dict keyed by frequency
+  feature_importances: Record<FreqKey, FeatureDetail[]>;
   insight_summary: string;
 }
 
