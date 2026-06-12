@@ -21,7 +21,6 @@ class PreprocessRequest(BaseModel):
 
 class PreprocessResponse(BaseModel):
     insight: Feature
-    dataset_id: Optional[int] = None
 
 class OpenRouterInsightRequest(BaseModel):
     target_task: str

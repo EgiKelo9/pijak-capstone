@@ -1,4 +1,4 @@
-import axiosInstance from "@/lib/axios";
+import axiosInstance from "../lib/axios";
 
 export const register = async (name: string, email: string, password: string, passwordConfirmation: string) => {
   try {
@@ -38,3 +38,15 @@ export const logout = async () => {
     throw new Error("Logout failed");
   }
 }
+
+/** Helper untuk dev SSO login — mengembalikan access_token string secara langsung */
+export const mockLogin = async (email: string, password: string): Promise<string> => {
+  try {
+    const response = await axiosInstance.post("/auth/login", { email, password });
+    const token = response.data?.data?.access_token;
+    if (!token) throw new Error("Token not found in response");
+    return token;
+  } catch (error) {
+    throw new Error("Failed to fetch mock token");
+  }
+}

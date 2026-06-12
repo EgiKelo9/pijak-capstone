@@ -1,13 +1,15 @@
 'use client';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Check, ChevronRight, Loader2, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Loader2, X } from 'lucide-react';
 import * as React from 'react';
 
 export interface TerminalStep {
   stepId: string;
   text: string;
   status: 'loading' | 'success' | 'error' | 'info';
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 interface TerminalLogProps {
@@ -23,6 +25,43 @@ const MASK_STYLE: React.CSSProperties = {
   WebkitMaskImage:
     'linear-gradient(to bottom, transparent 0%, black 10%, black 82%, transparent 100%)',
 };
+
+function InfoLogItem({ log }: { log: TerminalStep }) {
+  const [isExpanded, setIsExpanded] = React.useState(!log.defaultCollapsed);
+
+  // If it's not set as collapsible, return the standard text view
+  if (!log.collapsible) {
+    return (
+      <div className="flex items-start gap-3 text-neutral-500">
+        <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-40" />
+        <span className="whitespace-pre-wrap break-words">{log.text}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-start gap-3 text-neutral-500 cursor-pointer hover:text-neutral-700 transition-colors group select-none"
+      onClick={() => setIsExpanded(!isExpanded)}
+    >
+      {isExpanded ? (
+        <ChevronDown className="mt-0.5 size-4 shrink-0 opacity-60 text-[#2BBAEE]" />
+      ) : (
+        <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-60" />
+      )}
+      <div className="flex-1 min-w-0">
+        <span className={`whitespace-pre-wrap break-words ${!isExpanded ? 'line-clamp-2' : ''}`}>
+          {log.text}
+        </span>
+        {!isExpanded && (
+          <span className="text-[10px] text-[#2BBAEE] mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity block">
+            Klik untuk memperluas
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function TerminalLog({ logs }: TerminalLogProps) {
   const endOfLogRef = React.useRef<HTMLDivElement>(null);
@@ -112,15 +151,7 @@ export function TerminalLog({ logs }: TerminalLogProps) {
             }
 
             // 4. INFO
-            return (
-              <div
-                key={`info-${index}`}
-                className="flex items-start gap-3 text-neutral-500"
-              >
-                <ChevronRight className="mt-0.5 size-4 shrink-0 opacity-40" />
-                <span>{log.text}</span>
-              </div>
-            );
+            return <InfoLogItem key={log.stepId || `info-${index}`} log={log} />;
           })}
 
           {/* Auto-scroll anchor */}

@@ -16,6 +16,9 @@ from io import BytesIO
 import chardet 
 import httpx
 from app.core.config import get_settings
+from fastapi import WebSocket
+import websockets
+import asyncio
 
 UPLOAD_DIR = "static/datasets"
 
@@ -138,6 +141,34 @@ async def upload_bin(
             
             dataset_id = new_dataset.id
             dataset_name = new_dataset.dataset_name
+
+            if is_cleaned and ori_data_id:
+                orig_dataset = session.get(Dataset_Bin, ori_data_id)
+                if orig_dataset:
+                    import json
+                    orig_meta = orig_dataset.feature_metadata or {}
+                    if isinstance(orig_meta, str):
+                        try:
+                            orig_meta = json.loads(orig_meta)
+                        except:
+                            orig_meta = {}
+                    
+                    if not isinstance(orig_meta, dict):
+                        orig_meta = {}
+                    
+                    if model == 'Forecasting':
+                        orig_meta['cleaned_forecast_dataset_id'] = dataset_id
+                        orig_meta['cleaned_dataset_id'] = dataset_id
+                    elif model == 'Clustering':
+                        orig_meta['cleaned_cluster_dataset_id'] = dataset_id
+                        orig_meta['cleaned_dataset_id'] = dataset_id
+                    else:
+                        orig_meta['cleaned_dataset_id'] = dataset_id
+                    
+                    # Temporarily clear and flush to ensure SQLAlchemy registers the mutation
+                    orig_dataset.feature_metadata = None
+                    session.flush()
+                    orig_dataset.feature_metadata = orig_meta
             
     except Exception as e:
         raise HTTPException(
@@ -367,7 +398,7 @@ async def fetch_analysis_history_by_user(current_user: User, db: Session):
                     fr.confidence_level,
                     cr.silhouette_score
                 FROM analysis_history ah
-                LEFT JOIN datasets d ON ah.dataset_id = d.id
+                LEFT JOIN datasets_bin d ON ah.dataset_id = d.id
                 LEFT JOIN ml_models m ON ah.model_id = m.id
                 LEFT JOIN forecasting_results fr ON ah.id = fr.analysis_id
                 LEFT JOIN clustering_results cr ON ah.id = cr.analysis_id
@@ -409,24 +440,25 @@ async def analyze_dataset_columns(dataset_id: int, model_type: str, current_user
     ml_url = get_settings().ML_SERVICE_URL
 
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             analyze_payload = {"dataset_id": dataset_id, "model_type": model_type, "force_reload": force_reload}
             analyze_response = await client.post(f"{ml_url}/ml/v1/openrouter/analyze-columns", json=analyze_payload)
             
             if analyze_response.status_code != 200:
                 raise HTTPException(status_code=analyze_response.status_code, detail=f"Gagal saat analyze-columns: {analyze_response.text}")
 
+            ml_data = analyze_response.json()
             return StandardResponse(
-                code=200,
-                error=False,
-                message="Berhasil menjalankan analyze-columns",
-                data=analyze_response.json()
+                code=ml_data.get("code", analyze_response.status_code),
+                error=ml_data.get("error", False),
+                message=ml_data.get("message", "Berhasil menjalankan analyze-columns"),
+                data=ml_data.get("data", ml_data)
             )
             
     except httpx.RequestError as e:
         raise HTTPException(status_code=500, detail=f"Gagal menghubungi ML Services: {str(e)}")
 
-async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user: User, db: Session):
+async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user: User, db: Session, job_id: str | None = None):
     """Memanggil endpoint run preprocessing di ml_services."""
     transaction_manager = TransactionManager(db)
     
@@ -446,17 +478,65 @@ async def preprocess_dataset_run(dataset_id: int, model_type: str, current_user:
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             preprocess_payload = {"dataset_id": dataset_id, "model_type": model_type}
+            if job_id:
+                preprocess_payload["job_id"] = job_id
+            
             preprocess_response = await client.post(f"{ml_url}/ml/v1/preprocess/run", json=preprocess_payload)
 
             if preprocess_response.status_code != 200:
                 raise HTTPException(status_code=preprocess_response.status_code, detail=f"Gagal saat run preprocessing: {preprocess_response.text}")
 
+            try:
+                ml_data = preprocess_response.json()
+            except ValueError:
+                ml_data = {"data": preprocess_response.text}
+
             return StandardResponse(
-                code=200,
-                error=False,
-                message="Berhasil menjalankan preprocessing",
-                data=preprocess_response.json()
+                code=ml_data.get("code", preprocess_response.status_code),
+                error=ml_data.get("error", False),
+                message=ml_data.get("message", "Berhasil menjalankan preprocessing"),
+                data=ml_data.get("data", ml_data)
             )
             
     except httpx.RequestError as e:
         raise HTTPException(status_code=500, detail=f"Gagal menghubungi ML Services: {str(e)}")
+
+async def preprocess_websocket_handler(websocket: WebSocket, job_id: str):
+    await websocket.accept()
+    settings = get_settings()
+    ws_base = settings.ML_SERVICE_URL.replace("http://", "ws://").replace("https://", "wss://")
+    ml_ws_url = f"{ws_base}/ml/v1/preprocess/ws/{job_id}"
+    
+    async def proxy_ml_to_client(ml_ws, client_ws):
+        try:
+            while True:
+                msg = await ml_ws.recv()
+                await client_ws.send_text(msg)
+        except Exception:
+            pass
+
+    async def proxy_client_to_ml(ml_ws, client_ws):
+        try:
+            while True:
+                msg = await client_ws.receive_text()
+                await ml_ws.send(msg)
+        except Exception:
+            pass
+
+    try:
+        async with websockets.connect(ml_ws_url) as ml_ws:
+            task1 = asyncio.create_task(proxy_ml_to_client(ml_ws, websocket))
+            task2 = asyncio.create_task(proxy_client_to_ml(ml_ws, websocket))
+            done, pending = await asyncio.wait(
+                [task1, task2],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in pending:
+                task.cancel()
+    except Exception as e:
+        print(f"WebSocket Proxy Error: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except RuntimeError:
+            pass

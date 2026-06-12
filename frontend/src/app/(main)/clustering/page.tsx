@@ -665,7 +665,7 @@ export default function ClusteringPage() {
   const [isReanalyzing, setIsReanalyzing] = React.useState(false);
 
   React.useEffect(() => {
-    const storedId = sessionStorage.getItem('pijak_active_dataset_id');
+    const storedId = sessionStorage.getItem('pijak_cleaned_clustering_id') || sessionStorage.getItem('pijak_active_dataset_id');
     if (storedId) {
       const id = parseInt(storedId, 10);
       setDatasetId(id);

@@ -6,9 +6,16 @@ from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse, ProcessDatasetRequest
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler
 from app.shared.dependencies import get_current_user
 from app.models.user import User
+from fastapi import WebSocket, WebSocketDisconnect
+import websockets
+import asyncio
+import httpx
+from app.core.config import get_settings
+
+settings = get_settings()
 
 router = APIRouter(prefix="/datasets")
 
@@ -258,27 +265,24 @@ async def analyze_columns(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Endpoint untuk menjalankan analyze-columns ke ML Services.
+    Proxy request to ML Services for preprocessing.
     """
     return await analyze_dataset_columns(request.dataset_id, request.model_type, current_user, db, request.force_reload)
 
-@router.post(
-    "/preprocess",
-    response_model=StandardResponse[Dict[str, Any]],
-    responses={
-        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request"},
-        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
-        404: {"model": StandardResponse[dict], "description": "Not Found"},
-        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
-    }
-)
-async def run_preprocessing(
-    request: ProcessDatasetRequest,
+@router.post("/preprocess/run")
+async def run_preprocess_proxy(
+    payload: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Endpoint untuk menjalankan preprocessing ke ML Services.
+    Proxy request to ML Services for preprocessing.
     """
-    return await preprocess_dataset_run(request.dataset_id, request.model_type, current_user, db)
+    dataset_id = payload.get("dataset_id")
+    model_type = payload.get("model_type")
+    job_id = payload.get("job_id")
+    return await preprocess_dataset_run(dataset_id, model_type, current_user, db, job_id)
 
+@router.websocket("/preprocess/ws/{job_id}")
+async def preprocess_websocket_proxy(websocket: WebSocket, job_id: str):
+    await preprocess_websocket_handler(websocket, job_id)

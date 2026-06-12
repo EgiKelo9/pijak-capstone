@@ -231,12 +231,12 @@ export function LoadingCarousel({
                     transition={{ duration: 0.8, ease: "easeInOut" }}
                     className={`relative ${aspectRatioClasses[aspectRatio]} w-full overflow-hidden`}
                   >
-                    <Image
+                    <img
                       src={tip.image}
                       alt={`Visual representation for tip: ${tip.text}`}
-                      fill
+                      fetchPriority="high"
+                      decoding="async"
                       className="object-cover grayscale"
-                      priority
                     />
                     <div 
                       className="absolute inset-0 opacity-70 pointer-events-none mix-blend-color"

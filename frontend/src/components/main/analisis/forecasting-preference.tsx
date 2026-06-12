@@ -1,14 +1,11 @@
 'use client';
 
-interface ForecastingPreferenceProps {
-  value: number;
-  onChange: (value: number) => void;
-}
+import { type ForecastAggressivenessType, ForecastingPreferenceProps } from '@/types';
 
 const SEGMENTS = [
   {
     label: 'Conservative',
-    value: 0,
+    value: 'conservative' as ForecastAggressivenessType,
     feedback: 'Stabil, hindari lonjakan ekstrem.',
     activeColor: 'bg-neutral-500 text-white',
     inactiveColor: 'bg-white text-neutral-500 hover:bg-neutral-50 border-neutral-200',
@@ -16,7 +13,7 @@ const SEGMENTS = [
   },
   {
     label: 'Balance',
-    value: 50,
+    value: 'balance' as ForecastAggressivenessType,
     feedback: 'Titik tengah stabilitas & respons.',
     activeColor: 'bg-sky-400 text-white',
     inactiveColor: 'bg-white text-neutral-500 hover:bg-neutral-50 border-neutral-200',
@@ -24,26 +21,24 @@ const SEGMENTS = [
   },
   {
     label: 'Aggressive',
-    value: 100,
+    value: 'aggressive' as ForecastAggressivenessType,
     feedback: 'Sensitif terhadap perubahan tren.',
     activeColor: 'bg-sky-500 text-white',
     inactiveColor: 'bg-white text-neutral-500 hover:bg-neutral-50 border-neutral-200',
     feedbackColor: 'text-sky-500',
   },
-] as const;
-
-const getActiveIdx = (val: number) => (val < 33 ? 0 : val < 66 ? 1 : 2);
+];
 
 export function ForecastingPreference({ value, onChange }: ForecastingPreferenceProps) {
-  const activeIdx = getActiveIdx(value);
-  const seg = SEGMENTS[activeIdx];
+  const activeIdx = SEGMENTS.findIndex(s => s.value === value);
+  const seg = SEGMENTS[activeIdx !== -1 ? activeIdx : 1];
 
   return (
     <div className="flex h-full w-full flex-col justify-between pt-1">
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-2 w-full">
           {SEGMENTS.map((s, i) => {
-            const isActive = i === activeIdx;
+            const isActive = s.value === value;
             return (
               <button
                 key={s.label}
@@ -62,7 +57,7 @@ export function ForecastingPreference({ value, onChange }: ForecastingPreference
 
       {/* Feedback */}
       <p
-        key={activeIdx}
+        key={value}
         className={['text-[10px] font-medium italic leading-snug line-clamp-2 mt-2', seg.feedbackColor].join(' ')}
       >
         * {seg.feedback}

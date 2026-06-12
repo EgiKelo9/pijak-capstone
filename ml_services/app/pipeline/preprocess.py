@@ -4,7 +4,6 @@ from typing import Tuple
 from pydantic import UUID5
 from app.schemas.features import Feature
 from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
-from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
 from app.controller.openrouter import analyze_columns
 from app.schemas.openrouter import DatasetMetadataRequest
 from app.core.websocket_manager import manager
@@ -219,16 +218,20 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
 
     mapping_res = await get_dataset_feature_metadata(dataset_id)
     # print(mapping_res)
-    extracted = extract_response(mapping_res.get("data"))
+    extracted = extract_response(mapping_res or {})
     # print(extracted)
 
-    await manager.send(job_id, {"message": "Menyiapkan worker: memindai anomali dan membersihkan noise data..."})
+    step1_id = f"{job_id}-step1"
+    await manager.send(job_id, {"stepId": step1_id, "text": "Menyiapkan worker: memindai anomali dan membersihkan noise data...", "status": "loading"})
     await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
     try:
         df = (
             df.pipe(drop_cols, extracted.get("cols_to_drop"))
         )
-        await manager.send(job_id, {"message": "Mengekstraksi fitur temporal: menyelaraskan format matriks waktu..."})
+        await manager.send(job_id, {"stepId": step1_id, "text": "Anomali dan noise data berhasil dibersihkan.", "status": "success"})
+
+        step2_id = f"{job_id}-step2"
+        await manager.send(job_id, {"stepId": step2_id, "text": "Mengekstraksi fitur temporal: menyelaraskan format matriks waktu...", "status": "loading"})
         await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df, updated_col_dt = adjust_date_time(
             df,
@@ -239,22 +242,29 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             col_dt_whole=extracted.get("col_dt_whole")
         )
         extracted["col_dt_whole"] = updated_col_dt
+        await manager.send(job_id, {"stepId": step2_id, "text": "Fitur temporal berhasil diekstraksi.", "status": "success"})
         
         # If you have more steps, you can resume chaining here:
-        await manager.send(job_id, {"message": "Validasi skema: menormalisasi tipe variabel numerik dan kategorikal..."})
+        step3_id = f"{job_id}-step3"
+        await manager.send(job_id, {"stepId": step3_id, "text": "Validasi skema: menormalisasi tipe variabel numerik dan kategorikal...", "status": "loading"})
         await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df = (
             df.pipe(adjust_data_types, extracted.get("col_to_cat"), extracted.get("col_product"), extracted.get("col_to_num"))
         )
-        await manager.send(job_id, {"message": "Reduksi dimensi: memangkas vektor kolom yang redundan..."})
+        await manager.send(job_id, {"stepId": step3_id, "text": "Skema variabel berhasil dinormalisasi.", "status": "success"})
+
+        step4_id = f"{job_id}-step4"
+        await manager.send(job_id, {"stepId": step4_id, "text": "Reduksi dimensi: memangkas vektor kolom yang redundan...", "status": "loading"})
         await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         iter_cols, categorical_cols, numerical_cols = extract_column(df, extracted['col_dt_whole'])
         df = (
             df.pipe(enforce_types, numerical_cols, categorical_cols)
             .pipe(drop_or_impute, categorical_cols, numerical_cols, extracted['col_dt_whole'])
         )
+        await manager.send(job_id, {"stepId": step4_id, "text": "Reduksi dimensi selesai.", "status": "success"})
         
-        await manager.send(job_id, {"message": "Inisiasi rekayasa fitur: mensintesis metrik prediktif baru..."})
+        step5_id = f"{job_id}-step5"
+        await manager.send(job_id, {"stepId": step5_id, "text": "Inisiasi rekayasa fitur: mensintesis metrik prediktif baru...", "status": "loading"})
         await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         try:
             df, numerical_cols = generate_new_features(
@@ -265,34 +275,49 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         except Exception as e:
             print(f"Error occurred while generating new features: {str(e)}")
             raise e
+        await manager.send(job_id, {"stepId": step5_id, "text": "Rekayasa fitur berhasil diselesaikan.", "status": "success"})
+
         shapes.append(df.shape)
         print(f"Pipeline finished successfully. New Shape: {df.shape}")
         
         # Upload the cleaned dataset back to the backend
-        await manager.send(job_id, {"message": "Kompilasi selesai: mengonversi dan merekam matriks teroptimasi ke server..."})
+        step6_id = f"{job_id}-step6"
+        await manager.send(job_id, {"stepId": step6_id, "text": "Kompilasi selesai: mengonversi dan merekam matriks teroptimasi ke server...", "status": "loading"})
+        
+        cleaned_forecast_id = None
+        cleaned_cluster_id = None
+
         if model.lower() == 'both':
             upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
+            cleaned_forecast_id = upload_forecast.get("data", {}).get("dataset_id")
 
-            df = df.drop(columns=extracted['col_dt_whole'])
-            upload_cluster = await upload_cleaned_dataset(df, dataset_id, 'Clustering', extracted)
-            print(f"Upload successful: {upload_forecast, upload_cluster}")
-            cleaned_dataset_id = upload_forecast.get("data", {}).get("dataset_id") if isinstance(upload_forecast, dict) else None
+            df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            upload_cluster = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            cleaned_cluster_id = upload_cluster.get("data", {}).get("dataset_id")
+            print(f"Upload successful: forecast_id={cleaned_forecast_id}, cluster_id={cleaned_cluster_id}")
+        elif model.lower() == 'forecasting':
+            upload_result = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
+            cleaned_forecast_id = upload_result.get("data", {}).get("dataset_id")
+            print(f"Upload successful: forecast_id={cleaned_forecast_id}")
         else:
-            upload_result = await upload_cleaned_dataset(df, dataset_id, model, extracted)
-            print(f"Upload successful: {upload_result}")
-            cleaned_dataset_id = upload_result.get("data", {}).get("dataset_id") if isinstance(upload_result, dict) else None
+            df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            upload_result = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            cleaned_cluster_id = upload_result.get("data", {}).get("dataset_id")
+            print(f"Upload successful: cluster_id={cleaned_cluster_id}")
 
-        # Update the mapping with the new datetime column if changed
-        mapping_data = mapping_res.get("data", {})
-        if "col_date_time" in mapping_data:
-            if isinstance(mapping_data["col_date_time"], str):
-                mapping_data["col_date_time"] = extracted["col_dt_whole"]
-            elif isinstance(mapping_data["col_date_time"], dict):
-                if "col_whole" in mapping_data["col_date_time"]:
-                    mapping_data["col_date_time"]["col_whole"] = extracted["col_dt_whole"]
-                
+        await manager.send(job_id, {"stepId": step6_id, "text": "Dataset bersih berhasil disimpan ke database.", "status": "success"})
+        await manager.send(job_id, {
+            "stepId": f"{job_id}-done",
+            "text": "Pipeline preprocessing selesai. Dataset siap untuk analisis.",
+            "status": "success",
+            "cleaned_forecast_id": cleaned_forecast_id,
+            "cleaned_cluster_id": cleaned_cluster_id,
+            "feature_metadata": extracted
+        })
+
     except Exception as e:
         print(f"Pipeline failed during transformation: {str(e)}")
+        await manager.send(job_id, {"stepId": f"{job_id}-error", "text": f"Pipeline gagal: {str(e)}", "status": "error"})
         raise e
         
     return shapes

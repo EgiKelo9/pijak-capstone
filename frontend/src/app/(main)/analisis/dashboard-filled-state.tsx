@@ -65,8 +65,8 @@ export function FilledStateView({
   onReloadMapping,
 }: FilledStateViewProps) {
   const [activeAccordion, setActiveAccordion] = useState<'config' | 'quality' | null>(null);
-  const [hasInteractedForecasting, setHasInteractedForecasting] = useState(false);
-  const [hasInteractedClustering, setHasInteractedClustering] = useState(false);
+  const [hasInteractedForecasting, setHasInteractedForecasting] = useState(true);
+  const [hasInteractedClustering, setHasInteractedClustering] = useState(true);
 
   const statuses = resolveStatuses(cardStatuses);
 

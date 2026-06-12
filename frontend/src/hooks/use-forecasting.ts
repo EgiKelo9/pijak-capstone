@@ -34,9 +34,9 @@ export function useForecasting() {
       const latest = sortedHistory[0];
 
       // 2. Poll or fetch the result
-      if (latest.status === 'success' && latest.result) {
+      if (latest.status === 'berhasil' && latest.result) {
         setData(latest.result);
-      } else if (latest.status === 'failed') {
+      } else if (latest.status === 'gagal') {
         setError("Proses forecasting terakhir gagal.");
       } else {
         // Pending or running, fetch from result endpoint which might have the latest status

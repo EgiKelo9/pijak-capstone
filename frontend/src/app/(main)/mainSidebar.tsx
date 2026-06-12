@@ -7,12 +7,19 @@ import {
 } from '@/components/animate-ui/components/radix/sidebar';
 import { getStrictContext } from '@/lib/get-strict-context';
 import * as React from 'react';
-import type { TerminalStep } from '@/types';
+import type { TerminalStep } from './analisis/terminal';
 import { AppSidebarFooter } from './app-sidebar-footer';
 import { AppSidebarHeader } from './app-sidebar-header';
 import { AppSidebarNav } from './app-sidebar-nav';
 import { AppSidebarTopbar } from './app-sidebar-topbar';
-import { ITerminalContext } from '@/types';
+
+// 1. Create a shared context for terminal logs
+interface ITerminalContext {
+  logs: TerminalStep[];
+  setLogs: React.Dispatch<React.SetStateAction<TerminalStep[]>>;
+  isAnalysisReady: boolean;
+  setIsAnalysisReady: React.Dispatch<React.SetStateAction<boolean>>;
+}
 
 export const [TerminalContextProvider, useTerminal] =
   getStrictContext<ITerminalContext>('TerminalContext');

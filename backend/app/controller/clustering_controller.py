@@ -5,7 +5,7 @@ from app.shared.transaction_manager import TransactionManager
 from app.models.analysis_history import AnalysisHistory
 from app.models.clustering_result import ClusteringResult
 from app.models.ml_model import MLModel
-from app.models.dataset import Dataset
+from app.models.dataset import Dataset_Bin
 from app.schemas.clustering_schema import ClusteringRunRequest
 from app.schemas.base import StandardResponse
 from app.core.config import get_settings
@@ -17,9 +17,11 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
     transaction_manager = TransactionManager(db)
 
     # 1. Cek dataset exists
-    dataset = db.query(Dataset).filter(
-        Dataset.id == request.dataset_id,
-        Dataset.deleted_at == None
+    dataset = db.query(Dataset_Bin).filter(
+        Dataset_Bin.id == request.dataset_id,
+        Dataset_Bin.is_cleaned == True,
+        Dataset_Bin.model == "Clustering",
+        Dataset_Bin.deleted_at == None
     ).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset tidak ditemukan")
@@ -38,7 +40,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
             user_id=user_id,
             dataset_id=request.dataset_id,
             model_id=ml_model.id,
-            status="processing"
+            status="menunggu"
         )
         session.add(analysis)
         session.flush()
@@ -66,7 +68,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
             analysis = session.query(AnalysisHistory).filter(
                 AnalysisHistory.id == analysis_id
             ).first()
-            analysis.status = "failed"
+            analysis.status = "gagal"
         raise HTTPException(status_code=502, detail=f"ML service error: {str(e)}")
 
     # 5. Simpan hasil ke clustering_results
@@ -86,7 +88,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
         analysis = session.query(AnalysisHistory).filter(
             AnalysisHistory.id == analysis_id
         ).first()
-        analysis.status = "completed"
+        analysis.status = "berhasil"
 
     return StandardResponse(
         code=200,
@@ -94,7 +96,7 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
         message="Clustering berhasil dijalankan",
         data={
             "analysis_id": analysis_id,
-            "status": "completed",
+            "status": "berhasil",
             "result": ml_result
         }
     )

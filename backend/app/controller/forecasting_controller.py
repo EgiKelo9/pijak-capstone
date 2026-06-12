@@ -27,7 +27,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
     dataset = db.query(Dataset_Bin).filter(
         Dataset_Bin.id == request.dataset_id,
         Dataset_Bin.is_cleaned == True,
-        Dataset_Bin.model == "forecasting",
+        Dataset_Bin.model == "Forecasting",
         Dataset_Bin.deleted_at == None
     ).first()
     if not dataset:
@@ -47,7 +47,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
             user_id=user_id,
             dataset_id=request.dataset_id,
             model_id=ml_model.id,
-            status="pending"
+            status="menunggu"
         )
         session.add(analysis)
         session.flush()
@@ -84,7 +84,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
             analysis = session.query(AnalysisHistory).filter(
                 AnalysisHistory.id == analysis_id
             ).first()
-            analysis.status = "failed"
+            analysis.status = "gagal"
         
         error_detail = str(e)
         if isinstance(e, httpx.HTTPStatusError):
@@ -98,7 +98,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
         message="Forecasting sedang diproses di background",
         data={
             "analysis_id": analysis_id,
-            "status": "pending"
+            "status": "menunggu"
         }
     )
 
@@ -117,7 +117,7 @@ async def handle_forecasting_callback(request: ForecastingCallbackRequest, db: S
     if request.status == "failed":
         with transaction_manager.transaction() as session:
             analysis = session.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
-            analysis.status = "failed"
+            analysis.status = "gagal"
             # Optional: save the error message somewhere if needed
         logger.error(f"Forecasting analysis {analysis_id} failed: {request.error}")
         return StandardResponse(code=200, error=False, message="Callback failed status processed")
@@ -148,7 +148,7 @@ async def handle_forecasting_callback(request: ForecastingCallbackRequest, db: S
         
         # Update status
         analysis = session.query(AnalysisHistory).filter(AnalysisHistory.id == analysis_id).first()
-        analysis.status = "completed"
+        analysis.status = "berhasil"
 
     logger.info(f"Forecasting analysis {analysis_id} completed successfully")
     return StandardResponse(code=200, error=False, message="Callback success status processed")
@@ -171,7 +171,7 @@ async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
         ForecastingResult.analysis_id == analysis_id
     ).first()
     if not result:
-        if analysis.status in ["pending", "processing"]:
+        if analysis.status in ["menunggu", "processing"]:
             return StandardResponse(
                 code=200,
                 error=False,
@@ -182,7 +182,7 @@ async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
                     "result": None
                 }
             )
-        elif analysis.status == "failed":
+        elif analysis.status == "gagal":
             return StandardResponse(
                 code=200,
                 error=False,
