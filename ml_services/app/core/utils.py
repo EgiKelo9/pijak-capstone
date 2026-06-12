@@ -297,23 +297,26 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 "temperature": 0.0,
             }
         else:
-            # print("Schema is not empty")
+            # Gunakan json_object sebagai response_format karena model free
+            # tidak mendukung json_schema structured output.
+            # Schema diinstruksikan via prompt agar model tetap output JSON valid.
+            json_schema_str = json.dumps(Feature.model_json_schema(), indent=2)
+            structured_prompt = (
+                f"{prompt}\n\n"
+                f"IMPORTANT: You MUST respond with ONLY a valid JSON object (no markdown, no explanation, no code fences).\n"
+                f"The JSON must conform to this schema:\n{json_schema_str}"
+            )
             payload = {
                 "model": settings.LLM_MODEL,
                 "messages": [
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": structured_prompt}
                 ],
                 "response_format": {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "feature_extraction",
-                        "strict": False,
-                        "schema": Feature.model_json_schema()
-                    }
+                    "type": "json_object",
                 },
                 "stream": False,
                 "temperature": 0.0,
-                "max_tokens": 2670,
+                "max_tokens": 8000,
             }
             
         logger.info("Sending request to OpenRouter with prompt: %s", prompt)
@@ -323,7 +326,7 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
                 url=settings.OPEN_ROUTER_BASE_URL,
                 headers=headers,
                 json=payload,
-                timeout=120.0  # Diperpanjang menjadi 120 detik untuk model reasoning
+                timeout=180.0  # Diperpanjang menjadi 180 detik untuk model reasoning
             )
 
             print(f"Received response from OpenRouter: status_code={response.status_code}, response_text={response.text}", flush=True)
@@ -332,7 +335,23 @@ async def generate_from_openrouter(prompt: str, schema = None) -> StandardRespon
             response.raise_for_status()
             data = response.json()
             
-            reply = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            choices = data.get("choices")
+            reply = ""
+            if choices and len(choices) > 0:
+                message = choices[0].get("message")
+                if message:
+                    content = message.get("content")
+                    if content:
+                        reply = str(content).strip()
+            
+            if not reply:
+                logger.warning("OpenRouter returned empty content. Full response: %s", data)
+                return StandardResponse(
+                    code=500,
+                    error=True,
+                    message="OpenRouter returned empty content — model may have exhausted tokens on reasoning.",
+                    data={"response": ""}
+                )
             
             return StandardResponse(
                 code=200,

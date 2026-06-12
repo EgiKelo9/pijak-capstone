@@ -20,7 +20,7 @@ class ForecastingRunRequest(BaseModel):
     """
     dataset_id: int
     col_date: str
-    col_product: str
+    col_product: Optional[str] = None
     col_target: str
     col_regressors: list[str]
     horizon: int

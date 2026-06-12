@@ -69,20 +69,20 @@ export default function ForecastingDashboardPage() {
         <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 overflow-y-auto pb-6 ${activeTab === 'hasil' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
           
           {/* Row 1: Cards */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[220px]">
-            <div className="lg:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px] min-h-[220px] shrink-0">
+            <div className="lg:col-span-3 h-full min-h-0">
               <ConfidenceCard metrics={data?.metrics} />
             </div>
-            <div className="lg:col-span-4">
+            <div className="lg:col-span-4 h-full min-h-0">
               <FeatureInfluenceChart features={data?.feature_importances} />
             </div>
-            <div className="lg:col-span-5">
+            <div className="lg:col-span-5 h-full min-h-0">
               <FeatureDetailTable features={data?.feature_importances} />
             </div>
           </div>
 
           {/* Row 2: Chart */}
-          <div className="w-full h-[350px]">
+          <div className="w-full h-[350px] shrink-0">
             <ForecastingChart 
               data={data?.trend_data} 
               timeFilter={timeFilter} 
@@ -93,7 +93,7 @@ export default function ForecastingDashboardPage() {
           </div>
 
           {/* Row 3: Heatmap */}
-          <div className="w-full h-[220px]">
+          <div className="w-full h-[220px] shrink-0">
             <HistoricalHeatmap data={data?.trend_data} />
           </div>
         </div>
@@ -102,17 +102,21 @@ export default function ForecastingDashboardPage() {
         <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 overflow-y-auto pb-6 ${activeTab === 'pengujian' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
           
           {/* Row 1: Metrics & Config */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[200px]">
-            <MetricsCard metrics={data?.metrics} />
-            <AggressivenessControl 
-              value={aggressiveness} 
-              onChange={setAggressiveness} 
-              onApply={() => refetch()} 
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[220px] min-h-[200px] shrink-0">
+            <div className="h-full min-h-0">
+              <MetricsCard metrics={data?.metrics} />
+            </div>
+            <div className="h-full min-h-0">
+              <AggressivenessControl 
+                value={aggressiveness} 
+                onChange={setAggressiveness} 
+                onApply={() => refetch()} 
+              />
+            </div>
           </div>
 
           {/* Row 2: Fixed Monthly Chart */}
-          <div className="w-full h-[400px]">
+          <div className="w-full h-[400px] shrink-0">
             <ForecastingChart 
               data={data?.trend_data} 
               timeFilter="monthly"

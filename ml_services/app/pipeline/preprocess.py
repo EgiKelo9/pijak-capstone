@@ -288,7 +288,9 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         cleaned_cluster_id = None
 
         if model.lower() == 'both':
-            upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
+            prod_cols = as_list(extracted.get("col_product"))
+            df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
+            upload_forecast = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
             cleaned_forecast_id = upload_forecast.get("data", {}).get("dataset_id")
 
             df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
@@ -296,7 +298,9 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             cleaned_cluster_id = upload_cluster.get("data", {}).get("dataset_id")
             print(f"Upload successful: forecast_id={cleaned_forecast_id}, cluster_id={cleaned_cluster_id}")
         elif model.lower() == 'forecasting':
-            upload_result = await upload_cleaned_dataset(df, dataset_id, 'Forecasting', extracted)
+            prod_cols = as_list(extracted.get("col_product"))
+            df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
+            upload_result = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
             cleaned_forecast_id = upload_result.get("data", {}).get("dataset_id")
             print(f"Upload successful: forecast_id={cleaned_forecast_id}")
         else:

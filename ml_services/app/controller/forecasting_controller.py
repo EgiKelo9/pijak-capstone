@@ -44,7 +44,14 @@ async def run_forecasting(
             mode=request.forecasting_mode,
             horizon=horizon,
         )
-        actual_regressors = [c for c in df.columns if c not in [col_date, col_target]]
+        prod_cols = []
+        if col_product:
+            if isinstance(col_product, list):
+                prod_cols = col_product
+            else:
+                prod_cols = [col_product]
+
+        actual_regressors = [c for c in df.columns if c not in [col_date, col_target] and c not in prod_cols]
 
         try:
             df_grouped, actual_regressors = pipeline.load_frame(

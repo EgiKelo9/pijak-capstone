@@ -8,6 +8,16 @@ import type { AnalysisMode, AnalysisConfig, TerminalStep, ForecastAggressiveness
 import { DataConfigState } from '@/types';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
 
+/**
+ * Safely extract a single string from col_product which may be string or string[].
+ * Backend expects col_product as a single string, but LLM may return an array.
+ */
+function extractColProduct(value: any, fallback = 'product'): string {
+  if (Array.isArray(value)) return value[0] || fallback;
+  if (typeof value === 'string') return value;
+  return fallback;
+}
+
 export function useAnalysis() {
   const router = useRouter();
   const [date, setDate] = useState<DateRange | undefined>();
@@ -45,7 +55,7 @@ export function useAnalysis() {
 
     window.addEventListener('dataset_changed', handleDatasetChanged);
     window.addEventListener('open_upload_modal', openUploadModalEvent);
-    
+
     // Using a wrapper so that it can access the latest handleRunAnalysis
     const runAnalysisEvent = () => window.dispatchEvent(new Event('internal_run_analysis'));
     window.addEventListener('run_analysis_pipeline', runAnalysisEvent);
@@ -105,21 +115,20 @@ export function useAnalysis() {
                 break;
               }
               if (currentMeta?.analyze_status === 'error') {
-                throw new Error("Layanan OpenRouter gagal memetakan kolom.");
+                isProcessing = false;
+                break; // Fall through to retry
               }
               attempts++;
             }
             if (isProcessing) {
               throw new Error("Waktu tunggu analisis kolom habis.");
             }
-          } else if (existingStatus === 'error') {
-            throw new Error("Layanan OpenRouter gagal memetakan kolom.");
           }
-          // Jika status undefined/null, jatuh ke langkah 2 (panggil OpenRouter)
+          // Jika status undefined/null/error, jatuh ke langkah 2 (panggil OpenRouter)
         } catch (err: any) {
-          if (err.message?.includes("gagal") || err.message?.includes("habis")) throw err;
-          console.warn("[Dashboard] Gagal memuat metadata dari database, beralih ke analisis ML...");
-          setTerminalLogs((prev) => [...prev, { stepId: `meta_warn-${Date.now()}`, text: 'Metadata tidak ditemukan di database, beralih ke layanan ML...', status: 'info' as const }]);
+          if (err.message?.includes("habis")) throw err;
+          console.warn("[Dashboard] Gagal memuat metadata dari database atau metadata berstatus error, beralih ke analisis ML...");
+          setTerminalLogs((prev) => [...prev, { stepId: `meta_warn-${Date.now()}`, text: 'Memicu ulang analisis kolom via layanan ML...', status: 'info' as const }]);
         }
       }
 
@@ -325,11 +334,11 @@ export function useAnalysis() {
 
     const cleanedForecastIdStr = sessionStorage.getItem('pijak_cleaned_forecasting_id');
     const cleanedClusterIdStr = sessionStorage.getItem('pijak_cleaned_clustering_id');
-    
+
     const hasCleanedForecast = !!cleanedForecastIdStr;
     const hasCleanedCluster = !!cleanedClusterIdStr;
-    
-    const shouldDirectRun = 
+
+    const shouldDirectRun =
       (mode === 'forecasting' && hasCleanedForecast) ||
       (mode === 'clustering' && hasCleanedCluster) ||
       (mode === 'both' && hasCleanedForecast && hasCleanedCluster);
@@ -346,7 +355,6 @@ export function useAnalysis() {
           if ((mode === 'forecasting' || mode === 'both') && cleanedForecastIdStr) {
             const cleanedForecastId = parseInt(cleanedForecastIdStr, 10);
             const colDate = dataConfig.dateColumn || 'date';
-            const colProduct = rawFeatureMapping?.col_product || 'product';
             const colTarget = dataConfig.targetColumn || 'qty';
             const colRegressors = dataConfig.includedColumns || [];
 
@@ -358,9 +366,8 @@ export function useAnalysis() {
             await runForecasting({
               dataset_id: cleanedForecastId,
               col_date: colDate,
-              col_product: colProduct,
               col_target: colTarget,
-              col_regressors: colRegressors.filter((c: string) => c !== colDate && c !== colProduct && c !== colTarget),
+              col_regressors: colRegressors.filter((c: string) => c !== colDate && c !== colTarget),
               horizon: 8,
               freq: 'W'
             });
@@ -372,7 +379,7 @@ export function useAnalysis() {
 
           if ((mode === 'clustering' || mode === 'both') && cleanedClusterIdStr) {
             const cleanedClusterId = parseInt(cleanedClusterIdStr, 10);
-            const colProduct = rawFeatureMapping?.col_product || 'product';
+            const colProduct = extractColProduct(rawFeatureMapping?.col_product);
             const colFitur = dataConfig.includedColumns || [];
 
             setTerminalLogs((prev) => [
@@ -443,7 +450,7 @@ export function useAnalysis() {
       const jobId = `job-${Date.now()}`;
       const wsUrl = process.env.NEXT_PUBLIC_API_URL?.replace('http://', 'ws://').replace('https://', 'wss://') || 'ws://localhost:5000/api/v1';
       const ws = new WebSocket(`${wsUrl}/datasets/preprocess/ws/${jobId}`);
-      
+
       ws.onmessage = (event) => {
         try {
           handleBackendMessage(event.data);
@@ -460,13 +467,13 @@ export function useAnalysis() {
           ws.close();
         }
       };
-      
+
       ws.onerror = (error) => {
         console.error("WebSocket Error:", error);
         setTerminalLogs((prev) => prev.map(log => log.stepId === jobId ? { ...log, text: 'Koneksi WebSocket terputus atau gagal.', status: 'error' as const } : log));
       };
     };
-    
+
     run();
 
   }, [analysisConfig, rawFeatureMapping, mode, dataConfig, clusteringConfig]);
@@ -652,10 +659,10 @@ export function useAnalysis() {
     const newLog: TerminalStep = parsed.stepId
       ? parsed as TerminalStep
       : {
-          stepId: `ws-${Date.now()}`,
-          text: parsed.message || JSON.stringify(parsed),
-          status: parsed.status || 'info',
-        };
+        stepId: `ws-${Date.now()}`,
+        text: parsed.message || JSON.stringify(parsed),
+        status: parsed.status || 'info',
+      };
 
     setTerminalLogs((prevLogs) => {
       const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
@@ -682,40 +689,52 @@ export function useAnalysis() {
 
       // Auto-trigger model pipeline based on current mode
       if ((mode === 'forecasting' || mode === 'both') && cleanedForecastId) {
-        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn || 'date';
-        const colProduct = parsed.feature_metadata?.col_product || 'product';
-        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn || 'qty';
-        const colRegressors = parsed.feature_metadata?.col_to_num || dataConfig.includedColumns || [];
+        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
+        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
+        const colRegressors: string[] = Array.isArray(parsed.feature_metadata?.col_to_num)
+          ? parsed.feature_metadata.col_to_num
+          : dataConfig.includedColumns;
 
-        setTerminalLogs((prev) => [
-          ...prev,
-          { stepId: `forecast-auto-start-${Date.now()}`, text: 'Sistem mendeteksi model forecasting: memulai proses training XGBoost...', status: 'loading' as const }
-        ]);
+        if (!colDate || !colTarget) {
+          setTerminalLogs((prev) => [
+            ...prev,
+            {
+              stepId: `forecast-auto-skip-${Date.now()}`,
+              text: `Forecasting dilewati: kolom tanggal atau target tidak terdeteksi. Harap konfirmasi mapping kolom terlebih dahulu.`,
+              status: 'error' as const
+            }
+          ]);
+          return;
+        }
+
+        const validRegressors = colRegressors.filter(
+          (c: string) => c && c !== colDate && c !== colTarget
+        );
 
         runForecasting({
           dataset_id: cleanedForecastId,
           col_date: colDate,
-          col_product: colProduct,
           col_target: colTarget,
-          col_regressors: colRegressors.filter((c: string) => c !== colDate && c !== colProduct && c !== colTarget),
-          horizon: 30, // Default 30 periods
-          freq: 'D'
-        }).then(() => {
-          setTerminalLogs((prev) => [
-            ...prev,
-            { stepId: `forecast-auto-done-${Date.now()}`, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const }
-          ]);
-        }).catch((err: any) => {
-          console.error("Auto forecasting failed:", err);
-          setTerminalLogs((prev) => [
-            ...prev,
-            { stepId: `forecast-auto-fail-${Date.now()}`, text: `Gagal memicu forecasting otomatis: ${err.message}`, status: 'error' as const }
-          ]);
-        });
+          col_regressors: validRegressors,
+          horizon: 30,
+          freq: 'D'  // pastikan konsisten, atau buat dinamis dari state
+        })
+          .then(() => {
+            setTerminalLogs((prev) => [
+              ...prev,
+              { stepId: `forecast-auto-done-${Date.now()}`, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const }
+            ]);
+          }).catch((err: any) => {
+            console.error("Auto forecasting failed:", err);
+            setTerminalLogs((prev) => [
+              ...prev,
+              { stepId: `forecast-auto-fail-${Date.now()}`, text: `Gagal memicu forecasting otomatis: ${err.message}`, status: 'error' as const }
+            ]);
+          });
       }
 
       if ((mode === 'clustering' || mode === 'both') && cleanedClusterId) {
-        const colProduct = parsed.feature_metadata?.col_product || 'product';
+        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
         const colFitur = parsed.feature_metadata?.col_to_num || dataConfig.includedColumns || [];
 
         setTerminalLogs((prev) => [

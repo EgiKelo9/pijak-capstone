@@ -19,7 +19,7 @@ class ForecastingRequest(BaseModel):
     analysis_id: str
     dataset_id: int
     col_date: str
-    col_product: str
+    col_product: Optional[str] = None
     col_target: str
     col_regressors: list[str]      # boleh kosong [], model fallback ke lag-only mode
     horizon: int                   # jumlah periode ke depan yang ingin diprediksi

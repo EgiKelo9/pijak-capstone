@@ -24,20 +24,24 @@ export function FeatureDetailTable({ features = [] }: FeatureDetailTableProps) {
           </thead>
           <tbody>
             {features.length > 0 ? (
-              features.map((f, i) => (
-                <tr key={i} className="bg-white border-b border-neutral-50 hover:bg-neutral-50">
-                  <td className="px-4 py-2.5 font-medium text-neutral-700 whitespace-nowrap">{f.name}</td>
-                  <td className="px-4 py-2.5">{f.mode.toFixed(1)}</td>
-                  <td className="px-4 py-2.5">{f.mean.toFixed(1)}</td>
-                  <td className="px-4 py-2.5">{f.max.toFixed(1)}</td>
-                  <td className="px-4 py-2.5">{f.min.toFixed(1)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium">
-                    <span className={f.influence >= 0 ? "text-sky-500" : "text-neutral-400"}>
-                      {(f.influence * 100).toFixed(1)}%
-                    </span>
-                  </td>
-                </tr>
-              ))
+              features.map((f, i) => {
+                const isPercentage = Math.abs(f.influence) > 1;
+                const displayInfluence = isPercentage ? f.influence : f.influence * 100;
+                return (
+                  <tr key={i} className="bg-white border-b border-neutral-50 hover:bg-neutral-50">
+                    <td className="px-4 py-2.5 font-medium text-neutral-700 whitespace-nowrap">{f.name}</td>
+                    <td className="px-4 py-2.5">{f.mode.toFixed(1)}</td>
+                    <td className="px-4 py-2.5">{f.mean.toFixed(1)}</td>
+                    <td className="px-4 py-2.5">{f.max.toFixed(1)}</td>
+                    <td className="px-4 py-2.5">{f.min.toFixed(1)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium">
+                      <span className={f.influence >= 0 ? "text-sky-500" : "text-neutral-400"}>
+                        {displayInfluence.toFixed(1)}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">

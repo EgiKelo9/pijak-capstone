@@ -103,7 +103,6 @@ export async function runAnalysisPipeline(jobId: string, datasetId: number, mode
 export async function runForecasting(payload: {
   dataset_id: number;
   col_date: string;
-  col_product: string;
   col_target: string;
   col_regressors: string[];
   horizon: number;

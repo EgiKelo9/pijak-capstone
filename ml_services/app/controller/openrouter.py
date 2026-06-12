@@ -72,8 +72,18 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             print(f"[analyze_columns] OpenRouter returned an error: {llm_response.message}", flush=True)
             raise Exception(f"OpenRouter error: {llm_response.message}")
     
-        raw_text = llm_response.data.get("response", "")
-        clean_json = raw_text.replace("```json", "").replace("```", "").strip()
+        raw_text = (llm_response.data or {}).get("response", "")
+        if not raw_text:
+            raise Exception("LLM returned empty response — model may have exhausted tokens on reasoning. Try again or use a different model.")
+        
+        # Robustly extract JSON object
+        start_idx = raw_text.find('{')
+        end_idx = raw_text.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_json = raw_text[start_idx:end_idx + 1]
+        else:
+            clean_json = raw_text.replace("```json", "").replace("```", "").strip()
+            
         parsed = json.loads(clean_json)
         
         mapping = Feature(**parsed)

@@ -63,5 +63,5 @@ async def check_gemma_health() -> dict:
     return {
         "status": "healthy",
         "model": settings.LLM_MODEL,
-        "detail": result.data["response"].strip()
+        "detail": (result.data.get("response") or "").strip()
     }
