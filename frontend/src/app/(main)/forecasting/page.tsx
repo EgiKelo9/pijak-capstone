@@ -24,9 +24,6 @@ export default function ForecastingDashboardPage() {
     rerun
   } = useForecasting();
 
-  const currentMetrics = data?.metrics?.[timeFilter] || data?.metrics?.['weekly'] || undefined;
-  const currentFeatures = data?.feature_importances?.[timeFilter] || data?.feature_importances?.['weekly'] || undefined;
-
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center text-neutral-500">Memuat data forecasting...</div>;
   }
@@ -74,13 +71,13 @@ export default function ForecastingDashboardPage() {
           {/* Row 1: Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px] min-h-[220px] shrink-0">
             <div className="lg:col-span-3 h-full min-h-0">
-              <ConfidenceCard metrics={currentMetrics} />
+              <ConfidenceCard metrics={data?.metrics} />
             </div>
             <div className="lg:col-span-4 h-full min-h-0">
-              <FeatureInfluenceChart features={currentFeatures} />
+              <FeatureInfluenceChart features={data?.feature_importances} />
             </div>
             <div className="lg:col-span-5 h-full min-h-0">
-              <FeatureDetailTable features={currentFeatures} />
+              <FeatureDetailTable features={data?.feature_importances} />
             </div>
           </div>
 
@@ -105,7 +102,7 @@ export default function ForecastingDashboardPage() {
           {/* Row 1: Metrics & Config */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[220px] min-h-[200px] shrink-0">
             <div className="h-full min-h-0">
-              <MetricsCard metrics={currentMetrics} />
+              <MetricsCard metrics={data?.metrics} />
             </div>
             <div className="h-full min-h-0">
               <AggressivenessControl 

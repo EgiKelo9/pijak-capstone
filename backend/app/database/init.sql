@@ -101,7 +101,6 @@ CREATE TABLE forecasting_results (
     r2                      FLOAT,
     trend_data              JSONB NOT NULL,
     feature_importances     JSONB,
-    metrics                 JSONB,
     insight_summary         TEXT,
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -141,12 +141,12 @@ export interface ForecastingMetrics {
   r2: number;
 }
 
-export type FreqKey = 'daily' | 'weekly';
+export type FreqKey = 'daily' | 'weekly' | 'monthly';
 
 export interface ForecastingResultData {
-  metrics: Record<FreqKey, ForecastingMetrics>;
+  metrics: ForecastingMetrics;
   trend_data: Record<FreqKey, TrendDataPoint[]>; // dict keyed by frequency
-  feature_importances: Record<FreqKey, FeatureDetail[]>;
+  feature_importances: FeatureDetail[];
   insight_summary: string;
 }
 

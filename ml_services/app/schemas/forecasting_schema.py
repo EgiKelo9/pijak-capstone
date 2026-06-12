@@ -62,9 +62,9 @@ class ForecastingMetrics(BaseModel):
 
 class ForecastingResult(BaseModel):
     """Hasil forecasting yang dikembalikan pipeline"""
-    metrics: dict[str, ForecastingMetrics]
-    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...]}
-    feature_importances: dict[str, list[FeatureDetail]]
+    metrics: ForecastingMetrics
+    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...], "monthly": [...]}
+    feature_importances: list[FeatureDetail]
     insight_summary: str
 
 

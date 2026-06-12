@@ -133,34 +133,20 @@ async def handle_forecasting_callback(request: ForecastingCallbackRequest, db: S
         freq_key: [p.model_dump() for p in points]
         for freq_key, points in result_data.trend_data.items()
     }
-    
-    # metrics sekarang adalah dict[str, ForecastingMetrics]
-    metrics_serialized = {
-        freq_key: metric.model_dump()
-        for freq_key, metric in result_data.metrics.items()
-    }
-    
-    # feature_importances sekarang adalah dict[str, list[FeatureDetail]]
-    feature_importances_serialized = {
-        freq_key: [f.model_dump() for f in details]
-        for freq_key, details in result_data.feature_importances.items()
-    }
-    
-    primary_metrics = result_data.metrics.get("weekly") or result_data.metrics.get("daily")
+    feature_importances = [p.model_dump() for p in result_data.feature_importances]
     
     with transaction_manager.transaction() as session:
         forecasting_result = ForecastingResult(
             analysis_id=analysis_id,
-            confidence_percentage=primary_metrics.confidence_percentage if primary_metrics else None,
-            confidence_value=primary_metrics.confidence_value if primary_metrics else None,
-            mae=primary_metrics.mae if primary_metrics else None,
-            mape=primary_metrics.mape if primary_metrics else None,
-            mse=primary_metrics.mse if primary_metrics else None,
-            rmse=primary_metrics.rmse if primary_metrics else None,
-            r2=primary_metrics.r2 if primary_metrics else None,
+            confidence_percentage=result_data.metrics.confidence_percentage,
+            confidence_value=result_data.metrics.confidence_value,
+            mae=result_data.metrics.mae,
+            mape=result_data.metrics.mape,
+            mse=result_data.metrics.mse,
+            rmse=result_data.metrics.rmse,
+            r2=result_data.metrics.r2,
             trend_data=trend_data_serialized,
-            feature_importances=feature_importances_serialized,
-            metrics=metrics_serialized,
+            feature_importances=feature_importances,
             insight_summary=result_data.insight_summary
         )
         session.add(forecasting_result)
@@ -171,53 +157,6 @@ async def handle_forecasting_callback(request: ForecastingCallbackRequest, db: S
 
     logger.info(f"Forecasting analysis {analysis_id} completed successfully")
     return StandardResponse(code=200, error=False, message="Callback success status processed")
-
-
-def _format_result(result) -> dict | None:
-    if not result:
-        return None
-        
-    # Format metrics
-    metrics_data = {}
-    if result.metrics:
-        metrics_data = result.metrics
-    else:
-        # Fallback from column values
-        metrics_data = {
-            "weekly": {
-                "confidence_percentage": result.confidence_percentage or 0.0,
-                "confidence_value": result.confidence_value or 0.0,
-                "mae": result.mae or 0.0,
-                "mape": result.mape or 0.0,
-                "mse": result.mse or 0.0,
-                "rmse": result.rmse or 0.0,
-                "r2": result.r2 or 0.0,
-            }
-        }
-        # Copy weekly to daily for fallback if needed
-        metrics_data["daily"] = metrics_data["weekly"]
-        
-    # Format feature_importances
-    feature_data = {}
-    if isinstance(result.feature_importances, dict):
-        feature_data = result.feature_importances
-    elif isinstance(result.feature_importances, list):
-        feature_data = {
-            "weekly": result.feature_importances,
-            "daily": result.feature_importances
-        }
-    else:
-        feature_data = {
-            "weekly": [],
-            "daily": []
-        }
-        
-    return {
-        "metrics": metrics_data,
-        "trend_data": result.trend_data,
-        "feature_importances": feature_data,
-        "insight_summary": result.insight_summary
-    }
 
 
 async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
@@ -268,7 +207,20 @@ async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
         data={
             "analysis_id": analysis_id,
             "status": analysis.status,
-            "result": _format_result(result)
+            "result": {
+                "metrics": {
+                    "confidence_percentage": result.confidence_percentage,
+                    "confidence_value": result.confidence_value,
+                    "mae": result.mae,
+                    "mape": result.mape,
+                    "mse": result.mse,
+                    "rmse": result.rmse,
+                    "r2": result.r2,
+                },
+                "trend_data": result.trend_data,    # sudah berformat dict
+                "feature_importances": result.feature_importances,
+                "insight_summary": result.insight_summary
+            }
         }
     )
 
@@ -303,7 +255,20 @@ async def get_forecasting_history(user_id: int, db: Session):
             "dataset_id": analysis.dataset_id,
             "status": analysis.status,
             "created_at": analysis.created_at.isoformat(),
-            "result": _format_result(result) if result else None
+            "result": {
+                "metrics": {
+                    "confidence_percentage": result.confidence_percentage if result else None,
+                    "confidence_value": result.confidence_value if result else None,
+                    "mae": result.mae if result else None,
+                    "mape": result.mape if result else None,
+                    "mse": result.mse if result else None,
+                    "rmse": result.rmse if result else None,
+                    "r2": result.r2 if result else None,
+                } if result else None,
+                "trend_data": result.trend_data if result else None,      # dict format
+                "feature_importances": result.feature_importances if result else None,
+                "insight_summary": result.insight_summary if result else None
+            } if result else None
         })
 
     return StandardResponse(
