@@ -36,26 +36,26 @@ export default function MainDashboard() {
             ChatRole: "assistant",
             Model: "Clustering"
         },
-        {
-            ChatMessages: "Tolong analisis dataset penjualan saya, saya ingin tahu segmentasi produk berdasarkan tingkat penjualannya.",
-            ChatRole: "user",
-            Model: "Clustering"
-        },
-        {
-            ChatMessages: "Tentu! Berdasarkan **Analisis Clustering** menggunakan algoritma K-Means, saya telah membagi produk Anda menjadi 3 kelompok utama:\n\n1. **Cluster 0 (Produk Bintang)**: Penjualan tinggi, profit margin besar. (Contoh: *Produk A, Produk D*)\n2. **Cluster 1 (Produk Stabil)**: Penjualan stabil namun profit moderat.\n3. **Cluster 2 (Produk Lambat)**: Penjualan lambat, stok menumpuk. (Contoh: *Produk C, Produk F*)\n\nApakah Anda ingin melihat rekomendasi strategi untuk salah satu cluster di atas?",
-            ChatRole: "assistant",
-            Model: "Clustering"
-        },
-        {
-            ChatMessages: "Apa rekomendasi strategi yang bagus untuk produk di Cluster 2 agar stoknya cepat habis?",
-            ChatRole: "user",
-            Model: "Clustering"
-        },
-        {
-            ChatMessages: "Berikut adalah beberapa rekomendasi strategi untuk **Cluster 2 (Produk Lambat)**:\n\n* **Bundling Promo**: Gabungkan produk ini dengan produk dari *Cluster 0* dengan harga diskon.\n* **Flash Sale**: Adakan diskon besar-besaran dalam waktu singkat untuk menghabiskan sisa stok.\n* **Evaluasi Restock**: Kurangi atau hentikan pemesanan ulang untuk produk-produk di kategori ini bulan depan.\n\nPerlu saya rincikan produk apa saja yang masuk ke dalam list promo?",
-            ChatRole: "assistant",
-            Model: "Clustering"
-        },
+        // {
+        //     ChatMessages: "Tolong analisis dataset penjualan saya, saya ingin tahu segmentasi produk berdasarkan tingkat penjualannya.",
+        //     ChatRole: "user",
+        //     Model: "Clustering"
+        // },
+        // {
+        //     ChatMessages: "Tentu! Berdasarkan **Analisis Clustering** menggunakan algoritma K-Means, saya telah membagi produk Anda menjadi 3 kelompok utama:\n\n1. **Cluster 0 (Produk Bintang)**: Penjualan tinggi, profit margin besar. (Contoh: *Produk A, Produk D*)\n2. **Cluster 1 (Produk Stabil)**: Penjualan stabil namun profit moderat.\n3. **Cluster 2 (Produk Lambat)**: Penjualan lambat, stok menumpuk. (Contoh: *Produk C, Produk F*)\n\nApakah Anda ingin melihat rekomendasi strategi untuk salah satu cluster di atas?",
+        //     ChatRole: "assistant",
+        //     Model: "Clustering"
+        // },
+        // {
+        //     ChatMessages: "Apa rekomendasi strategi yang bagus untuk produk di Cluster 2 agar stoknya cepat habis?",
+        //     ChatRole: "user",
+        //     Model: "Clustering"
+        // },
+        // {
+        //     ChatMessages: "Berikut adalah beberapa rekomendasi strategi untuk **Cluster 2 (Produk Lambat)**:\n\n* **Bundling Promo**: Gabungkan produk ini dengan produk dari *Cluster 0* dengan harga diskon.\n* **Flash Sale**: Adakan diskon besar-besaran dalam waktu singkat untuk menghabiskan sisa stok.\n* **Evaluasi Restock**: Kurangi atau hentikan pemesanan ulang untuk produk-produk di kategori ini bulan depan.\n\nPerlu saya rincikan produk apa saja yang masuk ke dalam list promo?",
+        //     ChatRole: "assistant",
+        //     Model: "Clustering"
+        // },
 
         // --- FORECASTING FLOW ---
         {
@@ -63,31 +63,31 @@ export default function MainDashboard() {
             ChatRole: "assistant",
             Model: "Forecasting"
         },
-        {
-            ChatMessages: "Ya, tolong buatkan forecasting untuk produk kategori Elektronik berdasarkan data 2 tahun terakhir.",
-            ChatRole: "user",
-            Model: "Forecasting"
-        },
-        {
-            ChatMessages: "Memproses data historis... Selesai!\n\nBerikut adalah hasil **Forecasting Penjualan** untuk kategori Elektronik 3 bulan ke depan:\n\n### Ringkasan Prediksi\n- **Bulan 1**: Diproyeksikan naik **12.5%** (Estimasi: 1.250 unit)\n- **Bulan 2**: Stabil di kisaran **1.200 unit**\n- **Bulan 3**: Lonjakan **25%** (Estimasi: 1.500 unit) mendekati musim liburan.\n\nSecara keseluruhan, tren menunjukkan **pertumbuhan positif**.",
-            ChatRole: "assistant",
-            Model: "Forecasting"
-        },
-        {
-            ChatMessages: "Menarik, apakah ada tren musiman tertentu yang perlu saya perhatikan dari data tersebut?",
-            ChatRole: "user",
-            Model: "Forecasting"
-        },
-        {
-            ChatMessages: "Tentu. Sistem mendeteksi adanya **Pola Musiman (Seasonality)** yang kuat:\n\n1. **Puncak Penjualan (Peak Season)**: Terjadi setiap bulan November dan Desember. Persiapkan stok minimal 1.5 bulan sebelumnya.\n2. **Penurunan (Low Season)**: Terjadi di bulan Februari dan Maret. Sebaiknya kurangi budget marketing pada periode ini dan fokus pada retensi pelanggan lama.\n\nApakah Anda ingin saya menyimpan laporan metrik ini?",
-            ChatRole: "assistant",
-            Model: "Forecasting"
-         },
-        {
-            ChatMessages: "Boleh, tolong simpan laporannya ya.",
-            ChatRole: "user",
-            Model: "Forecasting"
-        }
+        // {
+        //     ChatMessages: "Ya, tolong buatkan forecasting untuk produk kategori Elektronik berdasarkan data 2 tahun terakhir.",
+        //     ChatRole: "user",
+        //     Model: "Forecasting"
+        // },
+        // {
+        //     ChatMessages: "Memproses data historis... Selesai!\n\nBerikut adalah hasil **Forecasting Penjualan** untuk kategori Elektronik 3 bulan ke depan:\n\n### Ringkasan Prediksi\n- **Bulan 1**: Diproyeksikan naik **12.5%** (Estimasi: 1.250 unit)\n- **Bulan 2**: Stabil di kisaran **1.200 unit**\n- **Bulan 3**: Lonjakan **25%** (Estimasi: 1.500 unit) mendekati musim liburan.\n\nSecara keseluruhan, tren menunjukkan **pertumbuhan positif**.",
+        //     ChatRole: "assistant",
+        //     Model: "Forecasting"
+        // },
+        // {
+        //     ChatMessages: "Menarik, apakah ada tren musiman tertentu yang perlu saya perhatikan dari data tersebut?",
+        //     ChatRole: "user",
+        //     Model: "Forecasting"
+        // },
+        // {
+        //     ChatMessages: "Tentu. Sistem mendeteksi adanya **Pola Musiman (Seasonality)** yang kuat:\n\n1. **Puncak Penjualan (Peak Season)**: Terjadi setiap bulan November dan Desember. Persiapkan stok minimal 1.5 bulan sebelumnya.\n2. **Penurunan (Low Season)**: Terjadi di bulan Februari dan Maret. Sebaiknya kurangi budget marketing pada periode ini dan fokus pada retensi pelanggan lama.\n\nApakah Anda ingin saya menyimpan laporan metrik ini?",
+        //     ChatRole: "assistant",
+        //     Model: "Forecasting"
+        //  },
+        // {
+        //     ChatMessages: "Boleh, tolong simpan laporannya ya.",
+        //     ChatRole: "user",
+        //     Model: "Forecasting"
+        // }
     ];
 
     const [ClusteringChats, setClusteringChats] = useState<ChatBotProps[]>(mockReceived.filter(chat => chat.Model === "Clustering"));

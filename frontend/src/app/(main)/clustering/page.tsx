@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { ClusteringEmptyState } from './clustering-empty-state';
+import { AnalysisEmptyState } from '@/components/analysis-empty-state';
+import { AnalysisLoadingState } from '@/components/analysis-loading-state';
 import { useClustering } from '@/hooks/use-clustering';
 import { CLUSTER_COLORS } from '@/lib/utils';
 import { KpiCard } from '@/components/main/clustering/kpi-card';
@@ -74,12 +75,85 @@ export default function ClusteringPage() {
     return counts;
   }, [result]);
 
+  const parsedInsight = useMemo(() => {
+    if (!result) return { categories: {}, insights: {}, priorities: [] };
+    const text = result.insight_summary || '';
+    
+    const categories: Record<number, string> = {};
+    const insights: Record<number, string> = {};
+    const priorities: string[] = [];
+    
+    // Split text by section titles
+    const sections = text.split(/(?=KATEGORI CLUSTER:|INSIGHT PER CLUSTER:|PRIORITAS AKSI BISNIS:)/gi);
+    
+    sections.forEach(section => {
+      const cleanSec = section.trim();
+      if (cleanSec.toUpperCase().startsWith("KATEGORI CLUSTER:")) {
+        const lines = cleanSec.split('\n');
+        lines.forEach(line => {
+          const match = line.match(/(?:Cluster|Klaster)\s*(\d+)\s*:\s*(.*)/i);
+          if (match) {
+            categories[parseInt(match[1])] = match[2].trim();
+          }
+        });
+      } else if (cleanSec.toUpperCase().startsWith("INSIGHT PER CLUSTER:")) {
+        const lines = cleanSec.replace("INSIGHT PER CLUSTER:", "").trim().split('\n');
+        let currentCluster: number | null = null;
+        let currentText = '';
+        
+        lines.forEach(line => {
+          const match = line.match(/^\s*(?:Cluster|Klaster)\s*(\d+)\s*(.*)/i);
+          if (match) {
+            if (currentCluster !== null) {
+              insights[currentCluster] = currentText.trim();
+            }
+            currentCluster = parseInt(match[1]);
+            let rest = match[2].trim();
+            if (rest.startsWith(":")) rest = rest.substring(1).trim();
+            currentText = rest;
+          } else if (currentCluster !== null) {
+            currentText += '\n' + line;
+          }
+        });
+        if (currentCluster !== null) {
+          insights[currentCluster] = currentText.trim();
+        }
+      } else if (cleanSec.toUpperCase().startsWith("PRIORITAS AKSI BISNIS:")) {
+        const lines = cleanSec.replace("PRIORITAS AKSI BISNIS:", "").trim().split('\n');
+        lines.forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) {
+            priorities.push(trimmed);
+          }
+        });
+      }
+    });
+    
+    return { categories, insights, priorities };
+  }, [result]);
+
   const clusterInsights = useMemo(() => {
     if (!result) return [];
-    const text = result.insight_summary;
-    const parts = text.split(/(?=Cluster \d+|Klaster \d+)/gi).filter(Boolean);
-    return parts.length > 1 ? parts : uniqueClusters.map(() => text);
-  }, [result, uniqueClusters]);
+    
+    const parsed = parsedInsight;
+    return uniqueClusters.map(c => {
+      if (parsed.insights[c]) {
+        const cat = parsed.categories[c];
+        const prefix = cat ? `**Kategori: ${cat}**\n\n` : '';
+        return prefix + parsed.insights[c];
+      }
+      
+      const text = result.insight_summary || '';
+      const parts = text.split(/(?=Cluster \d+|Klaster \d+)/gi).filter(Boolean);
+      const matchingPart = parts.find(p => {
+        const match = p.match(/(?:Cluster|Klaster)\s*(\d+)/i);
+        return match && parseInt(match[1]) === c;
+      });
+      if (matchingPart) return matchingPart;
+      
+      return text;
+    });
+  }, [result, parsedInsight, uniqueClusters]);
 
   const elbowData = useMemo(() =>
     result?.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] })) ?? [],
@@ -91,7 +165,34 @@ export default function ClusteringPage() {
     [result]
   );
 
-  if (!datasetId) return <div className="flex flex-col h-full w-full p-4"><ClusteringEmptyState /></div>;
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full w-full p-4 pt-12">
+        <AnalysisLoadingState
+          title="Sedang menjalankan clustering..."
+          subtitle="Proses ini mungkin memerlukan waktu beberapa saat"
+        />
+      </div>
+    );
+  }
+
+  if (!datasetId) {
+    return (
+      <div className="flex flex-col h-full w-full p-4">
+        <AnalysisEmptyState
+          title="dianalisis (Clustering)"
+          description="Upload data CSV di halaman Dasbor terlebih dahulu sebelum menjalankan clustering."
+          steps={[
+            'Buka halaman Dasbor dan unggah file CSV yang berisi data penjualan atau produk.',
+            'Setelah data berhasil diunggah, kembali ke halaman ini.',
+            'Pilih kolom produk dan fitur, lalu klik "Jalankan Clustering".',
+          ]}
+          icon={LayoutGrid}
+          redirectTo="/dasbor"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 w-full h-auto relative pt-12">
@@ -190,22 +291,6 @@ export default function ClusteringPage() {
         </div>
       )}
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="flex flex-col items-center gap-4 bg-white rounded-2xl border border-neutral-800/20 w-full h-full py-16">
-            <div className="relative">
-              <div className="size-16 rounded-full border-4 border-[#2BBAEE]/20" />
-              <div className="absolute inset-0 size-16 rounded-full border-4 border-t-[#2BBAEE] animate-spin" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold text-neutral-700">Sedang menjalankan clustering...</p>
-              <p className="text-xs text-neutral-400 mt-1">Proses ini mungkin memerlukan waktu beberapa saat</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Tab Panels */}
       {result && !isLoading && (
         <div className="relative flex-1 h-auto min-h-screen w-full mt-2">
@@ -252,13 +337,53 @@ export default function ClusteringPage() {
 
             <div>
               <AnalysisCard title="Analisis & Insight per Klaster" status="berhasil">
-                <div className="flex flex-col gap-2">
-                  {uniqueClusters.map((c, i) => (
-                    <ClusterAccordion key={c} clusterIndex={c}
-                      color={CLUSTER_COLORS[i % CLUSTER_COLORS.length]}
-                      productCount={clusterSizes[c] || 0}
-                      insight={clusterInsights[i] || result.insight_summary} />
-                  ))}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    {uniqueClusters.map((c, i) => (
+                      <ClusterAccordion key={c} clusterIndex={c}
+                        color={CLUSTER_COLORS[i % CLUSTER_COLORS.length]}
+                        productCount={clusterSizes[c] || 0}
+                        insight={clusterInsights[i] || result.insight_summary} />
+                    ))}
+                  </div>
+
+                  {parsedInsight.priorities.length > 0 && (
+                    <div className="mt-2 border-t border-neutral-100 pt-4">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest block mb-3">Prioritas Aksi Bisnis</span>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {parsedInsight.priorities.map((priority, idx) => {
+                          const cleanPriority = priority.replace(/^[-*\d.\s]+/, ''); // remove bullet
+                          const parts = cleanPriority.split(':');
+                          const title = parts[0]?.trim();
+                          const desc = parts.slice(1).join(':')?.trim();
+                          
+                          let borderColor = 'border-neutral-200';
+                          let titleColor = 'text-neutral-700';
+                          let bgHex = 'rgba(0,0,0,0.02)';
+                          if (title.toUpperCase().includes('RESTOCK')) {
+                            borderColor = 'border-emerald-200';
+                            titleColor = 'text-emerald-700';
+                            bgHex = 'rgba(16,185,129,0.04)';
+                          } else if (title.toUpperCase().includes('DISKON')) {
+                            borderColor = 'border-blue-200';
+                            titleColor = 'text-blue-700';
+                            bgHex = 'rgba(59,130,246,0.04)';
+                          } else if (title.toUpperCase().includes('EVALUASI')) {
+                            borderColor = 'border-amber-200';
+                            titleColor = 'text-amber-700';
+                            bgHex = 'rgba(245,158,11,0.04)';
+                          }
+                          
+                          return (
+                            <div key={idx} className="rounded-xl border p-4 flex flex-col gap-1" style={{ borderColor, backgroundColor: bgHex }}>
+                              <span className={cn("text-xs font-bold uppercase tracking-wider", titleColor)}>{title}</span>
+                              {desc && <span className="text-xs text-neutral-600 leading-relaxed">{desc}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </AnalysisCard>
             </div>

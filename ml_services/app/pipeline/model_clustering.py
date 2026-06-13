@@ -33,7 +33,8 @@ class ClusteringPipeline:
 
     def train(self, X: pd.DataFrame):
         """Melatih scaler dan model"""
-        X_scaled = self.scaler.fit_transform(X)
+        X_trans = np.sign(X) * np.log1p(np.abs(X))
+        X_scaled = self.scaler.fit_transform(X_trans)
         self.model.fit(X_scaled)
         self.is_fitted = True
         return self
@@ -42,7 +43,8 @@ class ClusteringPipeline:
         """Menghitung silhouette score dan WCSS"""
         if not self.is_fitted:
             raise ValueError("Model belum ditraining!")
-        X_scaled = self.scaler.transform(X)
+        X_trans = np.sign(X) * np.log1p(np.abs(X))
+        X_scaled = self.scaler.transform(X_trans)
         labels = self.model.predict(X_scaled)
         sil_score = silhouette_score(X_scaled, labels)
         wcss = float(self.model.inertia_)
@@ -100,7 +102,8 @@ class ClusteringPipeline:
         X = df_grouped[col_fitur]
 
         # Scale data
-        X_scaled = self.scaler.fit_transform(X)
+        X_trans = np.sign(X) * np.log1p(np.abs(X))
+        X_scaled = self.scaler.fit_transform(X_trans)
 
 
         max_k = min(10, len(df_grouped) - 1)
@@ -123,7 +126,8 @@ class ClusteringPipeline:
         scores = self.evaluate(X)
 
        
-        X_scaled_final = self.scaler.transform(X)
+        X_trans_final = np.sign(X) * np.log1p(np.abs(X))
+        X_scaled_final = self.scaler.transform(X_trans_final)
         labels = self.model.predict(X_scaled_final).tolist()
         df_grouped["cluster"] = labels
 
@@ -175,5 +179,6 @@ class ClusteringPipeline:
     def predict(self, X: pd.DataFrame) -> list:
         if not self.is_fitted:
             raise ValueError("Model belum ditraining!")
-        X_scaled = self.scaler.transform(X)
+        X_trans = np.sign(X) * np.log1p(np.abs(X))
+        X_scaled = self.scaler.transform(X_trans)
         return self.model.predict(X_scaled).tolist()

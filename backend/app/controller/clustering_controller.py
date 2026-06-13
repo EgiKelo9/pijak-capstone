@@ -181,6 +181,14 @@ async def get_clustering_result(analysis_id: int, user_id: int, db: Session):
             )
         raise HTTPException(status_code=404, detail="Hasil clustering belum tersedia")
 
+    optimal_k = result.cluster_amount
+    if result.silhouette_list and result.k_range and len(result.silhouette_list) == len(result.k_range):
+        try:
+            max_idx = result.silhouette_list.index(max(result.silhouette_list))
+            optimal_k = result.k_range[max_idx]
+        except Exception:
+            pass
+
     return StandardResponse(
         code=200,
         error=False,
@@ -190,6 +198,7 @@ async def get_clustering_result(analysis_id: int, user_id: int, db: Session):
             "status": analysis.status,
             "result": {
                 "cluster_amount": result.cluster_amount,
+                "optimal_k": optimal_k,
                 "silhouette_score": result.silhouette_score,
                 "wcss_score": result.wcss_score,
                 "cluster_data": result.cluster_data,
@@ -234,6 +243,11 @@ async def get_clustering_history(user_id: int, db: Session):
             "created_at": analysis.created_at.isoformat(),
             "result": {
                 "cluster_amount": result.cluster_amount if result else None,
+                "optimal_k": (
+                    result.k_range[result.silhouette_list.index(max(result.silhouette_list))]
+                    if result and result.silhouette_list and result.k_range and len(result.silhouette_list) == len(result.k_range)
+                    else (result.cluster_amount if result else None)
+                ),
                 "silhouette_score": result.silhouette_score if result else None,
                 "wcss_score": result.wcss_score if result else None,
                 "cluster_data": result.cluster_data if result else None,

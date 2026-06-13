@@ -19,6 +19,7 @@ class ClusteringRunRequest(BaseModel):
 
 class ClusteringResultData(BaseModel):
     cluster_amount: int
+    optimal_k: Optional[int] = None
     silhouette_score: float
     wcss_score: float
     cluster_data: list[dict[str, Any]]
