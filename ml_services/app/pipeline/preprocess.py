@@ -54,7 +54,6 @@ def should_preserve_column(col_name: str) -> bool:
 
 def ensure_clustering_columns(df: pd.DataFrame) -> pd.DataFrame:
     df_clean = df.copy()
-    existing_cols = df_clean.columns.tolist()
 
     # Required columns and their matching / fallback priority patterns
     # We want these lowercase names to exist in the final df_cluster
@@ -70,7 +69,7 @@ def ensure_clustering_columns(df: pd.DataFrame) -> pd.DataFrame:
     for target_col, patterns in required_maps.items():
         # Check if target_col already exists (case-insensitive)
         found_col = None
-        for col in existing_cols:
+        for col in df_clean.columns:
             if col.lower() == target_col:
                 found_col = col
                 break
@@ -83,7 +82,7 @@ def ensure_clustering_columns(df: pd.DataFrame) -> pd.DataFrame:
         # If not found, look for matches in the patterns
         mapped = False
         for pattern in patterns:
-            for col in existing_cols:
+            for col in df_clean.columns:
                 # Direct match or substring match
                 if pattern in col.lower() or col.lower() in pattern:
                     df_clean[target_col] = df_clean[col]

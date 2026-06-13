@@ -76,6 +76,11 @@ class ClusteringPipeline:
                         valid_numeric_fitur.append(col)
                         df[col] = converted.fillna(0)
         col_fitur = valid_numeric_fitur
+        if not col_fitur:
+            numeric_cols = df.select_dtypes(include='number').columns.tolist()
+            col_fitur = [col for col in numeric_cols if col != col_product]
+            for col in col_fitur:
+                df[col] = df[col].fillna(0)
 
         agg_dict = {}
         for col in col_fitur:
