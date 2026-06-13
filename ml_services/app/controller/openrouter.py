@@ -1,0 +1,203 @@
+import json
+from typing import Any
+from app.core.config import get_settings
+from app.core.utils import generate_from_openrouter
+from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse
+from app.schemas.features import Feature
+from app.core.utils import get_dataset, get_dataset_info, update_dataset_feature_metadata, get_dataset_feature_metadata, call_backend_api
+
+settings = get_settings()
+LLM_MODEL = settings.LLM_MODEL
+
+TASK_LABEL_MAP = {
+    "forecasting": "forecasting penjualan produk",
+    "clustering": "clustering produk",
+}
+
+FALLBACK_FEATURE = Feature(
+    cols_to_drop=None,
+    col_date_time=None,
+    col_product=None,
+    col_target=None,
+    col_to_numerical=None,
+    col_to_categorical=None,
+    new_feature_pairing=None,
+    reasonings="Fallback: gagal menganalisis kolom."
+)
+
+async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingResponse:
+    """Menganalisis metadata dataset dan memberikan saran pemetaan kolom menggunakan OpenRouter."""
+    try:
+        # 0. Cek DB jika sudah ada dan tidak sedang force reload.
+        # PENTING: Harus skip jika analyze_status adalah "processing" atau "error"
+        # agar background task ini tidak crash saat mencoba Feature(**{"analyze_status": "processing"})
+        if not req.force_reload:
+            try:
+                existing_metadata = await get_dataset_feature_metadata(req.dataset_id)
+                existing_status = existing_metadata.get("analyze_status") if existing_metadata else None
+                if existing_metadata and existing_status not in ["processing", "error", None]:
+                    print(f"[analyze_columns] Loaded existing feature metadata from DB for dataset {req.dataset_id}", flush=True)
+                    # Hapus analyze_status sebelum dimasukkan ke Feature agar tidak crash
+                    cleaned_metadata = {k: v for k, v in existing_metadata.items() if k != "analyze_status"}
+                    return OpenRouterMappingResponse(
+                        status="success",
+                        task=req.model_type,
+                        suggested_mapping=Feature(**cleaned_metadata),
+                    )
+            except Exception as e:
+                print(f"[analyze_columns] Failed to use existing feature metadata: {e}", flush=True)
+
+        # 1. Fetch dataset dari backend
+        df, _ = await get_dataset(req.dataset_id)
+        # 2. Build metadata dari DataFrame
+        dataset_info = get_dataset_info(df)
+
+        # 3. Handle model_type map (Clustering, Forecasting, or Both)
+        task_str = req.model_type
+        if task_str.lower() == "both":
+            task_str = "Both"
+
+        # Build prompt
+        prompt = f"""
+            Please extract features(columns) from the following dataset.
+            The user wants to do {task_str} option from the available service of Clustering and Forecasting.
+            Dataset:
+            {dataset_info}
+        """
+                
+        # Kirim ke OpenRouter
+        llm_response = await generate_from_openrouter(prompt, schema=Feature)
+        
+        if getattr(llm_response, "error", False):
+            print(f"[analyze_columns] OpenRouter returned an error: {llm_response.message}", flush=True)
+            raise Exception(f"OpenRouter error: {llm_response.message}")
+    
+        raw_text = (llm_response.data or {}).get("response", "")
+        if not raw_text:
+            raise Exception("LLM returned empty response — model may have exhausted tokens on reasoning. Try again or use a different model.")
+        
+        # Robustly extract JSON object
+        start_idx = raw_text.find('{')
+        end_idx = raw_text.rfind('}')
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_json = raw_text[start_idx:end_idx + 1]
+        else:
+            clean_json = raw_text.replace("```json", "").replace("```", "").strip()
+            
+        parsed = json.loads(clean_json)
+        
+        mapping = Feature(**parsed)
+
+        # Simpan hasil analisis ke DB dengan analyze_status: "done"
+        # agar polling frontend bisa berhenti dan mendeteksi keberhasilan
+        mapping_dict = mapping.model_dump()
+        mapping_dict["analyze_status"] = "done"
+        await call_backend_api(
+            "PATCH",
+            f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+            json=mapping_dict
+        )
+        print(f"[analyze_columns] Successfully saved feature metadata for dataset {req.dataset_id}", flush=True)
+
+        return OpenRouterMappingResponse(
+            status="success",
+            task=task_str,
+            suggested_mapping=mapping,
+        )
+
+    except Exception as e:
+        print(f"[analyze_columns] Error: {e}", flush=True)
+        # PENTING: Update status ke error agar polling frontend bisa berhenti
+        try:
+            await call_backend_api(
+                "PATCH",
+                f"/api/v1/datasets/feature-metadata-update/{req.dataset_id}",
+                json={"analyze_status": "error"}
+            )
+        except Exception as patch_err:
+            print(f"[analyze_columns] Failed to update error status: {patch_err}", flush=True)
+        return OpenRouterMappingResponse(
+            status="error",
+            task=req.model_type,
+            suggested_mapping=FALLBACK_FEATURE
+        )
+
+
+async def get_insight_from_data(target_task: str, json_data: Any) -> str:
+    """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
+    prompt = f"""
+    Kamu adalah Business Analyst non-teknis untuk wirausaha retail.
+    Task Machine Learning saat ini: "{target_task}"
+    Berdasarkan data prediksi berikut:
+    {json.dumps(json_data, default=str)}
+    Berikan insight bisnis yang konkret, singkat, dan mudah dipahami.
+    Fokus pada stok, barang tak laku, peluang promo, dan tindakan prioritas yang relevan dengan task.
+    Balas hanya dengan teks insight, tanpa markdown berlebihan.
+    """
+    try:
+        insight_response = await generate_from_openrouter(prompt)
+        if getattr(insight_response, "error", False):
+            return f"OpenRouter error: {insight_response.message}"
+        return insight_response.data.get("response", "") if insight_response.data else ""
+
+    except Exception as e:
+        return f"OpenRouter error: {str(e)}"
+        
+
+async def get_insight_from_clustering(cluster_summary: dict) -> str:
+    """Mendapatkan insight bisnis dari hasil clustering via OpenRouter.
+    
+    Diadaptasi dari gemma.py::get_insight_from_clustering.
+    Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
+    """
+    prompt = (
+        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Berdasarkan hasil segmentasi produk berikut (rata-rata fitur per klaster):\n"
+        f"{json.dumps(cluster_summary, default=str)}\n\n"
+        f"Berikan insight bisnis dalam format berikut. "
+        f"Jangan gunakan markdown formatting seperti ** atau *. "
+        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
+        f"KATEGORI CLUSTER: Kategorikan tiap cluster sebagai Fast Moving, "
+        f"Medium Moving, atau Slow Moving berdasarkan Sales dan Quantity.\n\n"
+        f"INSIGHT PER CLUSTER (maks 2 kalimat per cluster): "
+        f"Sebutkan karakteristik utama dan 1 rekomendasi aksi.\n\n"
+        f"PRIORITAS AKSI BISNIS:\n"
+        f"- Produk yang perlu RESTOCK\n"
+        f"- Produk yang perlu DISKON\n"
+        f"- Produk yang perlu DIEVALUASI\n\n"
+        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+    )
+    try:
+        result = await generate_from_openrouter(prompt)
+        if getattr(result, "error", False):
+            return f"OpenRouter error: {result.message}"
+        return result.data.get("response", "") if result.data else ""
+    except Exception as e:
+        return f"OpenRouter error: {str(e)}"
+
+
+async def get_insight_from_forecasting(forecast_summary: dict) -> str:
+    """Mendapatkan insight bisnis dari hasil forecasting via OpenRouter.
+    
+    Diadaptasi dari gemma.py::get_insight_from_gemma.
+    Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
+    """
+    prompt = (
+        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Berdasarkan prediksi penjualan agregat (keseluruhan) berikut:\n"
+        f"{json.dumps(forecast_summary, default=str)}\n\n"
+        f"Berikan insight bisnis dalam format berikut. "
+        f"Jangan gunakan markdown formatting seperti ** atau *. "
+        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
+        f"TREN KESELURUHAN: Ringkasan tren prediksi penjualan keseluruhan usaha di masa depan.\n\n"
+        f"ANALISIS PERFORMA: Penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya (berdasarkan data prediksi).\n\n"
+        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang oleh UMKM (seperti alokasi modal, strategi promosi keseluruhan, atau manajemen operasional).\n\n"
+        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+    )
+    try:
+        result = await generate_from_openrouter(prompt)
+        if getattr(result, "error", False):
+            return f"OpenRouter error: {result.message}"
+        return result.data.get("response", "") if result.data else ""
+    except Exception as e:
+        return f"OpenRouter error: {str(e)}"

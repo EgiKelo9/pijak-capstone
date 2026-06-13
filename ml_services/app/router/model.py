@@ -1,7 +1,11 @@
-from fastapi import APIRouter, HTTPException
-from app.controller.gemma import get_insight_from_gemma
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from app.controller.openrouter import get_insight_from_data
 from app.controller.model import generate_dummy_forecast
+from app.controller.clustering_controller import run_clustering
+from app.controller.forecasting_controller import run_forecasting
 from app.schemas.model import PredictRequest, FullPredictResponse, PredictResponseForecast
+from app.schemas.clustering_schema import ClusteringRequest, ClusteringResponse, ClusteringErrorResponse
+from app.schemas.forecasting_schema import ForecastingRequest, ForecastingResponse, ForecastingErrorResponse
 
 router = APIRouter(prefix="/model")
 
@@ -32,5 +36,44 @@ async def predict(request: PredictRequest):
         used_model="dummy-moving-average-v0.1",
         note="Output ini adalah DUMMY digenerate via local MA."
     )
-    insight_text = await get_insight_from_gemma(ml_forecast.model_dump())
+    insight_text = await get_insight_from_data("sales-forecasting", ml_forecast.model_dump())
     return FullPredictResponse(ml_forecast=ml_forecast, gemini_insight=insight_text)
+
+
+# clustering endpoint
+
+@router.post(
+    "/clustering",
+    responses={
+        200: {"model": ClusteringResponse, "description": "Clustering berhasil"},
+        400: {"model": ClusteringErrorResponse, "description": "Clustering gagal"}
+    }
+)
+async def clustering(request: ClusteringRequest):
+    """
+    Endpoint untuk menjalankan clustering produk.
+    Menerima dataset dan konfigurasi kolom,
+    mengembalikan hasil cluster beserta insight dari LLM.
+    """
+    result = await run_clustering(request)
+
+    if result.status == "failed":
+        raise HTTPException(status_code=400, detail=result.error)
+
+    return result
+
+
+# forecasting endpoint
+
+@router.post(
+    "/forecasting",
+)
+async def forecasting(request: ForecastingRequest, background_tasks: BackgroundTasks):
+    """
+    Endpoint untuk menjalankan forecasting penjualan per produk secara background.
+    Menerima dataset cleaned dari preprocessing beserta konfigurasi kolom,
+    menjalankan prediksi secara asinkron, dan mengembalikan 202.
+    """
+    background_tasks.add_task(run_forecasting, request)
+
+    return {"status": "processing", "analysis_id": request.analysis_id}

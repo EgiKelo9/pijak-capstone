@@ -1,12 +1,14 @@
-from io import BytesIO
-
 import pandas as pd
 import numpy as np
 from typing import Tuple
-
-import requests
-from app.controller.gemini import get_preprocess_from_gemini
+from pydantic import UUID5
 from app.schemas.features import Feature
+from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
+from app.controller.openrouter import analyze_columns
+from app.schemas.openrouter import DatasetMetadataRequest
+from app.core.websocket_manager import manager
+
+import asyncio
 
 def drop_missing_values(df: pd.DataFrame) -> pd.DataFrame:
     """Membersihkan raw data dari missing values"""
@@ -39,114 +41,6 @@ def prepare_forecasting_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 # ------------------------------------- Baroe --------------------------------------------
-
-async def get_dataset(dataset_id):
-    """
-    Fetch dataset from backend API,
-    load into pandas DataFrame,
-    and return summarized dataset information.
-    """
-
-    auth_url = f"http://backend:5000/api/v1/auth/login"
-    auth_response = requests.post(auth_url, json={'email': 'user@example.com', 'password': 'string'})
-    print(auth_response.json())
-    access_token = auth_response.json()["data"]["access_token"]
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-    
-    fetch_dataset_url = f"http://backend:5000/api/v1/datasets/{dataset_id}"
-    fetch_dataset_response = requests.get(
-        fetch_dataset_url,
-        headers=headers
-    )
-
-    if fetch_dataset_response.status_code != 200:
-        raise Exception(
-            f"Failed to fetch dataset: "
-            f"{fetch_dataset_response.status_code} - {fetch_dataset_response.text}"
-        )
-
-    csv_bytes = fetch_dataset_response.content
-
-    df = pd.read_csv(
-        BytesIO(csv_bytes)
-    )
-
-    return df
-
-async def upload_cleaned_dataset(df: pd.DataFrame, original_dataset_id: int, model: str):
-    """
-    Convert processed DataFrame to CSV and upload it back to the backend.
-    """
-    auth_url = f"http://backend:5000/api/v1/auth/login"
-    auth_response = requests.post(auth_url, json={'email': 'user@example.com', 'password': 'string'})
-    access_token = auth_response.json()["data"]["access_token"]
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
-    
-    csv_buffer = BytesIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_buffer.seek(0)
-    
-    upload_url = "http://backend:5000/api/v1/datasets/upload" # Adjust if your endpoint URL is different
-    
-    files = {
-        'file': (f"cleaned_dataset_{original_dataset_id}.csv", csv_buffer, "text/csv")
-    }
-    data = {
-        'is_cleaned': 'true',
-        'ori_data_id': str(original_dataset_id),
-        'model': model
-    }
-    
-    response = requests.post(upload_url, headers=headers, files=files, data=data)
-    
-    if response.status_code != 200:
-        raise Exception(f"Failed to upload cleaned dataset: {response.status_code} - {response.text}")
-        
-    return response.json()
-
-def get_dataset_info(df: pd.DataFrame):
-    dataset_summary = {
-        "shape": df.shape,
-        "dtypes": df.dtypes.astype(str).to_dict(),
-        "head": df.head().to_dict(orient="records"),
-        "missing_values": df.isnull().sum().to_dict()
-    }
-
-    return dataset_summary
-
-def extract_response(response):
-    col_dt_whole = None
-    is_whole = False
-    col_date_time = response.col_date_time
-    
-    if not col_date_time.col_whole:
-        col_day = col_date_time.col_day
-        col_month = col_date_time.col_month
-        col_year = col_date_time.col_year  
-    else:
-        is_whole = True
-        col_dt_whole = col_date_time.col_whole
-        col_day = None
-        col_month = None
-        col_year = None
-
-    return {
-        "cols_to_drop": response.cols_to_drop,
-        "col_product": response.col_product,
-        "col_target": response.col_target,
-        "col_to_cat": response.col_to_categorical,
-        "col_to_num": response.col_to_numerical,
-        "col_pairing": response.new_feature_pairing,
-        "is_whole": is_whole,
-        "col_dt_whole": col_dt_whole,
-        "col_day": col_day,
-        "col_month": col_month,
-        "col_year": col_year
-    }
 
 def drop_cols(df: pd.DataFrame, cols_to_drop: list[str] | str | None = None) -> pd.DataFrame:
     if not cols_to_drop:
@@ -254,15 +148,15 @@ def drop_or_impute(df, categorical_cols, numeric_cols, col_dt_whole=None, drop_t
 def generate_new_features(df, col_pairing, numeric_cols):
     if col_pairing:
         for pairing in col_pairing:
-            col1 = pairing.column_1
-            col2 = pairing.column_2
+            col1 = pairing['column_1']
+            col2 = pairing['column_2']
 
-            op = pairing.operator.lower().strip() 
+            op = pairing['operator'].lower().strip() 
             
             if col1 in df.columns and col2 in df.columns:
                 if pd.api.types.is_numeric_dtype(df[col1]) and pd.api.types.is_numeric_dtype(df[col2]):
                     
-                    new_col = pairing.new_col_name
+                    new_col = pairing['new_col_name']
                     
                     if op == 'add':
                         df[new_col] = df[col1] + df[col2]
@@ -281,71 +175,161 @@ def generate_new_features(df, col_pairing, numeric_cols):
 
     return df, numeric_cols
 
-async def temp_pipeline(dataset_id:int, model: str):
+def extract_response(response):
+    col_dt_whole = None
+    is_whole = False
+
+    col_date_time = response.get("col_date_time")
+
+    col_day, col_month, col_year = None, None, None
+
+    if isinstance(col_date_time, str):
+        is_whole = True
+        col_dt_whole = col_date_time
+
+    elif isinstance(col_date_time, dict):
+        if col_date_time.get("col_whole"):
+            is_whole = True
+            col_dt_whole = col_date_time["col_whole"]
+        else:
+            col_day = col_date_time.get("col_day")
+            col_month = col_date_time.get("col_month")
+            col_year = col_date_time.get("col_year")
+
+    return {
+        "cols_to_drop": response.get("cols_to_drop", []),
+        "col_product": response.get("col_product", []),
+        "col_target": response.get("col_target"),
+        "col_to_cat": response.get("col_to_categorical", []),
+        "col_to_num": response.get("col_to_numerical", []),
+        "col_pairing": response.get("new_feature_pairing", []),
+        "is_whole": is_whole,
+        "col_dt_whole": col_dt_whole,
+        "col_day": col_day,
+        "col_month": col_month,
+        "col_year": col_year
+    }
+
+async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     shapes = []
     
-    df: pd.DataFrame = await get_dataset(dataset_id)
+    df, _ = await get_dataset(dataset_id)
     shapes.append(df.shape)
 
-    dataset_summ = get_dataset_info(df)
+    mapping_res = await get_dataset_feature_metadata(dataset_id)
+    # print(mapping_res)
+    extracted = extract_response(mapping_res or {})
+    # print(extracted)
 
-    respons = await get_preprocess_from_gemini(dataset_summary=dataset_summ, model_type=model)
-    print(f'Respon Gemini begini kira-kira: {respons}')
-
-    # `respons` could be an error string or the actual Pydantic model parsed from Gemini
-    if isinstance(respons, str):
-        print(f"Gemini returned an error or fallback: {respons}")
-        return None
-        
-    xtracted = extract_response(respons)
-
+    step1_id = f"{job_id}-step1"
+    await manager.send(job_id, {"stepId": step1_id, "text": "Menyiapkan worker: memindai anomali dan membersihkan noise data...", "status": "loading"})
+    await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
     try:
         df = (
-            df.pipe(drop_cols, xtracted.get("cols_to_drop"))
+            df.pipe(drop_cols, extracted.get("cols_to_drop"))
         )
-        
+        await manager.send(job_id, {"stepId": step1_id, "text": "Anomali dan noise data berhasil dibersihkan.", "status": "success"})
+
+        step2_id = f"{job_id}-step2"
+        await manager.send(job_id, {"stepId": step2_id, "text": "Mengekstraksi fitur temporal: menyelaraskan format matriks waktu...", "status": "loading"})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df, updated_col_dt = adjust_date_time(
             df,
-            is_whole=xtracted.get("is_whole"),
-            col_day=xtracted.get("col_day"),
-            col_month=xtracted.get("col_month"),
-            col_year=xtracted.get("col_year"),
-            col_dt_whole=xtracted.get("col_dt_whole")
+            is_whole=extracted.get("is_whole"),
+            col_day=extracted.get("col_day"),
+            col_month=extracted.get("col_month"),
+            col_year=extracted.get("col_year"),
+            col_dt_whole=extracted.get("col_dt_whole")
         )
-        xtracted["col_dt_whole"] = updated_col_dt
+        extracted["col_dt_whole"] = updated_col_dt
+        await manager.send(job_id, {"stepId": step2_id, "text": "Fitur temporal berhasil diekstraksi.", "status": "success"})
         
         # If you have more steps, you can resume chaining here:
+        step3_id = f"{job_id}-step3"
+        await manager.send(job_id, {"stepId": step3_id, "text": "Validasi skema: menormalisasi tipe variabel numerik dan kategorikal...", "status": "loading"})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
         df = (
-            df.pipe(adjust_data_types, xtracted.get("col_to_cat"), xtracted.get("col_product"), xtracted.get("col_to_num"))
+            df.pipe(adjust_data_types, extracted.get("col_to_cat"), extracted.get("col_product"), extracted.get("col_to_num"))
         )
+        await manager.send(job_id, {"stepId": step3_id, "text": "Skema variabel berhasil dinormalisasi.", "status": "success"})
 
-        iter_cols, categorical_cols, numerical_cols = extract_column(df, xtracted['col_dt_whole'])
+        step4_id = f"{job_id}-step4"
+        await manager.send(job_id, {"stepId": step4_id, "text": "Reduksi dimensi: memangkas vektor kolom yang redundan...", "status": "loading"})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
+        iter_cols, categorical_cols, numerical_cols = extract_column(df, extracted['col_dt_whole'])
         df = (
             df.pipe(enforce_types, numerical_cols, categorical_cols)
-            .pipe(drop_or_impute, categorical_cols, numerical_cols, xtracted['col_dt_whole'])
+            .pipe(drop_or_impute, categorical_cols, numerical_cols, extracted['col_dt_whole'])
         )
+        await manager.send(job_id, {"stepId": step4_id, "text": "Reduksi dimensi selesai.", "status": "success"})
+        
+        step5_id = f"{job_id}-step5"
+        await manager.send(job_id, {"stepId": step5_id, "text": "Inisiasi rekayasa fitur: mensintesis metrik prediktif baru...", "status": "loading"})
+        await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
+        try:
+            df, numerical_cols = generate_new_features(
+                    df,
+                    extracted.get('col_pairing'),
+                    numerical_cols
+                )
+        except Exception as e:
+            print(f"Error occurred while generating new features: {str(e)}")
+            raise e
+        await manager.send(job_id, {"stepId": step5_id, "text": "Rekayasa fitur berhasil diselesaikan.", "status": "success"})
 
-        df, numerical_cols = generate_new_features(
-            df,
-            xtracted.get('col_pairing'),
-            numerical_cols
-        )
         shapes.append(df.shape)
         print(f"Pipeline finished successfully. New Shape: {df.shape}")
         
         # Upload the cleaned dataset back to the backend
-        if model.lower() == 'both':
-            upload_forecast = await upload_cleaned_dataset(df, dataset_id, 'Forecasting')
+        step6_id = f"{job_id}-step6"
+        await manager.send(job_id, {"stepId": step6_id, "text": "Kompilasi selesai: mengonversi dan merekam matriks teroptimasi ke server...", "status": "loading"})
+        
+        cleaned_forecast_id = None
+        cleaned_cluster_id = None
 
-            df = df.drop(columns=xtracted['col_dt_whole'])
-            upload_cluster = await upload_cleaned_dataset(df, dataset_id, 'Clustering')
-            print(f"Upload successful: {upload_forecast, upload_cluster}")
+        if model.lower() == 'both':
+            prod_cols = as_list(extracted.get("col_product"))
+            df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
+            upload_forecast = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
+            cleaned_forecast_id = upload_forecast.get("data", {}).get("dataset_id")
+
+            df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            upload_cluster = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            cleaned_cluster_id = upload_cluster.get("data", {}).get("dataset_id")
+            print(f"Upload successful: forecast_id={cleaned_forecast_id}, cluster_id={cleaned_cluster_id}")
+        elif model.lower() == 'forecasting':
+            prod_cols = as_list(extracted.get("col_product"))
+            df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
+            upload_result = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
+            cleaned_forecast_id = upload_result.get("data", {}).get("dataset_id")
+            print(f"Upload successful: forecast_id={cleaned_forecast_id}")
         else:
-            upload_result = await upload_cleaned_dataset(df, dataset_id, model)
-            print(f"Upload successful: {upload_result}")
+            df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            upload_result = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            cleaned_cluster_id = upload_result.get("data", {}).get("dataset_id")
+            print(f"Upload successful: cluster_id={cleaned_cluster_id}")
+
+        await manager.send(job_id, {"stepId": step6_id, "text": "Dataset bersih berhasil disimpan ke database.", "status": "success"})
+        await manager.send(job_id, {
+            "stepId": f"{job_id}-done",
+            "text": "Pipeline preprocessing selesai. Dataset siap untuk analisis.",
+            "status": "success",
+            "cleaned_forecast_id": cleaned_forecast_id,
+            "cleaned_cluster_id": cleaned_cluster_id,
+            "feature_metadata": extracted
+        })
 
     except Exception as e:
         print(f"Pipeline failed during transformation: {str(e)}")
+        await manager.send(job_id, {"stepId": f"{job_id}-error", "text": f"Pipeline gagal: {str(e)}", "status": "error"})
         raise e
         
     return shapes
+
+async def test_ws(job_id: str):
+    await manager.send(job_id, {"message": "skibidi"})
+    await asyncio.sleep(5)
+    await manager.send(job_id, {"message": "5 second has passed"})
+    await asyncio.sleep(3)
+    await manager.send(job_id, {"message": "3 second has passed"})
+    return

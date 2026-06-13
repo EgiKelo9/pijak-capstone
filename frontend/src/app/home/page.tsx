@@ -13,10 +13,11 @@ import { Button } from "@/components/ui/button";
 import LoadingCarousel from "@/components/ui/loading-carousel";
 import { TextHoverEffect } from "@/components/ui/text-hover-effect";
 import { IconSparklesFilled } from "@tabler/icons-react";
-import { CtaBackground, HeroBackground, HomeBackground } from "./bgForHome";
-import { BentoFeature } from "./featureBento";
-import TeamSection from "./teamsContainer";
-import TextHome from "./textHome";
+import { CtaBackground, HeroBackground, HomeBackground } from "./bg-for-home";
+import { BentoFeature } from "./feature-bento";
+import TeamSection from "./teams-container";
+import TextHome from "./text-home";
+import Link from "next/link";
 
 export default function LandingPage() {
   return (
@@ -128,7 +129,7 @@ export default function LandingPage() {
                     tips={[
                       { 
                         text: "Energi besar Anda terlalu berharga jika hanya dihabiskan untuk merapikan tumpukan kertas.", 
-                        image: "/carousel/slide1-struggle.jpg" 
+                        image: "/carousel/slide1-struggle.webp" 
                       },
                       { 
                         text: "Sistem analitik seringkali terasa mahal, rumit, dan butuh keahlian IT untuk memahaminya.", 
@@ -136,15 +137,15 @@ export default function LandingPage() {
                       },
                       { 
                         text: "Padahal, teknologi yang benar-benar pintar seharusnya mudah dipakai oleh siapa saja.", 
-                        image: "/carousel/slide3-accessible.jpg" 
+                        image: "/carousel/slide3-accessible.webp" 
                       },
                       { 
                         text: "Di sinilah kami hadir. Biarkan sistem kami yang memproses kerumitan data di belakang layar.", 
-                        image: "/carousel/slide4-insights.jpg" 
+                        image: "/carousel/slide4-insights.webp" 
                       },
                       { 
                         text: "Kini, Anda punya ruang untuk terus berinovasi dan waktu yang cukup untuk beristirahat.", 
-                        image: "/carousel/slide5-outcome.jpg" 
+                        image: "/carousel/slide5-outcome.webp" 
                       }
                     ]}
                   />
@@ -214,12 +215,14 @@ export default function LandingPage() {
               <br/>
                 mulai bertindak.
             </h2>
-
-            <Button className="px-6 py-4 md:px-8 md:py-7 2xl:px-12 2xl:py-10 text-xl md:text-2xl 2xl:text-3xl rounded-full bg-[#272727] hover:bg-[#333333] border-[0.4px] border-[#5D5D5D] shadow-xl hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer">
-              <span className="bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
-                Mulai Lebih eZ
-              </span>
-            </Button>
+            
+            <Link href="/dashboard">
+              <Button className="px-6 py-4 md:px-8 md:py-7 2xl:px-12 2xl:py-10 text-xl md:text-2xl 2xl:text-3xl rounded-full bg-[#272727] hover:bg-[#333333] border-[0.4px] border-[#5D5D5D] shadow-xl hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer">
+                <span className="bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
+                  Mulai Lebih eZ
+                </span>
+              </Button>
+            </Link>
           </div>
           <div className="w-full max-h-[24vh]">
             <TextHoverEffect text="BeeZ" />
