@@ -111,8 +111,6 @@ export function ForecastingChart({
     try {
       const date = new Date(tickItem);
       if (isNaN(date.getTime())) return String(tickItem);
-      if (timeFilter === 'monthly')
-        return date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
       if (timeFilter === 'weekly')
         return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
       return date.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' });
@@ -178,7 +176,6 @@ export function ForecastingChart({
   const FILTER_LABELS: Record<TimeFilter, string> = {
     daily: 'Harian',
     weekly: 'Mingguan',
-    monthly: 'Bulanan',
   };
 
   const hasData = displayData.length > 0;
@@ -192,10 +189,10 @@ export function ForecastingChart({
       <div className="flex items-center justify-between mb-3 w-full gap-2 flex-wrap">
         {/* Filter tab */}
         <div className="flex bg-neutral-100/50 p-1 rounded-lg border border-neutral-200/60">
-          {(['daily', 'weekly', 'monthly'] as TimeFilter[]).map((filter) => (
+          {(['daily', 'weekly'] as TimeFilter[]).map((filter) => (
             <button
               key={filter}
-              disabled={isFixedFilter && filter !== 'monthly'}
+              disabled={isFixedFilter}
               onClick={() => setTimeFilter(filter)}
               className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
                 timeFilter === filter

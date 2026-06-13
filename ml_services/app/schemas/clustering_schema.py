@@ -8,10 +8,11 @@ from typing import Any, Optional
 class ClusteringRequest(BaseModel):
     """Schema input yang diterima dari frontend/controller"""
     analysis_id: str
+    dataset_id: int
     col_product: str
     col_fitur: list[str]
-    data: list[dict[str, Any]]
     n_clusters: Optional[int] = None  # None = sistem otomatis cari K optimal, int = user tentukan sendiri
+    callback_url: str
 
 
 # ================================

@@ -24,7 +24,7 @@ export function AppSidebarNav() {
   const pathname = usePathname();
 
   return (
-    <SidebarContent className="px-5 mt-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
+    <SidebarContent className="px-5 py-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:items-center">
       <SidebarGroup className="p-0">
         <SidebarMenu className="gap-5">
           {DATA.navMain.map((item) =>

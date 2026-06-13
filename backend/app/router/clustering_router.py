@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from fastapi import Depends, APIRouter
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.clustering_schema import ClusteringRunRequest
-from app.controller.clustering_controller import run_clustering, get_clustering_result, get_clustering_history
+from app.schemas.clustering_schema import ClusteringRunRequest, ClusteringCallbackRequest
+from app.controller.clustering_controller import run_clustering, get_clustering_result, get_clustering_history, handle_clustering_callback
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 
@@ -27,6 +27,18 @@ async def run_clustering_endpoint(
 ):
     """Menjalankan clustering produk."""
     return await run_clustering(request, current_user.id, db)
+
+
+@router.patch(
+    "/callback",
+    response_model=StandardResponse[dict],
+)
+async def clustering_callback_endpoint(
+    request: ClusteringCallbackRequest,
+    db: Session = Depends(get_db)
+):
+    """Menerima callback dari ML service setelah proses clustering selesai/gagal."""
+    return await handle_clustering_callback(request, db)
 
 
 @router.get(

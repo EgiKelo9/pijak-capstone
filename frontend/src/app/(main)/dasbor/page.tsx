@@ -2,11 +2,32 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/animate-ui/components/animate/tabs";
 import { AnalysisCard } from "@/components/main-card";
-import { Cpu, TrendingUp } from "lucide-react";
+import { useClustering } from "@/hooks/use-clustering";
+import { useForecasting } from "@/hooks/use-forecasting";
+import { ClusterScatterChart } from "@/components/main/clustering/cluster-scatter-chart";
+import { ProductTable } from "@/components/main/clustering/product-table";
+import { ForecastingChart } from "@/components/main/forecasting/forecasting-chart";
+import { Cpu, TrendingUp, Loader2 } from "lucide-react";
 import { useState } from "react";
 import ChatBot, { ChatBotProps } from "./chatbot";
+import { sendChatbotMessage } from "@/services/chatbot";
+import { AttachedType, TargetTask } from "@/types";
 
-export default function MainDashboar() {
+export default function MainDashboard() {
+    const {
+        result: clusteringResult,
+        colFitur: clusteringColFitur,
+        isLoading: isLoadingClustering,
+        error: errorClustering,
+    } = useClustering();
+
+    const {
+        data: forecastData,
+        timeFilter,
+        setTimeFilter,
+        isLoading: isLoadingForecasting,
+        error: errorForecasting,
+    } = useForecasting();
 
     const mockReceived: ChatBotProps[] = [
         // --- CLUSTERING FLOW ---
@@ -72,35 +93,181 @@ export default function MainDashboar() {
     const [ClusteringChats, setClusteringChats] = useState<ChatBotProps[]>(mockReceived.filter(chat => chat.Model === "Clustering"));
     const [ForecastingChats, setForecastingChats] = useState<ChatBotProps[]>(mockReceived.filter(chat => chat.Model === "Forecasting"));
 
-    const [activeTab, setActiveTab] = useState<'forecasting' | 'clustering'>('forecasting')
+    const [activeTab, setActiveTab] = useState<TargetTask>('forecasting')
+    const [isForecastingChatLoading, setIsForecastingChatLoading] = useState(false);
+    const [isClusteringChatLoading, setIsClusteringChatLoading] = useState(false);
+
+    const handleSendMessage = async (
+        message: string,
+        attachedType: AttachedType
+    ) => {
+        if (!message.trim()) return;
+
+        const targetTask = activeTab;
+
+        const newUserChat: ChatBotProps = {
+            ChatMessages: message,
+            ChatRole: 'user',
+            Model: targetTask === 'forecasting' ? 'Forecasting' : 'Clustering'
+        };
+
+        if (targetTask === 'forecasting') {
+            setForecastingChats(prev => [...prev, newUserChat]);
+            setIsForecastingChatLoading(true);
+        } else {
+            setClusteringChats(prev => [...prev, newUserChat]);
+            setIsClusteringChatLoading(true);
+        }
+
+        // Gather raw data based on attachedType
+        let attachment: any = null;
+        if (attachedType === 'forecasting') {
+            attachment = forecastData?.trend_data || null;
+        } else if (attachedType === 'clustering') {
+            attachment = clusteringResult || null;
+        } else if (attachedType === 'table') {
+            attachment = clusteringResult?.cluster_data || null;
+        }
+
+        let taskId = 'unknown';
+        if (targetTask === 'forecasting') {
+            const storedConfig = sessionStorage.getItem('pijak_forecast_config');
+            if (storedConfig) {
+                try {
+                    taskId = JSON.parse(storedConfig).dataset_id?.toString() || 'unknown';
+                } catch {}
+            }
+        } else {
+            taskId = (clusteringResult as any)?.analysis_id?.toString() || sessionStorage.getItem('pijak_cleaned_clustering_id') || 'unknown';
+        }
+
+        try {
+            const response = await sendChatbotMessage(targetTask, {
+                task_id: taskId,
+                message,
+                attachment
+            });
+
+            const newAssistantChat: ChatBotProps = {
+                ChatMessages: response.message,
+                ChatRole: 'assistant',
+                Model: targetTask === 'forecasting' ? 'Forecasting' : 'Clustering'
+            };
+
+            if (targetTask === 'forecasting') {
+                setForecastingChats(prev => [...prev, newAssistantChat]);
+            } else {
+                setClusteringChats(prev => [...prev, newAssistantChat]);
+            }
+        } catch (error: any) {
+            console.error('Error sending chatbot message:', error);
+            const errorChat: ChatBotProps = {
+                ChatMessages: `Maaf, terjadi kesalahan saat menghubungi BeeZ AI: ${error.response?.data?.message || error.message || 'Error'}`,
+                ChatRole: 'assistant',
+                Model: targetTask === 'forecasting' ? 'Forecasting' : 'Clustering'
+            };
+            if (targetTask === 'forecasting') {
+                setForecastingChats(prev => [...prev, errorChat]);
+            } else {
+                setClusteringChats(prev => [...prev, errorChat]);
+            }
+        } finally {
+            if (targetTask === 'forecasting') {
+                setIsForecastingChatLoading(false);
+            } else {
+                setIsClusteringChatLoading(false);
+            }
+        }
+    };
+
+    // Determine status for clustering cards
+    const clusteringStatus = isLoadingClustering
+        ? 'menunggu'
+        : errorClustering
+        ? 'gagal'
+        : !clusteringResult
+        ? 'kosong'
+        : 'berhasil';
 
     return (
         <>
         {/* Main Container */}
-        <div className="flex gap-4 w-full h-full">
+        <div className="flex gap-4 w-full h-full p-4 overflow-hidden">
             {/* Left */}
-            <div className="flex flex-col gap-4 w-full h-full">
-                <div className="flex gap-4 w-full h-full">
-                    <AnalysisCard title={"Visualisasi Cluster"} className="w-full">
-                        TODO: Scatter Plot, i think
+            <div className="flex flex-col gap-4 flex-1 h-full max-h-[85vh] overflow-y-auto pr-2 pb-6">
+                <div className="flex flex-col gap-4 w-full shrink-0">
+                    <AnalysisCard title={"Visualisasi Cluster"} className="h-auto" status={clusteringStatus}>
+                        {isLoadingClustering ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-2 text-neutral-500">
+                                <Loader2 className="size-6 animate-spin text-[#2BBAEE]" />
+                                <span className="text-xs">Memuat visualisasi cluster...</span>
+                            </div>
+                        ) : errorClustering ? (
+                            <div className="text-rose-500 text-xs py-20 text-center">
+                                Gagal memuat data: {errorClustering}
+                            </div>
+                        ) : !clusteringResult ? (
+                            <div className="text-neutral-400 text-xs py-20 text-center">
+                                Belum ada data analisis cluster. Silakan jalankan analisis di halaman Clustering.
+                            </div>
+                        ) : (
+                            <ClusterScatterChart result={clusteringResult} colFitur={clusteringColFitur} />
+                        )}
                     </AnalysisCard>
+
+                    {isLoadingForecasting ? (
+                        <AnalysisCard title="Visualisasi Forecasting" className="w-full" status="menunggu">
+                            <div className="flex flex-col items-center justify-center py-20 gap-2 text-neutral-500">
+                                <Loader2 className="size-6 animate-spin text-[#f59e0b]" />
+                                <span className="text-xs">Memuat visualisasi forecasting...</span>
+                            </div>
+                        </AnalysisCard>
+                    ) : errorForecasting ? (
+                        <AnalysisCard title="Visualisasi Forecasting" className="w-full" status="gagal">
+                            <div className="text-rose-500 text-xs py-20 text-center">
+                                Gagal memuat data: {errorForecasting}
+                            </div>
+                        </AnalysisCard>
+                    ) : !forecastData ? (
+                        <AnalysisCard title="Visualisasi Forecasting" className="w-full" status="kosong">
+                            <div className="text-neutral-400 text-xs py-20 text-center">
+                                Belum ada data forecasting. Silakan jalankan analisis di halaman Forecasting.
+                            </div>
+                        </AnalysisCard>
+                    ) : (
+                        <ForecastingChart 
+                            data={forecastData.trend_data} 
+                            timeFilter={timeFilter} 
+                            setTimeFilter={setTimeFilter} 
+                        />
+                    )}
                     
-                    <AnalysisCard title={"Analisis Produk"} className="w-full">
-                        TODO: Simple Table
+                    <AnalysisCard title={"Analisis Produk"} className="h-auto" status={clusteringStatus}>
+                        {isLoadingClustering ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-2 text-neutral-500">
+                                <Loader2 className="size-6 animate-spin text-[#2BBAEE]" />
+                                <span className="text-xs">Memuat analisis produk...</span>
+                            </div>
+                        ) : errorClustering ? (
+                            <div className="text-rose-500 text-xs py-20 text-center">
+                                Gagal memuat data: {errorClustering}
+                            </div>
+                        ) : !clusteringResult ? (
+                            <div className="text-neutral-400 text-xs py-20 text-center">
+                                Belum ada data analisis produk. Silakan jalankan analisis di halaman Clustering.
+                            </div>
+                        ) : (
+                            <ProductTable data={clusteringResult.cluster_data} colFitur={clusteringColFitur} />
+                        )}
                     </AnalysisCard>
                 </div>
-
-                <AnalysisCard title={"Visualisasi Forecasting"} className="w-full h-full">
-                    TODO: Line Chart
-                </AnalysisCard>
-
             </div>
             {/* Right */}
-            <aside className="w-[33vw] md:w-[48vw]">
+            <aside className="w-[24vw] h-full max-h-[85vh] shrink-0">
                 <AnalysisCard
                     title="Tanya BeeZ AI"
                     className="h-full w-full"
-                    innerClassName="flex flex-col p-1.51 pt-0  gap-2 relative group/chat overflow-hidden"
+                    innerClassName="flex flex-col p-1.51 pt-0 gap-2 relative group/chat overflow-hidden"
                 >
                     <Tabs
                     value={activeTab}
@@ -129,7 +296,6 @@ export default function MainDashboar() {
                         {/* Forecasting panel */}
                         <TabsContent
                         value="forecasting"
-                        forceMount
                         className={[
                             'absolute inset-0 transition-opacity duration-300',
                             activeTab === 'forecasting'
@@ -137,13 +303,16 @@ export default function MainDashboar() {
                             : 'opacity-0 pointer-events-none z-0',
                         ].join(' ')}
                         >
-                            <ChatBot chats={ForecastingChats} />
+                            <ChatBot 
+                                chats={ForecastingChats} 
+                                onSendMessage={handleSendMessage}
+                                isLoading={isForecastingChatLoading}
+                            />
                         </TabsContent>
             
                         {/* Clustering panel */}
                         <TabsContent
                         value="clustering"
-                        forceMount
                         className={[
                             'absolute inset-0 transition-opacity duration-300',
                             activeTab === 'clustering'
@@ -151,7 +320,11 @@ export default function MainDashboar() {
                             : 'opacity-0 pointer-events-none z-0',
                         ].join(' ')}
                         >
-                            <ChatBot chats={ClusteringChats} />
+                            <ChatBot 
+                                chats={ClusteringChats} 
+                                onSendMessage={handleSendMessage}
+                                isLoading={isClusteringChatLoading}
+                            />
                         </TabsContent>
             
                     </div>

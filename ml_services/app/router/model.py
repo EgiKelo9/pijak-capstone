@@ -44,23 +44,13 @@ async def predict(request: PredictRequest):
 
 @router.post(
     "/clustering",
-    responses={
-        200: {"model": ClusteringResponse, "description": "Clustering berhasil"},
-        400: {"model": ClusteringErrorResponse, "description": "Clustering gagal"}
-    }
 )
-async def clustering(request: ClusteringRequest):
+async def clustering(request: ClusteringRequest, background_tasks: BackgroundTasks):
     """
-    Endpoint untuk menjalankan clustering produk.
-    Menerima dataset dan konfigurasi kolom,
-    mengembalikan hasil cluster beserta insight dari LLM.
+    Endpoint untuk menjalankan clustering produk secara background.
     """
-    result = await run_clustering(request)
-
-    if result.status == "failed":
-        raise HTTPException(status_code=400, detail=result.error)
-
-    return result
+    background_tasks.add_task(run_clustering, request)
+    return {"status": "processing", "analysis_id": request.analysis_id}
 
 
 # forecasting endpoint

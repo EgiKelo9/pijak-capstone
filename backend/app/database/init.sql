@@ -101,6 +101,7 @@ CREATE TABLE forecasting_results (
     r2                      FLOAT,
     trend_data              JSONB NOT NULL,
     feature_importances     JSONB,
+    metrics                 JSONB,
     insight_summary         TEXT,
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -118,6 +119,9 @@ CREATE TABLE clustering_results (
     wcss_score       FLOAT,
     cluster_data     JSONB NOT NULL,
     insight_summary  TEXT,
+    wcss_list        JSONB,
+    silhouette_list  JSONB,
+    k_range          JSONB,
     created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at       TIMESTAMP NULL
@@ -178,11 +182,11 @@ INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_
     (8, 0.78, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-02-01", "value": 180}]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
     (10, 0.88, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-03-01", "value": 210}]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
 
-INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary) VALUES
-    (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.'),
-    (5, 4, 0.72, 980.20, '[{"cluster": 1, "size": 100}]', 'Ditemukan 4 kelompok utama pelanggan dengan pola keluhan yang sama pada pengiriman.'),
-    (7, 0, NULL, NULL, '[]', 'Sedang memproses pengelompokan berdasarkan tingkat frekuensi dan nilai transaksi...'),
-    (9, 0, NULL, NULL, '[]', 'Dataset memiliki terlalu banyak nilai kosong sehingga gagal dikelompokkan.');
+INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary, wcss_list, silhouette_list, k_range) VALUES
+    (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.', '[2000.0, 1500.0, 1250.50, 1100.0, 1000.0]', '[0.45, 0.55, 0.65, 0.60, 0.58]', '[2, 3, 4, 5, 6]'),
+    (5, 4, 0.72, 980.20, '[{"cluster": 1, "size": 100}]', 'Ditemukan 4 kelompok utama pelanggan dengan pola keluhan yang sama pada pengiriman.', '[1800.0, 1400.0, 1150.0, 980.20, 900.0]', '[0.50, 0.60, 0.68, 0.72, 0.70]', '[2, 3, 4, 5, 6]'),
+    (7, 0, NULL, NULL, '[]', 'Sedang memproses pengelompokan berdasarkan tingkat frekuensi dan nilai transaksi...', NULL, NULL, NULL),
+    (9, 0, NULL, NULL, '[]', 'Dataset memiliki terlalu banyak nilai kosong sehingga gagal dikelompokkan.', NULL, NULL, NULL);
 
 INSERT INTO chat_messages (analysis_id, sender_type, message) VALUES
     (1, 'user', 'Bagaimana prediksi penjualan untuk akhir tahun?'),

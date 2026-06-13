@@ -24,6 +24,9 @@ export default function ForecastingDashboardPage() {
     rerun
   } = useForecasting();
 
+  const currentMetrics = data?.metrics?.[timeFilter] || data?.metrics?.['weekly'] || undefined;
+  const currentFeatures = data?.feature_importances?.[timeFilter] || data?.feature_importances?.['weekly'] || undefined;
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center text-neutral-500">Memuat data forecasting...</div>;
   }
@@ -64,20 +67,20 @@ export default function ForecastingDashboardPage() {
         </Tabs>
       </div>
 
-      <div className="relative flex-1 min-h-0 w-full mt-2">
+      <div className="relative flex-1 h-auto w-full mt-2">
         {/* Tab: Hasil */}
         <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 overflow-y-auto pb-6 ${activeTab === 'hasil' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
           
           {/* Row 1: Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px] min-h-[220px] shrink-0">
             <div className="lg:col-span-3 h-full min-h-0">
-              <ConfidenceCard metrics={data?.metrics} />
+              <ConfidenceCard metrics={currentMetrics} />
             </div>
             <div className="lg:col-span-4 h-full min-h-0">
-              <FeatureInfluenceChart features={data?.feature_importances} />
+              <FeatureInfluenceChart features={currentFeatures} />
             </div>
             <div className="lg:col-span-5 h-full min-h-0">
-              <FeatureDetailTable features={data?.feature_importances} />
+              <FeatureDetailTable features={currentFeatures} />
             </div>
           </div>
 
@@ -102,7 +105,7 @@ export default function ForecastingDashboardPage() {
           {/* Row 1: Metrics & Config */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[220px] min-h-[200px] shrink-0">
             <div className="h-full min-h-0">
-              <MetricsCard metrics={data?.metrics} />
+              <MetricsCard metrics={currentMetrics} />
             </div>
             <div className="h-full min-h-0">
               <AggressivenessControl 
