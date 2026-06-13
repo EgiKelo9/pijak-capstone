@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset, runAnalysisPipeline, runClustering } from '@/services/analysis';
-import { ForecastingRunPayload, runForecasting } from '@/services/forecasting';
+import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset, runAnalysisPipeline } from '@/services/analysis';
+import { ForecastingRunPayload, runForecasting, getForecastingResult } from '@/services/forecasting';
+import { runClustering, getClusteringResult } from '@/services/clustering';
 import { useRouter } from 'next/navigation';
 import type { AnalysisMode, AnalysisConfig, TerminalStep, ForecastAggressivenessType, ClusteringConfig } from '@/types';
 import { DataConfigState } from '@/types';
@@ -284,59 +285,214 @@ export function useAnalysis() {
     }
   }, [activeDatasetId, dataConfig, rawFeatureMapping]);
 
+  const fetchAndParseCleanedDataset = async (id: number): Promise<any[]> => {
+    const token = localStorage.getItem('access_token');
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const res = await fetch(`${baseUrl}/api/v1/datasets/${id}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (!res.ok) throw new Error('Gagal mengunduh dataset bersih dari server.');
+    const text = await res.text();
+
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const lines = text.split('\n').filter(Boolean);
+    if (lines.length === 0) return [];
+    const headers = parseCSVLine(lines[0]);
+    return lines.slice(1).map(line => {
+      const vals = parseCSVLine(line);
+      return headers.reduce((acc, h, i) => {
+        const raw = vals[i] ?? '';
+        acc[h] = isNaN(Number(raw)) || raw === '' ? raw.replace(/^"+|"+$/g, '') : Number(raw);
+        return acc;
+      }, {} as Record<string, any>);
+    });
+  };
+
+  const trackForecastingProgress = useCallback((analysisId: number) => {
+    const startId = `forecast-progress-${Date.now()}`;
+    setTerminalLogs((prev) => [
+      ...prev,
+      { stepId: `${startId}-1`, text: 'Forecasting: Menginisialisasi training model XGBoost...', status: 'loading' as const }
+    ]);
+
+    let step = 1;
+    const interval = setInterval(() => {
+      step++;
+      if (step === 2) {
+        setTerminalLogs((prev) => [
+          ...prev.map(l => l.stepId === `${startId}-1` ? { ...l, text: 'Forecasting: Training model XGBoost diinisialisasi.', status: 'success' as const } : l),
+          { stepId: `${startId}-2`, text: 'Forecasting: Menjalankan kombinasi pipeline (Daily & Weekly)...', status: 'loading' as const }
+        ]);
+      } else if (step === 3) {
+        setTerminalLogs((prev) => [
+          ...prev.map(l => l.stepId === `${startId}-2` ? { ...l, text: 'Forecasting: Pipeline harian (daily) dan mingguan (weekly) selesai dilatih.', status: 'success' as const } : l),
+          { stepId: `${startId}-3`, text: 'Forecasting: Menganalisis hasil dan meminta ringkasan insight dari LLM...', status: 'loading' as const }
+        ]);
+      }
+    }, 4000);
+
+    const checkStatus = async () => {
+      try {
+        const data = await getForecastingResult(analysisId) as any;
+        const status = data?.status;
+
+        if (status === 'berhasil') {
+          clearInterval(interval);
+          setTerminalLogs((prev) => {
+            const list = prev.map(l => {
+              if (l.stepId?.startsWith(startId) && l.status === 'loading') {
+                return { ...l, text: l.text.replace('...', '') + ' selesai.', status: 'success' as const };
+              }
+              return l;
+            });
+            list.push({
+              stepId: `${startId}-success`,
+              text: 'Forecasting: Seluruh kombinasi model berhasil dilatih dan insight LLM selesai digenerasi!',
+              status: 'success' as const
+            });
+            return list;
+          });
+          return true;
+        } else if (status === 'gagal') {
+          clearInterval(interval);
+          setTerminalLogs((prev) => {
+            const list = prev.map(l => {
+              if (l.stepId?.startsWith(startId) && l.status === 'loading') {
+                return { ...l, text: l.text.replace('...', '') + ' gagal.', status: 'error' as const };
+              }
+              return l;
+            });
+            list.push({
+              stepId: `${startId}-fail`,
+              text: 'Forecasting: Proses training gagal di backend / ML service.',
+              status: 'error' as const
+            });
+            return list;
+          });
+          return true;
+        }
+      } catch (err) {
+        console.error("Error polling forecasting status:", err);
+      }
+      return false;
+    };
+
+    const pollInterval = setInterval(async () => {
+      const finished = await checkStatus();
+      if (finished) {
+        clearInterval(pollInterval);
+      }
+    }, 5000);
+  }, [setTerminalLogs]);
+
+  const trackClusteringProgress = useCallback((analysisId: number) => {
+    const startId = `cluster-progress-${Date.now()}`;
+    setTerminalLogs((prev) => [
+      ...prev,
+      { stepId: `${startId}-1`, text: 'Clustering: Mempersiapkan data untuk model pengelompokan KMeans...', status: 'loading' as const }
+    ]);
+
+    let step = 1;
+    const interval = setInterval(() => {
+      step++;
+      if (step === 2) {
+        setTerminalLogs((prev) => [
+          ...prev.map(l => l.stepId === `${startId}-1` ? { ...l, text: 'Clustering: Data berhasil dipersiapkan.', status: 'success' as const } : l),
+          { stepId: `${startId}-2`, text: 'Clustering: Mencari K optimal (Elbow & Silhouette) dan melakukan clustering...', status: 'loading' as const }
+        ]);
+      } else if (step === 3) {
+        setTerminalLogs((prev) => [
+          ...prev.map(l => l.stepId === `${startId}-2` ? { ...l, text: 'Clustering: Pengelompokan KMeans berhasil diselesaikan.', status: 'success' as const } : l),
+          { stepId: `${startId}-3`, text: 'Clustering: Menganalisis karakteristik cluster dan meminta ringkasan insight dari LLM...', status: 'loading' as const }
+        ]);
+      }
+    }, 4000);
+
+    const checkStatus = async () => {
+      try {
+        const data = await getClusteringResult(analysisId) as any;
+        const status = data?.status;
+
+        if (status === 'berhasil') {
+          clearInterval(interval);
+          setTerminalLogs((prev) => {
+            const list = prev.map(l => {
+              if (l.stepId?.startsWith(startId) && l.status === 'loading') {
+                return { ...l, text: l.text.replace('...', '') + ' selesai.', status: 'success' as const };
+              }
+              return l;
+            });
+            list.push({
+              stepId: `${startId}-success`,
+              text: 'Clustering: Proses pengelompokan produk selesai dan insight LLM berhasil dibuat!',
+              status: 'success' as const
+            });
+            return list;
+          });
+          return true;
+        } else if (status === 'gagal') {
+          clearInterval(interval);
+          setTerminalLogs((prev) => {
+            const list = prev.map(l => {
+              if (l.stepId?.startsWith(startId) && l.status === 'loading') {
+                return { ...l, text: l.text.replace('...', '') + ' gagal.', status: 'error' as const };
+              }
+              return l;
+            });
+            list.push({
+              stepId: `${startId}-fail`,
+              text: 'Clustering: Proses clustering gagal di backend / ML service.',
+              status: 'error' as const
+            });
+            return list;
+          });
+          return true;
+        }
+      } catch (err) {
+        console.error("Error polling clustering status:", err);
+      }
+      return false;
+    };
+
+    const pollInterval = setInterval(async () => {
+      const finished = await checkStatus();
+      if (finished) {
+        clearInterval(pollInterval);
+      }
+    }, 5000);
+  }, [setTerminalLogs]);
+
   const handleRunAnalysis = useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
       console.warn('[Dashboard] Run Analysis aborted: No valid date range selected');
       return;
     }
 
-    const fetchAndParseCleanedDataset = async (id: number): Promise<any[]> => {
-      const token = localStorage.getItem('access_token');
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-      const res = await fetch(`${baseUrl}/api/v1/datasets/${id}`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-      if (!res.ok) throw new Error('Gagal mengunduh dataset bersih dari server.');
-      const text = await res.text();
-
-      const parseCSVLine = (line: string): string[] => {
-        const result: string[] = [];
-        let current = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"') {
-            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-            else inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            result.push(current.trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        result.push(current.trim());
-        return result;
-      };
-
-      const lines = text.split('\n').filter(Boolean);
-      if (lines.length === 0) return [];
-      const headers = parseCSVLine(lines[0]);
-      return lines.slice(1).map(line => {
-        const vals = parseCSVLine(line);
-        return headers.reduce((acc, h, i) => {
-          const raw = vals[i] ?? '';
-          acc[h] = isNaN(Number(raw)) || raw === '' ? raw.replace(/^"+|"+$/g, '') : Number(raw);
-          return acc;
-        }, {} as Record<string, any>);
-      });
-    };
-
     const cleanedForecastIdStr = sessionStorage.getItem('pijak_cleaned_forecasting_id');
     const cleanedClusterIdStr = sessionStorage.getItem('pijak_cleaned_clustering_id');
 
     const hasCleanedForecast = !!cleanedForecastIdStr;
     const hasCleanedCluster = !!cleanedClusterIdStr;
+
 
     const shouldDirectRun =
       (mode === 'forecasting' && hasCleanedForecast) ||
@@ -346,6 +502,9 @@ export function useAnalysis() {
     if (shouldDirectRun) {
       const runDirect = async () => {
         const runId = `direct-${Date.now()}`;
+        const colsToDrop = Array.isArray(rawFeatureMapping?.cols_to_drop)
+          ? rawFeatureMapping.cols_to_drop
+          : [];
         setTerminalLogs((prev) => [
           ...prev,
           { stepId: runId, text: 'Menyinkronkan data: memuat berkas hasil preprocessing dari cache...', status: 'loading' as const }
@@ -357,6 +516,7 @@ export function useAnalysis() {
             const colDate = dataConfig.dateColumn || 'date';
             const colTarget = dataConfig.targetColumn || 'qty';
             const colRegressors = dataConfig.includedColumns || [];
+            const colProduct = extractColProduct(rawFeatureMapping?.col_product);
 
             setTerminalLogs((prev) => [
               ...prev.map(l => l.stepId === runId ? { ...l, text: 'Data hasil preprocessing berhasil dimuat.', status: 'success' as const } : l),
@@ -367,10 +527,10 @@ export function useAnalysis() {
               dataset_id: cleanedForecastId,
               col_date: colDate,
               col_target: colTarget,
-              col_regressors: colRegressors.filter((c: string) => c !== colDate && c !== colTarget),
+              col_regressors: colRegressors.filter((c: string) => c && c !== colDate && c !== colTarget && c !== colProduct && !colsToDrop.includes(c)),
               forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
             };
-            await runForecasting(forecastPayload);
+            const runResp = await runForecasting(forecastPayload);
             // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
             sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
               dataset_id: forecastPayload.dataset_id,
@@ -380,38 +540,46 @@ export function useAnalysis() {
             }));
 
             setTerminalLogs((prev) => [
-              ...prev.map(l => l.status === 'loading' ? { ...l, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const } : l)
+              ...prev.map(l => l.status === 'loading' ? { ...l, text: 'Model forecasting berhasil dijalankan.', status: 'success' as const } : l)
             ]);
+
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackForecastingProgress(analysisId);
+            }
           }
 
           if ((mode === 'clustering' || mode === 'both') && cleanedClusterIdStr) {
             const cleanedClusterId = parseInt(cleanedClusterIdStr, 10);
             const colProduct = extractColProduct(rawFeatureMapping?.col_product);
             const colFitur = dataConfig.includedColumns || [];
+            const colDate = dataConfig.dateColumn || 'date';
+            const colTarget = dataConfig.targetColumn || 'qty';
 
             setTerminalLogs((prev) => [
               ...prev,
-              { stepId: `cluster-direct-fetch-${Date.now()}`, text: 'Memuat berkas clustering dari database...', status: 'loading' as const }
-            ]);
-
-            const parsedData = await fetchAndParseCleanedDataset(cleanedClusterId);
-
-            setTerminalLogs((prev) => [
-              ...prev.map(l => l.stepId?.includes('cluster-direct-fetch') ? { ...l, text: 'Berkas clustering berhasil dimuat.', status: 'success' as const } : l),
               { stepId: `cluster-direct-start-${Date.now()}`, text: 'Sistem memicu model clustering: memulai pengelompokan KMeans...', status: 'loading' as const }
             ]);
 
-            await runClustering({
+            const filteredFitur = colFitur.filter(
+              (c: string) => c && c !== colProduct && c !== colDate && c !== colTarget && !colsToDrop.includes(c)
+            );
+
+            const runResp = await runClustering({
               dataset_id: cleanedClusterId,
               col_product: colProduct,
-              col_fitur: colFitur.filter((c: string) => c !== colProduct),
-              data: parsedData,
+              col_fitur: filteredFitur,
               n_clusters: clusteringConfig.mode === 'auto' ? null : clusteringConfig.clusterCount
             });
 
             setTerminalLogs((prev) => [
               ...prev.map(l => l.status === 'loading' ? { ...l, text: 'Model clustering berhasil dijalankan.', status: 'success' as const } : l)
             ]);
+
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackClusteringProgress(analysisId);
+            }
           }
 
           // Final success message
@@ -483,7 +651,7 @@ export function useAnalysis() {
 
     run();
 
-  }, [analysisConfig, rawFeatureMapping, mode, dataConfig, clusteringConfig]);
+  }, [analysisConfig, rawFeatureMapping, mode, dataConfig, clusteringConfig, trackForecastingProgress, trackClusteringProgress]);
 
   useEffect(() => {
     const handleInternalRun = () => handleRunAnalysis();
@@ -698,9 +866,13 @@ export function useAnalysis() {
       if ((mode === 'forecasting' || mode === 'both') && cleanedForecastId) {
         const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
         const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
+        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
         const colRegressors: string[] = Array.isArray(parsed.feature_metadata?.col_to_num)
           ? parsed.feature_metadata.col_to_num
           : dataConfig.includedColumns;
+        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
+          ? parsed.feature_metadata.cols_to_drop
+          : [];
 
         if (!colDate || !colTarget) {
           setTerminalLogs((prev) => [
@@ -715,7 +887,7 @@ export function useAnalysis() {
         }
 
         const validRegressors = colRegressors.filter(
-          (c: string) => c && c !== colDate && c !== colTarget
+          (c: string) => c && c !== colDate && c !== colTarget && c !== colProduct && !colsToDrop.includes(c)
         );
 
         const forecastPayloadWs = {
@@ -726,7 +898,7 @@ export function useAnalysis() {
           forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
         };
         runForecasting(forecastPayloadWs)
-          .then(() => {
+          .then((runResp) => {
             // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
             sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
               dataset_id: forecastPayloadWs.dataset_id,
@@ -734,10 +906,10 @@ export function useAnalysis() {
               col_target: forecastPayloadWs.col_target,
               col_regressors: forecastPayloadWs.col_regressors,
             }));
-            setTerminalLogs((prev) => [
-              ...prev,
-              { stepId: `forecast-auto-done-${Date.now()}`, text: 'Model forecasting berhasil dijalankan dan sedang diproses di background.', status: 'success' as const }
-            ]);
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackForecastingProgress(analysisId);
+            }
           }).catch((err: any) => {
             console.error("Auto forecasting failed:", err);
             setTerminalLogs((prev) => [
@@ -750,30 +922,39 @@ export function useAnalysis() {
       if ((mode === 'clustering' || mode === 'both') && cleanedClusterId) {
         const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
         const colFitur = parsed.feature_metadata?.col_to_num || dataConfig.includedColumns || [];
+        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
+        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
+        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
+          ? parsed.feature_metadata.cols_to_drop
+          : [];
 
         setTerminalLogs((prev) => [
           ...prev,
           { stepId: `cluster-auto-start-${Date.now()}`, text: 'Sistem mendeteksi model clustering: memulai pengelompokan KMeans...', status: 'loading' as const }
         ]);
 
+        const filteredFitur = colFitur.filter(
+          (c: string) => c && c !== colProduct && c !== colDate && c !== colTarget && !colsToDrop.includes(c)
+        );
+
         runClustering({
           dataset_id: cleanedClusterId,
           col_product: colProduct,
-          col_fitur: colFitur.filter((c: string) => c !== colProduct),
-          data: [], // Backend loads from database
+          col_fitur: filteredFitur,
           n_clusters: clusteringConfig.mode === 'auto' ? null : clusteringConfig.clusterCount
-        }).then(() => {
-          setTerminalLogs((prev) => [
-            ...prev,
-            { stepId: `cluster-auto-done-${Date.now()}`, text: 'Model clustering berhasil dijalankan.', status: 'success' as const }
-          ]);
-        }).catch((err: any) => {
-          console.error("Auto clustering failed:", err);
-          setTerminalLogs((prev) => [
-            ...prev,
-            { stepId: `cluster-auto-fail-${Date.now()}`, text: `Gagal memicu clustering otomatis: ${err.message}`, status: 'error' as const }
-          ]);
-        });
+        })
+          .then((runResp) => {
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackClusteringProgress(analysisId);
+            }
+          })
+          .catch((err: any) => {
+            console.error("Auto clustering failed:", err);
+            setTerminalLogs((prev) => [
+              ...prev.map(l => l.status === 'loading' ? { ...l, text: `Gagal memicu clustering otomatis: ${err.message}`, status: 'error' as const } : l)
+            ]);
+          });
       }
     }
   };

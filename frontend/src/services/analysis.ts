@@ -99,34 +99,3 @@ export async function runAnalysisPipeline(jobId: string, datasetId: number, mode
     throw new Error(error.response?.data?.message || "Failed to start analysis pipeline");
   }
 }
-
-export async function runForecasting(payload: {
-  dataset_id: number;
-  col_date: string;
-  col_target: string;
-  col_regressors: string[];
-  horizon: number;
-  freq: string;
-}) {
-  try {
-    const response = await axiosInstance.post(`/forecasting/run`, payload);
-    return response.data.data; // { analysis_id, status }
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Failed to start forecasting");
-  }
-}
-
-export async function runClustering(payload: {
-  dataset_id: number;
-  col_product: string;
-  col_fitur: string[];
-  data: Record<string, any>[];
-  n_clusters?: number | null;
-}) {
-  try {
-    const response = await axiosInstance.post(`/clustering/run`, payload);
-    return response.data.data; // { analysis_id, status, result }
-  } catch (error: any) {
-    throw new Error(error.response?.data?.message || "Failed to start clustering");
-  }
-}
