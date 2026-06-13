@@ -9,7 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { ClusteringEmptyState } from './clustering-empty-state';
 import { useClustering } from '@/hooks/use-clustering';
-import { CLUSTER_COLORS } from '@/components/main/clustering/utils';
+import { CLUSTER_COLORS } from '@/lib/utils';
 import { KpiCard } from '@/components/main/clustering/kpi-card';
 import { ClusterSummaryCards } from '@/components/main/clustering/cluster-summary-cards';
 import { DistribusiChart } from '@/components/main/clustering/distribusi-chart';
