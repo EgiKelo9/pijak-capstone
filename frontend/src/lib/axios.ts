@@ -1,5 +1,5 @@
-import axios from "axios";
 import { AuthCookieValue } from "@/types";
+import axios from "axios";
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1",
@@ -71,8 +71,11 @@ axiosInstance.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token");
-        document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        window.location.reload();
+        document.cookie = "access_token=; path=/; max-age=0";
+        
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

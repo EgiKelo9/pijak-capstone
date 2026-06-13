@@ -2,11 +2,38 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v
 const ML_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || "http://localhost:8000/ml/v1";
 
 /**
+ * Helper to extract auth token from cookies (modern) or localStorage (legacy)
+ */
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; access_token=`);
+  if (parts.length === 2) {
+    const tokenCookie = parts.pop()?.split(";").shift();
+    if (tokenCookie) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(tokenCookie));
+        if (parsed.accessToken) return parsed.accessToken;
+      } catch {}
+      try {
+        const parsed = JSON.parse(tokenCookie);
+        if (parsed.accessToken) return parsed.accessToken;
+      } catch {}
+      return tokenCookie;
+    }
+  }
+
+  // Fallback to localStorage
+  return localStorage.getItem("access_token");
+}
+
+/**
  * Base fetch wrapper to automatically inject auth tokens
  * and handle global 401 Unauthorized errors.
  */
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = getAuthToken();
   
   const headers = new Headers(options.headers);
   if (token) {
@@ -21,7 +48,10 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   if (response.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
-      window.location.reload();
+      document.cookie = "access_token=; path=/; max-age=0";
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
     }
     throw new Error("Unauthorized");
   }
@@ -33,7 +63,7 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
  * Fetch wrapper explicitly for ML Services
  */
 async function fetchMLWithAuth(endpoint: string, options: RequestInit = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = getAuthToken();
   
   const headers = new Headers(options.headers);
   if (token) {
@@ -48,7 +78,10 @@ async function fetchMLWithAuth(endpoint: string, options: RequestInit = {}) {
   if (response.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("access_token");
-      window.location.reload();
+      document.cookie = "access_token=; path=/; max-age=0";
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
     }
     throw new Error("Unauthorized");
   }
@@ -171,7 +204,7 @@ export async function mockLogin(email: string, password: string) {
 }
 
 export const fetchUserDatasets = async () => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = getAuthToken();
   const response = await fetch("http://localhost:5000/api/v1/datasets/user/me", {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -188,7 +221,7 @@ export const fetchUserDatasets = async () => {
 };
 
 export const runAnalysisPipeline = async (jobId: string, datasetId: number, modelType: string) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = getAuthToken();
   const response = await fetch("http://localhost:8000/ml/v1/preprocess/run", {
     method: "POST",
     headers: {

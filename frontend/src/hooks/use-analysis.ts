@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { format } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset, runAnalysisPipeline } from '@/services/analysis';
-import { ForecastingRunPayload, runForecasting, getForecastingResult } from '@/services/forecasting';
-import { runClustering, getClusteringResult } from '@/services/clustering';
-import { useRouter } from 'next/navigation';
-import type { AnalysisMode, AnalysisConfig, TerminalStep, ForecastAggressivenessType, ClusteringConfig } from '@/types';
-import { DataConfigState } from '@/types';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
+import { getAuthToken } from '@/lib/middle-man';
+import { analyzeColumns, getDataset, getDatasetFeatureMetadata, runAnalysisPipeline, updateDatasetFeatureMetadata, uploadDataset } from '@/services/analysis';
+import { getClusteringResult, runClustering } from '@/services/clustering';
+import { getForecastingResult, runForecasting } from '@/services/forecasting';
+import type { AnalysisConfig, AnalysisMode, ClusteringConfig, ForecastAggressivenessType } from '@/types';
+import { DataConfigState } from '@/types';
+import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DateRange } from 'react-day-picker';
 
 /**
  * Safely extract a single string from col_product which may be string or string[].
@@ -286,7 +287,7 @@ export function useAnalysis() {
   }, [activeDatasetId, dataConfig, rawFeatureMapping]);
 
   const fetchAndParseCleanedDataset = async (id: number): Promise<any[]> => {
-    const token = localStorage.getItem('access_token');
+    const token = getAuthToken();
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
     const res = await fetch(`${baseUrl}/api/v1/datasets/${id}`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -481,6 +482,141 @@ export function useAnalysis() {
     }, 5000);
   }, [setTerminalLogs]);
 
+  const handleBackendMessage = useCallback((incomingPayload: string) => {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(incomingPayload);
+    } catch {
+      console.warn('[WS] Failed to parse message:', incomingPayload);
+      return;
+    }
+
+    // Normalize: support both TerminalStep format {stepId, text, status} and legacy {message}
+    const newLog: TerminalStep = parsed.stepId
+      ? parsed as TerminalStep
+      : {
+        stepId: `ws-${Date.now()}`,
+        text: parsed.message || JSON.stringify(parsed),
+        status: parsed.status || 'info',
+      };
+
+    setTerminalLogs((prevLogs) => {
+      const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
+      if (existingLogIndex !== -1) {
+        const updatedLogs = [...prevLogs];
+        updatedLogs[existingLogIndex] = newLog;
+        return updatedLogs;
+      }
+      return [...prevLogs, newLog];
+    });
+
+    // Handle completed preprocessing pipeline
+    if (parsed.status === 'success' && parsed.stepId?.endsWith('-done')) {
+      const cleanedForecastId = parsed.cleaned_forecast_id;
+      const cleanedClusterId = parsed.cleaned_cluster_id;
+
+      // Save to sessionStorage
+      if (cleanedForecastId) {
+        sessionStorage.setItem('pijak_cleaned_forecasting_id', cleanedForecastId.toString());
+      }
+      if (cleanedClusterId) {
+        sessionStorage.setItem('pijak_cleaned_clustering_id', cleanedClusterId.toString());
+      }
+
+      // Auto-trigger model pipeline based on current mode
+      if ((mode === 'forecasting' || mode === 'both') && cleanedForecastId) {
+        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
+        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
+        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
+        const colRegressors: string[] = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
+          ? parsed.feature_metadata.col_to_num
+          : dataConfig.includedColumns;
+        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
+          ? parsed.feature_metadata.cols_to_drop
+          : [];
+
+        if (!colDate || !colTarget) {
+          setTerminalLogs((prev) => [
+            ...prev,
+            {
+              stepId: `forecast-auto-skip-${Date.now()}`,
+              text: `Forecasting dilewati: kolom tanggal atau target tidak terdeteksi. Harap konfirmasi mapping kolom terlebih dahulu.`,
+              status: 'error' as const
+            }
+          ]);
+          return;
+        }
+
+        const validRegressors = colRegressors.filter(
+          (c: string) => c && c !== colDate && c !== colTarget && c !== colProduct && !colsToDrop.includes(c)
+        );
+
+        const forecastPayloadWs = {
+          dataset_id: cleanedForecastId,
+          col_date: colDate,
+          col_target: colTarget,
+          col_regressors: validRegressors,
+          forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
+        };
+        runForecasting(forecastPayloadWs)
+          .then((runResp) => {
+            // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
+            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
+              dataset_id: forecastPayloadWs.dataset_id,
+              col_date: forecastPayloadWs.col_date,
+              col_target: forecastPayloadWs.col_target,
+              col_regressors: forecastPayloadWs.col_regressors,
+            }));
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackForecastingProgress(analysisId);
+            }
+          }).catch((err: any) => {
+            console.error("Auto forecasting failed:", err);
+            setTerminalLogs((prev) => [
+              ...prev,
+              { stepId: `forecast-auto-fail-${Date.now()}`, text: `Gagal memicu forecasting otomatis: ${err.message}`, status: 'error' as const }
+            ]);
+          });
+      }
+
+      if ((mode === 'clustering' || mode === 'both') && cleanedClusterId) {
+        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
+        const colFitur = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
+          ? parsed.feature_metadata.col_to_num
+          : (dataConfig.includedColumns || []);
+        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
+        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
+        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
+          ? parsed.feature_metadata.cols_to_drop
+          : [];
+
+        const filteredFitur = colFitur.filter(
+          (c: string) => c && c !== colProduct && c !== colDate && c !== colTarget && !colsToDrop.includes(c)
+        );
+
+        runClustering({
+          dataset_id: cleanedClusterId,
+          col_product: colProduct,
+          col_fitur: filteredFitur,
+          n_clusters: clusteringConfig.mode === 'auto' ? null : clusteringConfig.clusterCount
+        })
+          .then((runResp) => {
+            const analysisId = (runResp as any)?.analysis_id;
+            if (analysisId) {
+              trackClusteringProgress(analysisId);
+            }
+          })
+          .catch((err: any) => {
+            console.error("Auto clustering failed:", err);
+            setTerminalLogs((prev) => [
+              ...prev.map(l => l.status === 'loading' ? { ...l, text: `Gagal memicu clustering otomatis: ${err.message}`, status: 'error' as const } : l)
+            ]);
+          });
+      }
+    }
+  }, [mode, dataConfig, clusteringConfig, forecastAggressiveness, setTerminalLogs, trackForecastingProgress, trackClusteringProgress]);
+
   const handleRunAnalysis = useCallback(() => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
       console.warn('[Dashboard] Run Analysis aborted: No valid date range selected');
@@ -651,7 +787,7 @@ export function useAnalysis() {
 
     run();
 
-  }, [analysisConfig, rawFeatureMapping, mode, dataConfig, clusteringConfig, trackForecastingProgress, trackClusteringProgress]);
+  }, [analysisConfig, rawFeatureMapping, mode, dataConfig, clusteringConfig, trackForecastingProgress, trackClusteringProgress, handleBackendMessage]);
 
   useEffect(() => {
     const handleInternalRun = () => handleRunAnalysis();
@@ -812,154 +948,15 @@ export function useAnalysis() {
       } finally {
         setIsLoadingDataset(false);
       }
-
-      // SEKARANG kita jalankan pipeline setelah data (dan kolom) selesai di-parse!
-      // Ini mencegah LLM Mapping gagal mengkonfigurasi UI karena availableColumns sebelumnya masih kosong
-      runPreprocessingPipeline(activeDatasetId, mode);
     };
 
     initDataAndPipeline();
-  }, [activeDatasetId]);
-
-  const handleBackendMessage = (incomingPayload: string) => {
-    let parsed: any;
-    try {
-      parsed = JSON.parse(incomingPayload);
-    } catch {
-      console.warn('[WS] Failed to parse message:', incomingPayload);
-      return;
-    }
-
-    // Normalize: support both TerminalStep format {stepId, text, status} and legacy {message}
-    const newLog: TerminalStep = parsed.stepId
-      ? parsed as TerminalStep
-      : {
-        stepId: `ws-${Date.now()}`,
-        text: parsed.message || JSON.stringify(parsed),
-        status: parsed.status || 'info',
-      };
-
-    setTerminalLogs((prevLogs) => {
-      const existingLogIndex = prevLogs.findIndex(log => log.stepId === newLog.stepId);
-      if (existingLogIndex !== -1) {
-        const updatedLogs = [...prevLogs];
-        updatedLogs[existingLogIndex] = newLog;
-        return updatedLogs;
-      }
-      return [...prevLogs, newLog];
-    });
-
-    // Handle completed preprocessing pipeline
-    if (parsed.status === 'success' && parsed.stepId?.endsWith('-done')) {
-      const cleanedForecastId = parsed.cleaned_forecast_id;
-      const cleanedClusterId = parsed.cleaned_cluster_id;
-
-      // Save to sessionStorage
-      if (cleanedForecastId) {
-        sessionStorage.setItem('pijak_cleaned_forecasting_id', cleanedForecastId.toString());
-      }
-      if (cleanedClusterId) {
-        sessionStorage.setItem('pijak_cleaned_clustering_id', cleanedClusterId.toString());
-      }
-
-      // Auto-trigger model pipeline based on current mode
-      if ((mode === 'forecasting' || mode === 'both') && cleanedForecastId) {
-        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
-        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
-        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
-        const colRegressors: string[] = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
-          ? parsed.feature_metadata.col_to_num
-          : dataConfig.includedColumns;
-        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
-          ? parsed.feature_metadata.cols_to_drop
-          : [];
-
-        if (!colDate || !colTarget) {
-          setTerminalLogs((prev) => [
-            ...prev,
-            {
-              stepId: `forecast-auto-skip-${Date.now()}`,
-              text: `Forecasting dilewati: kolom tanggal atau target tidak terdeteksi. Harap konfirmasi mapping kolom terlebih dahulu.`,
-              status: 'error' as const
-            }
-          ]);
-          return;
-        }
-
-        const validRegressors = colRegressors.filter(
-          (c: string) => c && c !== colDate && c !== colTarget && c !== colProduct && !colsToDrop.includes(c)
-        );
-
-        const forecastPayloadWs = {
-          dataset_id: cleanedForecastId,
-          col_date: colDate,
-          col_target: colTarget,
-          col_regressors: validRegressors,
-          forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
-        };
-        runForecasting(forecastPayloadWs)
-          .then((runResp) => {
-            // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
-            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
-              dataset_id: forecastPayloadWs.dataset_id,
-              col_date: forecastPayloadWs.col_date,
-              col_target: forecastPayloadWs.col_target,
-              col_regressors: forecastPayloadWs.col_regressors,
-            }));
-            const analysisId = (runResp as any)?.analysis_id;
-            if (analysisId) {
-              trackForecastingProgress(analysisId);
-            }
-          }).catch((err: any) => {
-            console.error("Auto forecasting failed:", err);
-            setTerminalLogs((prev) => [
-              ...prev,
-              { stepId: `forecast-auto-fail-${Date.now()}`, text: `Gagal memicu forecasting otomatis: ${err.message}`, status: 'error' as const }
-            ]);
-          });
-      }
-
-      if ((mode === 'clustering' || mode === 'both') && cleanedClusterId) {
-        const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
-        const colFitur = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
-          ? parsed.feature_metadata.col_to_num
-          : (dataConfig.includedColumns || []);
-        const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
-        const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
-        const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
-          ? parsed.feature_metadata.cols_to_drop
-          : [];
-
-        const filteredFitur = colFitur.filter(
-          (c: string) => c && c !== colProduct && c !== colDate && c !== colTarget && !colsToDrop.includes(c)
-        );
-
-        runClustering({
-          dataset_id: cleanedClusterId,
-          col_product: colProduct,
-          col_fitur: filteredFitur,
-          n_clusters: clusteringConfig.mode === 'auto' ? null : clusteringConfig.clusterCount
-        })
-          .then((runResp) => {
-            const analysisId = (runResp as any)?.analysis_id;
-            if (analysisId) {
-              trackClusteringProgress(analysisId);
-            }
-          })
-          .catch((err: any) => {
-            console.error("Auto clustering failed:", err);
-            setTerminalLogs((prev) => [
-              ...prev.map(l => l.status === 'loading' ? { ...l, text: `Gagal memicu clustering otomatis: ${err.message}`, status: 'error' as const } : l)
-            ]);
-          });
-      }
-    }
-  };
+  }, [activeDatasetId, setTerminalLogs, setDate, setDataConfig]);
 
   return {
     date, setDate,
     isOpen, setIsOpen,
-    mode, setMode, modeLabel,
+    mode, setMode,
     isFileUploadOpen, setIsFileUploadOpen,
     activeDatasetId, setActiveDatasetId,
     datasetData, setDatasetData,
@@ -970,17 +967,20 @@ export function useAnalysis() {
     dataConfigStatus, setDataConfigStatus,
     rawFeatureMapping, setRawFeatureMapping,
     terminalLogs, setTerminalLogs,
-    isReady, setIsAnalysisReady,
     analysisConfig,
-    runPreprocessingPipeline,
-    hasInteractedForecasting, setHasInteractedForecasting,
-    hasInteractedClustering, setHasInteractedClustering,
-    isPreferencesReady,
     handleOpenUploadModal,
+    runPreprocessingPipeline,
     handleUploadConfirm,
     handleReloadMapping,
     handleConfirmMapping,
+    fetchAndParseCleanedDataset,
     handleRunAnalysis,
+    modeLabel,
+    isReady,
+    hasInteractedForecasting, setHasInteractedForecasting,
+    hasInteractedClustering, setHasInteractedClustering,
+    isPreferencesReady,
+    setIsAnalysisReady,
     handleBackendMessage
   };
 }
