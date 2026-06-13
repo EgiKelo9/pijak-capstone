@@ -1,7 +1,4 @@
-'use client'
-
 import { clsx, type ClassValue } from "clsx"
-import { CSSProperties, useState } from "react";
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
@@ -44,18 +41,6 @@ export function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}jt`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}rb`;
   return n.toFixed(1);
-}
-
-export function useHoverStyle(baseStyle?: CSSProperties) {
-  const [hovered, setHovered] = useState(false);
-  const style: CSSProperties = {
-    ...baseStyle,
-    transform: hovered ? 'translateY(-3px) scale(1.01)' : 'translateY(0) scale(1)',
-    boxShadow: hovered ? '0 12px 32px rgba(43,186,238,0.13)' : '0 1px 4px rgba(0,0,0,0.06)',
-    transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
-    cursor: 'pointer',
-  };
-  return { hovered, setHovered, style };
 }
 
 function isSecureCookie(): boolean {
