@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/animate-ui/components/animate/tabs";
 import { useForecasting } from '@/hooks/use-forecasting';
 import { ConfidenceCard } from '@/components/main/forecasting/confidence-card';
@@ -11,6 +11,10 @@ import { HistoricalHeatmap } from '@/components/main/forecasting/historical-heat
 import { MetricsCard } from '@/components/main/forecasting/metrics-card';
 import { AggressivenessControl } from '@/components/main/forecasting/aggressiveness-control';
 import { ChartSpline, CheckCircle2 } from 'lucide-react';
+import { AnalysisCard } from '@/components/main-card';
+import { cn } from '@/lib/utils';
+import { AnalysisEmptyState } from '@/components/analysis-empty-state';
+import { AnalysisLoadingState } from '@/components/analysis-loading-state';
 
 export default function ForecastingDashboardPage() {
   const [activeTab, setActiveTab] = useState<'hasil' | 'pengujian'>('hasil');
@@ -27,15 +31,96 @@ export default function ForecastingDashboardPage() {
   const currentMetrics = data?.metrics?.[timeFilter] || data?.metrics?.['weekly'] || undefined;
   const currentFeatures = data?.feature_importances?.[timeFilter] || data?.feature_importances?.['weekly'] || undefined;
 
+  const parsedForecastingInsight = useMemo(() => {
+    if (!data || !data.insight_summary) return { trend: '', performa: '', rekomendasi: [] };
+    const text = data.insight_summary;
+    
+    let trend = '';
+    let performa = '';
+    const rekomendasi: string[] = [];
+    
+    // Split by section titles
+    const sections = text.split(/(?=TREN KESELURUHAN:|ANALISIS PERFORMA:|REKOMENDASI AKSI:)/gi);
+    
+    sections.forEach(section => {
+      const cleanSec = section.trim();
+      if (cleanSec.toUpperCase().startsWith("TREN KESELURUHAN:")) {
+        trend = cleanSec.replace(/TREN KESELURUHAN:/i, "").trim();
+      } else if (cleanSec.toUpperCase().startsWith("ANALISIS PERFORMA:")) {
+        performa = cleanSec.replace(/ANALISIS PERFORMA:/i, "").trim();
+      } else if (cleanSec.toUpperCase().startsWith("REKOMENDASI AKSI:")) {
+        const lines = cleanSec.replace(/REKOMENDASI AKSI:/i, "").trim().split('\n');
+        lines.forEach(line => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) {
+            rekomendasi.push(trimmed);
+          } else if (trimmed) {
+            rekomendasi.push(trimmed);
+          }
+        });
+      }
+    });
+    
+    // Fallback if structured parsing fails
+    if (!trend && !performa && rekomendasi.length === 0) {
+      trend = text;
+    }
+    
+    return { trend, performa, rekomendasi };
+  }, [data]);
+
   if (isLoading) {
-    return <div className="flex h-full w-full items-center justify-center text-neutral-500">Memuat data forecasting...</div>;
+    return (
+      <div className="flex flex-col h-full w-full p-4 pt-12">
+        <AnalysisLoadingState
+          title="Memuat data forecasting..."
+          subtitle="Proses ini mungkin memerlukan waktu beberapa saat"
+        />
+      </div>
+    );
   }
 
+  // Render Empty State if no data has been generated yet, or if the history is empty
+  const isNoHistory = !data || (error && error.includes("Belum ada riwayat"));
+  
+  if (isNoHistory) {
+    return (
+      <div className="flex flex-col h-full w-full p-4 pt-12">
+        <AnalysisEmptyState
+          title="dianalisis (Forecasting)"
+          description="Silakan jalankan analisis forecasting di halaman Dasbor terlebih dahulu sebelum melihat hasil forecasting."
+          steps={[
+            'Buka halaman Dasbor dan unggah file CSV data penjualan.',
+            'Pilih modul Forecasting pada analisis cepat di Dasbor.',
+            'Tentukan tanggal target, kolom target, dan regressor, lalu jalankan analisis.',
+            'Setelah forecasting selesai diproses, hasil proyeksi akan tampil di sini.'
+          ]}
+          icon={ChartSpline}
+          redirectTo="/dasbor"
+        />
+      </div>
+    );
+  }
+
+  // Render error card for real system failures
   if (error) {
     return (
-      <div className="flex h-full w-full items-center justify-center flex-col gap-2">
-        <div className="text-rose-500 font-medium">Gagal memuat data</div>
-        <div className="text-neutral-500 text-sm">{error}</div>
+      <div className="flex flex-col h-full w-full p-4 pt-12">
+        <div className="flex flex-col items-center justify-center gap-4 bg-white rounded-2xl border border-rose-200 w-full h-full py-16 px-6 shadow-sm">
+          <div className="flex size-16 items-center justify-center rounded-full bg-rose-50">
+            <span className="text-rose-500 text-2xl font-bold">!</span>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-rose-600">Gagal Memuat Data Forecasting</p>
+            <p className="text-xs text-neutral-400 mt-1">{error}</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 rounded-lg border border-neutral-200 px-4 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50 transition-all"
+          >
+            Muat Ulang Halaman
+          </button>
+        </div>
       </div>
     );
   }
@@ -69,7 +154,7 @@ export default function ForecastingDashboardPage() {
 
       <div className="relative flex-1 h-auto w-full mt-2">
         {/* Tab: Hasil */}
-        <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 overflow-y-auto pb-6 ${activeTab === 'hasil' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 h-auto overflow-y-auto pb-6 ${activeTab === 'hasil' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
           
           {/* Row 1: Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:h-[300px] min-h-[220px] shrink-0">
@@ -85,7 +170,7 @@ export default function ForecastingDashboardPage() {
           </div>
 
           {/* Row 2: Chart */}
-          <div className="w-full h-[350px] shrink-0">
+          <div className="w-full h-auto shrink-0">
             <ForecastingChart 
               data={data?.trend_data} 
               timeFilter={timeFilter} 
@@ -93,10 +178,84 @@ export default function ForecastingDashboardPage() {
             />
           </div>
 
-          {/* Row 3: Heatmap */}
-          {/* <div className="w-full h-[220px] shrink-0">
-            <HistoricalHeatmap data={data?.trend_data} />
-          </div> */}
+          {/* Row 3: Analisis & Insight */}
+          {data?.insight_summary && (
+            <div className="shrink-0">
+              <AnalysisCard title="Analisis & Insight Forecasting" status="berhasil">
+                <div className="flex flex-col gap-4">
+                  {/* Grid for Tren & Performa */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {parsedForecastingInsight.trend && (
+                      <div className="rounded-xl border border-neutral-100 bg-neutral-50/30 p-4 flex flex-col gap-1.5">
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Tren Keseluruhan</span>
+                        <p className="text-xs text-neutral-600 leading-relaxed">{parsedForecastingInsight.trend}</p>
+                      </div>
+                    )}
+                    {parsedForecastingInsight.performa && (
+                      <div className="rounded-xl border border-neutral-100 bg-neutral-50/30 p-4 flex flex-col gap-1.5">
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Analisis Performa</span>
+                        <p className="text-xs text-neutral-600 leading-relaxed">{parsedForecastingInsight.performa}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Rekomendasi Aksi */}
+                  {parsedForecastingInsight.rekomendasi.length > 0 && (
+                    <div className="border-t border-neutral-100 pt-4">
+                      <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest block mb-3">Rekomendasi Aksi</span>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {parsedForecastingInsight.rekomendasi.map((rec, idx) => {
+                          const cleanRec = rec.replace(/^[-*\d.\s]+/, ''); // remove bullet
+                          const parts = cleanRec.split(':');
+                          
+                          let title = '';
+                          let desc = '';
+                          if (parts.length > 1 && parts[0].length < 40) {
+                            title = parts[0]?.trim();
+                            desc = parts.slice(1).join(':')?.trim();
+                          } else {
+                            desc = cleanRec;
+                          }
+                          
+                          // Style based on keywords
+                          let borderColor = 'border-neutral-200';
+                          let titleColor = 'text-neutral-700';
+                          let bgHex = 'rgba(0,0,0,0.02)';
+                          
+                          const checkText = (title || desc).toUpperCase();
+                          if (checkText.includes('STOK') || checkText.includes('KETERSEDIAAN') || checkText.includes('RESTOCK') || checkText.includes('TINGKATKAN') || checkText.includes('PERSONEL')) {
+                            borderColor = 'border-emerald-200';
+                            titleColor = 'text-emerald-700';
+                            bgHex = 'rgba(16,185,129,0.04)';
+                            if (!title) title = "Optimalisasi Stok & Ketersediaan";
+                          } else if (checkText.includes('PROMOSI') || checkText.includes('DISKON') || checkText.includes('LOYALITAS') || checkText.includes('PROMO') || checkText.includes('PROGRAM')) {
+                            borderColor = 'border-blue-200';
+                            titleColor = 'text-blue-700';
+                            bgHex = 'rgba(59,130,246,0.04)';
+                            if (!title) title = "Promosi & Program Loyalitas";
+                          } else if (checkText.includes('EVALUASI') || checkText.includes('PERBAIKI') || checkText.includes('PROSES') || checkText.includes('SISTEM') || checkText.includes('BAHAN BAKU') || checkText.includes('PEMESANAN')) {
+                            borderColor = 'border-amber-200';
+                            titleColor = 'text-amber-700';
+                            bgHex = 'rgba(245,158,11,0.04)';
+                            if (!title) title = "Evaluasi & Perbaikan Proses";
+                          } else {
+                            if (!title) title = "Aksi Rekomendasi";
+                          }
+                          
+                          return (
+                            <div key={idx} className="rounded-xl border p-4 flex flex-col gap-1" style={{ borderColor, backgroundColor: bgHex }}>
+                              <span className={cn("text-xs font-bold uppercase tracking-wider", titleColor)}>{title}</span>
+                              {desc && <span className="text-xs text-neutral-600 leading-relaxed">{desc}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </AnalysisCard>
+            </div>
+          )}
         </div>
 
         {/* Tab: Pengujian */}
@@ -117,13 +276,9 @@ export default function ForecastingDashboardPage() {
             </div>
           </div>
 
-          {/* Row 2: Fixed Monthly Chart */}
-          <div className="w-full h-[400px] shrink-0">
-            <ForecastingChart 
-              data={data?.trend_data} 
-              timeFilter={timeFilter} 
-              setTimeFilter={setTimeFilter}
-            />
+          {/* Row 2: Supporting Chart (Historical Heatmap) */}
+          <div className="w-full h-auto shrink-0">
+            <HistoricalHeatmap data={data?.trend_data} />
           </div>
         </div>
       </div>

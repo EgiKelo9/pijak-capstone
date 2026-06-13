@@ -10,7 +10,7 @@ export function useClustering() {
   const [colFitur, setColFitur] = useState<string[]>([]);
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [result, setResult] = useState<ClusteringResultData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hasil' | 'pengujian'>('hasil');
   const [filterCluster, setFilterCluster] = useState('all');
@@ -188,11 +188,22 @@ export function useClustering() {
           }
           return typeof sample[k] === 'number';
         });
-        setColProduct('product');
+        
+        // Map the generic "product" key back to the original CSV column name
+        const sampleProductVal = sample.product;
+        const originalProductCol = columns.find(col => {
+          return rawData.some(row => row[col] === sampleProductVal);
+        });
+        if (originalProductCol) {
+          setColProduct(originalProductCol);
+        } else {
+          setColProduct('product');
+        }
+
         setColFitur(numericKeys);
       }
     }
-  }, [result, rawData]);
+  }, [result, rawData, columns]);
 
   return {
     datasetId,
