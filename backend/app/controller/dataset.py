@@ -395,7 +395,7 @@ async def fetch_analysis_history_by_user(current_user: User, db: Session):
                     INITCAP(m.type) AS metode,
                     ah.status,
                     COALESCE(fr.insight_summary, cr.insight_summary, 'Belum ada insight.') AS insight,
-                    fr.confidence_level,
+                    fr.confidence_percentage AS confidence_level,
                     cr.silhouette_score
                 FROM analysis_history ah
                 LEFT JOIN datasets_bin d ON ah.dataset_id = d.id

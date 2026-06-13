@@ -19,12 +19,11 @@ from app.schemas.forecasting_schema import (
 )
 
 # ====================================================================
-# Konfigurasi 3 kombinasi forecasting yang selalu dijalankan sekaligus
+# Konfigurasi kombinasi forecasting yang selalu dijalankan sekaligus
 # ====================================================================
 FORECASTING_COMBINATIONS = [
     {"name": "daily",   "freq": "D",  "horizon": 30},
     {"name": "weekly",  "freq": "W",  "horizon": 10},
-    {"name": "monthly", "freq": "ME", "horizon": 3},
 ]
 
 
@@ -173,16 +172,13 @@ async def run_forecasting(
             c for c in df.columns if c not in [col_date, col_target] and c not in prod_cols
         ]
 
-        # 2. Jalankan 3 kombinasi pipeline secara berurutan
-        logger.info("Step 2: Running 3 forecasting combinations (daily/weekly/monthly)")
+        # 2. Jalankan kombinasi pipeline secara berurutan
+        logger.info("Step 2: Running forecasting combinations (daily/weekly)")
 
         all_trend_data: dict[str, list[TrendDataPoint]] = {}
-        primary_metrics: dict = {}
+        all_metrics: dict[str, ForecastingMetrics] = {}
+        all_feature_importances: dict[str, list[FeatureDetail]] = {}
         forecast_summaries: dict = {}
-        # Simpan reference pipeline weekly untuk feature importance stats
-        weekly_pipeline_ref: XGBoostForecastingPipeline | None = None
-        weekly_df_grouped = None
-        weekly_valid_regressors: list = []
 
         for combo in FORECASTING_COMBINATIONS:
             name = combo["name"]
@@ -202,6 +198,59 @@ async def run_forecasting(
                 )
                 all_trend_data[name] = trend_data_list
 
+                # Calculate metrics for this combo
+                mae = round(metrics.get("mae", 0.0), 4)
+                mape = round(metrics.get("mape", 0.0), 4)
+                mse = round(metrics.get("mse", 0.0), 4)
+                rmse = round(metrics.get("rmse", 0.0), 4)
+                r2 = round(metrics.get("r2", 0.0), 4)
+                confidence_percentage = round(metrics.get("confidence_percentage", 0.0), 4)
+                confidence_value = round(metrics.get("confidence_value", 0.0), 4)
+                all_metrics[name] = ForecastingMetrics(
+                    confidence_percentage=confidence_percentage,
+                    confidence_value=confidence_value,
+                    mae=mae,
+                    mape=mape,
+                    mse=mse,
+                    rmse=rmse,
+                    r2=r2,
+                    forecasting_mode=request.forecasting_mode,
+                )
+                # Build feature importances
+                feature_importances_dict = metrics.get("feature_importances", {})
+                feature_details_list: list[FeatureDetail] = []
+                try:
+                    pipeline_for_stats = XGBoostForecastingPipeline.from_mode(
+                        mode=request.forecasting_mode, horizon=horizon
+                    )
+                    df_grouped_combo, _ = pipeline_for_stats.load_frame(
+                        data=df.copy(),
+                        date_column=col_date,
+                        target_column=col_target,
+                        regressor_columns=list(actual_regressors),
+                        freq=freq,
+                        agg="mean",
+                    )
+                    ohe_columns = set(pipeline_for_stats.one_hot_columns)
+                    for col, influence in feature_importances_dict.items():
+                        if col in df_grouped_combo.columns:
+                            series = df_grouped_combo[col]
+                            is_cat = col in ohe_columns
+                            feature_details_list.append(
+                                FeatureDetail(
+                                    name=col,
+                                    mode=float(series.mode().iloc[0]) if not series.mode().empty else 0.0,
+                                    mean=float(series.mean()),
+                                    max=float(series.max()),
+                                    min=float(series.min()),
+                                    influence=float(influence),
+                                    is_categorical=is_cat,
+                                )
+                            )
+                except Exception as fi_err:
+                    logger.warning(f"Feature importance stats failed for {name}: {fi_err}")
+                all_feature_importances[name] = feature_details_list
+
                 preds = [
                     p.predicted_value
                     for p in trend_data_list
@@ -209,9 +258,9 @@ async def run_forecasting(
                 ]
                 forecast_summaries[name] = {
                     "predictions": preds,
-                    "mae": round(metrics.get("mae", 0.0), 4),
-                    "rmse": round(metrics.get("rmse", 0.0), 4),
-                    "r2": round(metrics.get("r2", 0.0), 4),
+                    "mae": mae,
+                    "rmse": rmse,
+                    "r2": r2,
                     "avg_prediction": round(float(np.mean(preds)), 4) if preds else 0.0,
                     "trend": "naik" if preds and preds[-1] > preds[0] else "turun",
                     "freq": freq,
@@ -219,73 +268,22 @@ async def run_forecasting(
                     "forecasting_mode": request.forecasting_mode,
                 }
 
-                # Gunakan weekly sebagai metrik utama
-                if name == "weekly":
-                    primary_metrics = metrics
-
-                logger.info(f"  -> Combination {name} completed. MAE={metrics.get('mae', 0.0):.4f}")
+                logger.info(f"  -> Combination {name} completed. MAE={mae:.4f}")
 
             except Exception as combo_err:
                 logger.warning(f"  -> Combination {name} failed: {combo_err}. Skipping.")
                 all_trend_data[name] = []
-
-        # Fallback jika weekly gagal
-        if not primary_metrics:
-            for fallback_name in ["daily", "monthly"]:
-                if all_trend_data.get(fallback_name):
-                    logger.warning(f"Weekly pipeline failed. Using '{fallback_name}' metrics as primary.")
-                    primary_metrics = {
-                        "mae": 0.0, "mse": 0.0, "rmse": 0.0, "mape": 0.0,
-                        "r2": 0.0, "confidence_percentage": 0.0,
-                        "confidence_value": 0.0, "feature_importances": {}
-                    }
-                    break
-
-        mae = round(primary_metrics.get("mae", 0.0), 4)
-        mape = round(primary_metrics.get("mape", 0.0), 4)
-        mse = round(primary_metrics.get("mse", 0.0), 4)
-        rmse = round(primary_metrics.get("rmse", 0.0), 4)
-        r2 = round(primary_metrics.get("r2", 0.0), 4)
-        confidence_percentage = round(primary_metrics.get("confidence_percentage", 0.0), 4)
-        confidence_value = round(primary_metrics.get("confidence_value", 0.0), 4)
-
-        # Build feature importances dengan tag is_categorical
-        feature_importances_dict = primary_metrics.get("feature_importances", {})
-        feature_details_list: list[FeatureDetail] = []
-
-        try:
-            # Load df_grouped weekly untuk statistik fitur + one_hot_columns info
-            pipeline_for_stats = XGBoostForecastingPipeline.from_mode(
-                mode=request.forecasting_mode, horizon=10
-            )
-            df_grouped_weekly, _ = pipeline_for_stats.load_frame(
-                data=df.copy(),
-                date_column=col_date,
-                target_column=col_target,
-                regressor_columns=list(actual_regressors),
-                freq="W",
-                agg="mean",
-            )
-            # one_hot_columns = kolom yang berasal dari OHE
-            ohe_columns = set(pipeline_for_stats.one_hot_columns)
-
-            for col, influence in feature_importances_dict.items():
-                if col in df_grouped_weekly.columns:
-                    series = df_grouped_weekly[col]
-                    is_cat = col in ohe_columns
-                    feature_details_list.append(
-                        FeatureDetail(
-                            name=col,
-                            mode=float(series.mode().iloc[0]) if not series.mode().empty else 0.0,
-                            mean=float(series.mean()),
-                            max=float(series.max()),
-                            min=float(series.min()),
-                            influence=float(influence),
-                            is_categorical=is_cat,
-                        )
-                    )
-        except Exception as fi_err:
-            logger.warning(f"Feature importance stats failed: {fi_err}")
+                all_metrics[name] = ForecastingMetrics(
+                    confidence_percentage=0.0,
+                    confidence_value=0.0,
+                    mae=0.0,
+                    mape=0.0,
+                    mse=0.0,
+                    rmse=0.0,
+                    r2=0.0,
+                    forecasting_mode=request.forecasting_mode,
+                )
+                all_feature_importances[name] = []
 
         # 3. Kirim ke LLM untuk insight
         logger.info(f"Step 3: Getting insight from LLM for {len(forecast_summaries)} combinations")
@@ -298,18 +296,9 @@ async def run_forecasting(
             analysis_id=request.analysis_id,
             status="completed",
             result=ForecastingResult(
-                metrics=ForecastingMetrics(
-                    confidence_percentage=confidence_percentage,
-                    confidence_value=confidence_value,
-                    mae=mae,
-                    mape=mape,
-                    mse=mse,
-                    rmse=rmse,
-                    r2=r2,
-                    forecasting_mode=request.forecasting_mode,
-                ),
+                metrics=all_metrics,
                 trend_data=all_trend_data,
-                feature_importances=feature_details_list,
+                feature_importances=all_feature_importances,
                 insight_summary=insight,
             ),
         )

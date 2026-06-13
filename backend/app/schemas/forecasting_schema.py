@@ -59,9 +59,9 @@ class ForecastingMetrics(BaseModel):
 
 class ForecastingResultData(BaseModel):
     """Hasil keseluruhan forecasting dari ML service."""
-    metrics: ForecastingMetrics
-    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...], "monthly": [...]}
-    feature_importances: list[FeatureDetail]
+    metrics: dict[str, ForecastingMetrics]        # {"daily": ..., "weekly": ...}
+    trend_data: dict[str, list[TrendDataPoint]]   # {"daily": [...], "weekly": [...]}
+    feature_importances: dict[str, list[FeatureDetail]]
     insight_summary: str
 
 

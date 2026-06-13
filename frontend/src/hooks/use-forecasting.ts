@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getForecastingHistory, getForecastingResult, runForecasting } from '@/services/forecasting';
 import { ForecastingResultData, ForecastingHistoryItem } from '@/types';
 
-export type TimeFilter = 'daily' | 'weekly' | 'monthly';
+export type TimeFilter = 'daily' | 'weekly';
 export type AggType = 'mean' | 'sum';
 export type ConfidenceType = 'percentage' | 'value';
 export type ForecastAggressiveness = 'aggressive' | 'balance' | 'conservative';
@@ -29,7 +29,7 @@ export function useForecasting() {
   const [error, setError] = useState<string | null>(null);
   const [isRerunning, setIsRerunning] = useState<boolean>(false);
 
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('monthly');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('weekly');
   const [aggType, setAggType] = useState<AggType>('mean');
   const [confidenceType, setConfidenceType] = useState<ConfidenceType>('percentage');
   const [aggressiveness, setAggressiveness] = useState<ForecastAggressiveness>('balance');
