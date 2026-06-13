@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { CLUSTER_COLORS, useHoverStyle } from '@/lib/utils';
+import { CLUSTER_COLORS } from '@/lib/utils';
 import { ClusteringResultData } from '@/types';
+import { useHoverStyle } from '@/app/(main)/clustering/page';
 
 export function DistribusiChart({ result }: { result: ClusteringResultData }) {
   const { hovered, setHovered, style } = useHoverStyle();

@@ -16,7 +16,7 @@ export default async function LandingPageLayout({
   return (
     // <html lang="en" suppressHydrationWarning>
       // <body>
-        <div className="fixed top-0 left-0 w-full h-screen z-50 flex flex-col overflow-hidden">
+        <div className="w-full h-auto flex flex-col overflow-hidden">
           <AppSidebarLayout defaultOpen={defaultOpen}>
             {children}
           </AppSidebarLayout>

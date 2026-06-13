@@ -76,14 +76,14 @@ export function FilledStateView({
     <div className="grid grid-cols-1 lg:grid-cols-5 w-full gap-3 flex-1 min-h-0 min-w-0 overflow-hidden h-full">
 
       {/* ── Left: Data Table ─────────────────────────────────────────────── */}
-      <div className="lg:col-span-3 flex flex-col rounded-3xl border border-neutral-800/20 bg-white overflow-hidden min-w-0 min-h-0">
+      <div className="lg:col-span-3 flex flex-col rounded-3xl border border-neutral-800/20 bg-white overflow-hidden min-w-0 min-h-0 max-h-[85vh] overflow-y-auto">
         <div className="flex flex-col flex-1 min-h-0 min-w-0 w-full bg-neutral-50/50 p-2 sm:p-1.5">
           <DynamicDataTable data={filteredTableData} />
         </div>
       </div>
 
       {/* ── Right: Config & Status Cards ─────────────────────────────────── */}
-      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 mb-2 overflow-hidden">
+      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 max-h-[85vh] overflow-y-auto mb-2 overflow-hidden">
 
         {/* Terminal — non-collapsible, flex-1 to fill remaining height */}
         <AnalysisCard

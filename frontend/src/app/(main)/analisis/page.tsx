@@ -29,7 +29,7 @@ export default function AnalysisPage() {
   } = useAnalysis();
 
   return (
-    <div className="flex h-full flex-1 flex-col gap-3 min-h-0 min-w-0">
+    <div className="flex h-auto flex-1 flex-col gap-3 min-h-0 min-w-0 overflow-hidden">
       <DashboardHeader
         mode={mode}
         setMode={setMode}

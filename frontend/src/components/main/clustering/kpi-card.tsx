@@ -1,4 +1,4 @@
-import { useHoverStyle } from '@/lib/utils';
+import { useHoverStyle } from "@/app/(main)/clustering/page";
 
 export function KpiCard({ title, value, sub, opacity }: { title: string; value: string | number; sub: string; opacity: number }) {
   const { hovered, setHovered, style } = useHoverStyle();
