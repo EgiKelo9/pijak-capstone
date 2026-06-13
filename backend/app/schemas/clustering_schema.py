@@ -23,11 +23,20 @@ class ClusteringResultData(BaseModel):
     wcss_score: float
     cluster_data: list[dict[str, Any]]
     insight_summary: str
+    wcss_list: Optional[list[float]] = None
+    silhouette_list: Optional[list[float]] = None
+    k_range: Optional[list[int]] = None
 
 class ClusteringRunResponse(BaseModel):
     analysis_id: int
     status: str
     result: ClusteringResultData
+
+class ClusteringCallbackRequest(BaseModel):
+    analysis_id: int
+    status: str
+    error: Optional[str] = None
+    result: Optional[ClusteringResultData] = None
 
 # StandardResponse wrappers
 ClusteringSuccessResponse = StandardResponse[ClusteringRunResponse]

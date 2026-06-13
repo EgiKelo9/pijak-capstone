@@ -1,0 +1,80 @@
+import { useState, useMemo } from 'react';
+import { CLUSTER_COLORS, getSegmentLabel, formatNumber } from '@/lib/utils';
+import { ClusteringResultData } from '@/types';
+
+export function ClusterSummaryCards({ result, colFitur }: { result: ClusteringResultData; colFitur: string[] }) {
+  const mainFitur = colFitur[0] || '';
+  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+
+  const clusterStats = useMemo(() => {
+    const stats: Record<number, { count: number; total: number }> = {};
+    result.cluster_data.forEach(d => {
+      if (!stats[d.cluster]) stats[d.cluster] = { count: 0, total: 0 };
+      stats[d.cluster].count++;
+      stats[d.cluster].total += Number(d[mainFitur]) || 0;
+    });
+    return stats;
+  }, [result, mainFitur]);
+
+  const sorted = Object.entries(clusterStats).sort(([, a], [, b]) => b.total - a.total);
+  const totalProducts = result.cluster_data.length;
+  const totalSales = Object.values(clusterStats).reduce((s, v) => s + v.total, 0);
+  const cols = Math.min(result.cluster_amount, 5);
+
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+      {sorted.map(([clusterKey, stats], rankIdx) => {
+        const c = parseInt(clusterKey);
+        const segment = getSegmentLabel(rankIdx, sorted.length);
+        const pct = totalProducts > 0 ? Math.round((stats.count / totalProducts) * 100) : 0;
+        const salesPct = totalSales > 0 ? Math.round((stats.total / totalSales) * 100) : 0;
+        const isHovered = hoveredCard === c;
+
+        return (
+          <div key={c}
+            onMouseEnter={() => setHoveredCard(c)}
+            onMouseLeave={() => setHoveredCard(null)}
+            className="relative flex flex-col gap-3 rounded-2xl border bg-white p-5 overflow-hidden"
+            style={{
+              borderColor: isHovered ? CLUSTER_COLORS[c % CLUSTER_COLORS.length] + '60' : 'rgba(0,0,0,0.08)',
+              transform: isHovered ? 'translateY(-3px) scale(1.01)' : 'translateY(0) scale(1)',
+              boxShadow: isHovered ? `0 12px 32px ${CLUSTER_COLORS[c % CLUSTER_COLORS.length]}25` : '0 1px 4px rgba(0,0,0,0.05)',
+              transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+              cursor: 'pointer',
+            }}>
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl"
+              style={{ backgroundColor: CLUSTER_COLORS[c % CLUSTER_COLORS.length] }} />
+            <div className="absolute -top-8 -right-8 size-24 rounded-full pointer-events-none"
+              style={{ backgroundColor: CLUSTER_COLORS[c % CLUSTER_COLORS.length], opacity: isHovered ? 0.08 : 0.03, filter: 'blur(16px)', transition: 'opacity 0.3s' }} />
+
+            <div className="flex items-center justify-between flex-wrap gap-1 relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full shrink-0" style={{ backgroundColor: CLUSTER_COLORS[c % CLUSTER_COLORS.length] }} />
+                <span className="text-sm font-bold text-neutral-800">Klaster {c + 1}</span>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ backgroundColor: segment.bg, color: segment.color }}>{segment.label}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 relative z-10">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">Produk</span>
+                <span className="text-xl font-bold text-neutral-800 tabular-nums">{stats.count}</span>
+                <span className="text-[11px] text-neutral-400">{pct}% total</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider truncate">{mainFitur || 'Nilai'}</span>
+                <span className="text-xl font-bold text-neutral-800 tabular-nums">{formatNumber(stats.total)}</span>
+                <span className="text-[11px] text-neutral-400">{salesPct}% kontribusi</span>
+              </div>
+            </div>
+
+            <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden relative z-10">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: CLUSTER_COLORS[c % CLUSTER_COLORS.length], transition: 'width 0.8s ease' }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

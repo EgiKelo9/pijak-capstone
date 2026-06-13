@@ -42,6 +42,69 @@ def prepare_forecasting_data(df: pd.DataFrame) -> pd.DataFrame:
 
 # ------------------------------------- Baroe --------------------------------------------
 
+def should_preserve_column(col_name: str) -> bool:
+    name_lower = col_name.lower()
+    keywords = [
+        'city', 'town', 'municipality', 'district', 'kota',
+        'state', 'province', 'region', 'prefecture', 'territory', 'provinsi', 'negara',
+        'category', 'class', 'type', 'group', 'department', 'kategori',
+        'segment', 'market', 'audience', 'segmen'
+    ]
+    return any(k in name_lower for k in keywords)
+
+def ensure_clustering_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df_clean = df.copy()
+    existing_cols = df_clean.columns.tolist()
+
+    # Required columns and their matching / fallback priority patterns
+    # We want these lowercase names to exist in the final df_cluster
+    required_maps = {
+        'city': ['city', 'town', 'municipality', 'district', 'city/town', 'kota', 'state', 'region', 'province', 'country'],
+        'state': ['state', 'province', 'region', 'prefecture', 'territory', 'provinsi', 'negara bagian', 'city', 'country'],
+        'region': ['region', 'area', 'zone', 'wilayah', 'daerah', 'state', 'country', 'city'],
+        'segment': ['segment', 'market', 'audience', 'customer segment', 'segmen'],
+        'category': ['category', 'class', 'type', 'group', 'department', 'kategori'],
+        'sub_category': ['sub-category', 'sub_category', 'subclass', 'subtype', 'subgroup', 'sub category', 'sub-kategori', 'category']
+    }
+
+    for target_col, patterns in required_maps.items():
+        # Check if target_col already exists (case-insensitive)
+        found_col = None
+        for col in existing_cols:
+            if col.lower() == target_col:
+                found_col = col
+                break
+        
+        if found_col:
+            if found_col != target_col:
+                df_clean = df_clean.rename(columns={found_col: target_col})
+            continue
+
+        # If not found, look for matches in the patterns
+        mapped = False
+        for pattern in patterns:
+            for col in existing_cols:
+                # Direct match or substring match
+                if pattern in col.lower() or col.lower() in pattern:
+                    df_clean[target_col] = df_clean[col]
+                    mapped = True
+                    break
+            if mapped:
+                break
+        
+        # If still not found, fallback to any available non-numeric (categorical) column that isn't already used
+        if not mapped:
+            non_numeric_cols = df_clean.select_dtypes(exclude='number').columns.tolist()
+            # filter out already mapped targets
+            usable_cols = [c for c in non_numeric_cols if c not in required_maps.keys()]
+            if usable_cols:
+                df_clean[target_col] = df_clean[usable_cols[0]]
+            else:
+                # absolute fallback: fill with dummy string
+                df_clean[target_col] = "N/A"
+
+    return df_clean
+
 def drop_cols(df: pd.DataFrame, cols_to_drop: list[str] | str | None = None) -> pd.DataFrame:
     if not cols_to_drop:
         return df
@@ -81,14 +144,14 @@ def as_list(item):
     return [item] if isinstance(item, str) else item
 
 def adjust_data_types(df, col_to_cat, col_product, col_to_num):
-
-    cols_to_cat = as_list(col_to_cat) + as_list(col_product)
+    preserved_cats = [c for c in as_list(col_to_num) if should_preserve_column(c)]
+    cols_to_cat = as_list(col_to_cat) + as_list(col_product) + preserved_cats
     for col in cols_to_cat:
         if col in df.columns:
             df[col] = df[col].astype(str)
             df.loc[df[col] == 'nan', col] = pd.NA 
 
-    cols_to_num = as_list(col_to_num)
+    cols_to_num = [c for c in as_list(col_to_num) if not should_preserve_column(c)]
     for col in cols_to_num:
         if col in df.columns:
             if df[col].dtype == 'object':
@@ -225,8 +288,10 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     await manager.send(job_id, {"stepId": step1_id, "text": "Menyiapkan worker: memindai anomali dan membersihkan noise data...", "status": "loading"})
     await asyncio.sleep(np.random.uniform(4.2, 6.7))  # Simulate time-consuming task
     try:
+        raw_cols = extracted.get("cols_to_drop") or []
+        cols_to_drop = [col for col in (raw_cols if isinstance(raw_cols, list) else [raw_cols]) if not should_preserve_column(col)]
         df = (
-            df.pipe(drop_cols, extracted.get("cols_to_drop"))
+            df.pipe(drop_cols, cols_to_drop)
         )
         await manager.send(job_id, {"stepId": step1_id, "text": "Anomali dan noise data berhasil dibersihkan.", "status": "success"})
 
@@ -294,6 +359,7 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             cleaned_forecast_id = upload_forecast.get("data", {}).get("dataset_id")
 
             df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            df_cluster = ensure_clustering_columns(df_cluster)
             upload_cluster = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
             cleaned_cluster_id = upload_cluster.get("data", {}).get("dataset_id")
             print(f"Upload successful: forecast_id={cleaned_forecast_id}, cluster_id={cleaned_cluster_id}")
@@ -305,6 +371,7 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
             print(f"Upload successful: forecast_id={cleaned_forecast_id}")
         else:
             df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
+            df_cluster = ensure_clustering_columns(df_cluster)
             upload_result = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
             cleaned_cluster_id = upload_result.get("data", {}).get("dataset_id")
             print(f"Upload successful: cluster_id={cleaned_cluster_id}")

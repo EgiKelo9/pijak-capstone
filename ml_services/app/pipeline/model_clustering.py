@@ -61,8 +61,21 @@ class ClusteringPipeline:
         n_clusters_input = input_json.get("n_clusters")
 
         
+        # Validasi dan filter col_fitur agar hanya berisi kolom numerik.
+        # Kolom kategorikal (seperti city, state, dll.) tidak akan di-convert ke numeric/0,
+        # melainkan tetap dipertahankan nilai string aslinya dan akan di-aggregate dengan "first".
+        valid_numeric_fitur = []
         for col in col_fitur:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            if col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    valid_numeric_fitur.append(col)
+                    df[col] = df[col].fillna(0)
+                else:
+                    converted = pd.to_numeric(df[col], errors='coerce')
+                    if len(df) > 0 and converted.notna().mean() > 0.5:
+                        valid_numeric_fitur.append(col)
+                        df[col] = converted.fillna(0)
+        col_fitur = valid_numeric_fitur
 
         agg_dict = {}
         for col in col_fitur:
@@ -70,6 +83,10 @@ class ClusteringPipeline:
                 agg_dict[col] = "mean"
             else:
                 agg_dict[col] = "sum"
+
+        for col in df.columns:
+            if col != col_product and col not in col_fitur:
+                agg_dict[col] = "first"
 
         df_grouped = df.groupby(col_product).agg(agg_dict).reset_index()
 

@@ -141,12 +141,12 @@ export interface ForecastingMetrics {
   r2: number;
 }
 
-export type FreqKey = 'daily' | 'weekly' | 'monthly';
+export type FreqKey = 'daily' | 'weekly';
 
 export interface ForecastingResultData {
-  metrics: ForecastingMetrics;
+  metrics: Record<FreqKey, ForecastingMetrics>;
   trend_data: Record<FreqKey, TrendDataPoint[]>; // dict keyed by frequency
-  feature_importances: FeatureDetail[];
+  feature_importances: Record<FreqKey, FeatureDetail[]>;
   insight_summary: string;
 }
 
@@ -172,4 +172,30 @@ export interface ClusteringConfig {
 export interface ClusteringPreferenceProps {
   config: ClusteringConfig;
   onChange: (config: ClusteringConfig) => void;
+}
+
+export interface ClusteringResultData {
+  cluster_amount: number;
+  optimal_k: number;
+  silhouette_score: number;
+  silhouette_list: number[];
+  wcss_score: number;
+  wcss_list: number[];
+  k_range: number[];
+  cluster_data: Record<string, any>[];
+  insight_summary: string;
+}
+
+export interface ClusteringRunResponse {
+  analysis_id: number;
+  status: string;
+  result: ClusteringResultData;
+}
+
+export interface ClusteringHistoryItem {
+  analysis_id: number;
+  dataset_id: number | null;
+  status: string;
+  created_at: string;
+  result: ClusteringResultData | null;
 }
