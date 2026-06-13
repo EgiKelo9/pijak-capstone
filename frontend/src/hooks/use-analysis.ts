@@ -867,7 +867,7 @@ export function useAnalysis() {
         const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
         const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
         const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
-        const colRegressors: string[] = Array.isArray(parsed.feature_metadata?.col_to_num)
+        const colRegressors: string[] = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
           ? parsed.feature_metadata.col_to_num
           : dataConfig.includedColumns;
         const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
@@ -921,17 +921,14 @@ export function useAnalysis() {
 
       if ((mode === 'clustering' || mode === 'both') && cleanedClusterId) {
         const colProduct = extractColProduct(parsed.feature_metadata?.col_product);
-        const colFitur = parsed.feature_metadata?.col_to_num || dataConfig.includedColumns || [];
+        const colFitur = (Array.isArray(parsed.feature_metadata?.col_to_num) && parsed.feature_metadata.col_to_num.length > 0)
+          ? parsed.feature_metadata.col_to_num
+          : (dataConfig.includedColumns || []);
         const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
         const colTarget = parsed.feature_metadata?.col_target || dataConfig.targetColumn;
         const colsToDrop = Array.isArray(parsed.feature_metadata?.cols_to_drop)
           ? parsed.feature_metadata.cols_to_drop
           : [];
-
-        setTerminalLogs((prev) => [
-          ...prev,
-          { stepId: `cluster-auto-start-${Date.now()}`, text: 'Sistem mendeteksi model clustering: memulai pengelompokan KMeans...', status: 'loading' as const }
-        ]);
 
         const filteredFitur = colFitur.filter(
           (c: string) => c && c !== colProduct && c !== colDate && c !== colTarget && !colsToDrop.includes(c)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, UUID5
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.schemas.features import Feature
     
 class DatasetMetadataRequest(BaseModel):
@@ -25,6 +25,17 @@ class PreprocessResponse(BaseModel):
 class OpenRouterInsightRequest(BaseModel):
     target_task: str
     json_data: str
+
+# New chatbot request/response models
+class ChatbotRequest(BaseModel):
+    task_id: str
+    target: str  # "forecasting" or "clustering"
+    message: str
+    attachment: Optional[Any] = None
+
+class ChatbotResponse(BaseModel):
+    message: str
+    metadata: Optional[Dict] = None
 
 class OpenRouterInsightResponse(BaseModel):
     insight: str

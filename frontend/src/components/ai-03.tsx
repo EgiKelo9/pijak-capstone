@@ -19,17 +19,28 @@ import {
   Send,
   TableProperties,
   Zap,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
+import { AttachedType } from "@/types";
 
-export default function Ai03() {
+interface Ai03Props {
+  onSendMessage: (message: string, attachedType: AttachedType) => void;
+  isLoading?: boolean;
+}
+
+export default function Ai03({ onSendMessage, isLoading }: Ai03Props) {
   const [input, setInput] = useState("");
   const [selectedPerformance, setSelectedPerformance] = useState("High");
   const [openMenu, setOpenMenu] = useState<"attachment" | "performance" | null>(null);
+  const [attachedType, setAttachedType] = useState<AttachedType>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
+    if (input.trim() && !isLoading) {
+      onSendMessage(input, attachedType);
+      setInput("");
+      setAttachedType(null);
     }
   };
 
@@ -49,9 +60,30 @@ export default function Ai03() {
                 target.style.height = "auto";
                 target.style.height = target.scrollHeight + "px";
               }}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
             />
           </form>
         </div>
+
+        {attachedType && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 border border-neutral-200 text-neutral-600 rounded-full text-xs font-medium w-fit ml-3 mb-2">
+            <span>📎 {attachedType === 'forecasting' ? 'Grafik Forecasting' : attachedType === 'clustering' ? 'Grafik Clustering' : 'Data Tabel'}</span>
+            <button 
+              type="button" 
+              onClick={() => setAttachedType(null)} 
+              className="ml-1 text-neutral-400 hover:text-neutral-600 font-bold"
+              disabled={isLoading}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         <div className="mb-2 px-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -65,6 +97,7 @@ export default function Ai03() {
                   variant="ghost"
                   size="sm"
                   className="h-7 w-7 p-0 rounded-full border border-neutral-200 hover:bg-neutral-100"
+                  disabled={isLoading}
                 >
                   <Plus className="size-3 text-neutral-600" />
                 </Button>
@@ -72,26 +105,35 @@ export default function Ai03() {
 
               <DropdownMenuContent
                 align="start"
-                className="max-w-xs rounded-2xl p-1.5 bg-white border-neutral-200 shadow-lg"
+                className="max-w-xs rounded-2xl p-1.5 bg-white border-neutral-200 shadow-lg z-50"
               >
                 <DropdownMenuGroup className="space-y-1">
                   <DropdownMenuItem
                     className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                    onClick={() => {}}
+                    onClick={() => {
+                      setAttachedType('forecasting');
+                      setOpenMenu(null);
+                    }}
                   >
                     <LineChart size={16} className="opacity-60" />
                     Sisipkan Grafik Forecasting
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                    onClick={() => {}}
+                    onClick={() => {
+                      setAttachedType('clustering');
+                      setOpenMenu(null);
+                    }}
                   >
                     <Network size={16} className="opacity-60" />
                     Sisipkan Grafik Clustering
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                    onClick={() => {}}
+                    onClick={() => {
+                      setAttachedType('table');
+                      setOpenMenu(null);
+                    }}
                   >
                     <TableProperties size={16} className="opacity-60" />
                     Sisipkan Data Tabel
@@ -101,60 +143,74 @@ export default function Ai03() {
             </DropdownMenu>
 
             {/* Performance Dropdown */}
-        <DropdownMenu 
-          open={openMenu === "performance"} 
-          onOpenChange={(open) => setOpenMenu(open ? "performance" : null)}
-        >
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-                  className="h-7 px-2.5 rounded-full border border-neutral-200 hover:bg-neutral-100 text-neutral-600 text-xs gap-1.5"
+            <DropdownMenu 
+              open={openMenu === "performance"} 
+              onOpenChange={(open) => setOpenMenu(open ? "performance" : null)}
             >
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 rounded-full border border-neutral-200 hover:bg-neutral-100 text-neutral-600 text-xs gap-1.5"
+                  disabled={isLoading}
+                >
                   <Zap className="size-3" />
                   <span className="text-xs font-medium">{selectedPerformance}</span>
                   <ChevronDown className="size-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-                className="max-w-xs rounded-2xl p-1.5 bg-white border-neutral-200 shadow-lg"
-          >
-            <DropdownMenuGroup className="space-y-1">
-              <DropdownMenuItem
-                    className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                onClick={() => setSelectedPerformance("High")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="max-w-xs rounded-2xl p-1.5 bg-white border-neutral-200 shadow-lg z-50"
               >
+                <DropdownMenuGroup className="space-y-1">
+                  <DropdownMenuItem
+                    className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
+                    onClick={() => {
+                      setSelectedPerformance("High");
+                      setOpenMenu(null);
+                    }}
+                  >
                     <Zap size={16} className="opacity-60" />
-                High
-              </DropdownMenuItem>
-              <DropdownMenuItem
+                    High
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                onClick={() => setSelectedPerformance("Medium")}
-              >
+                    onClick={() => {
+                      setSelectedPerformance("Medium");
+                      setOpenMenu(null);
+                    }}
+                  >
                     <Gauge size={16} className="opacity-60" />
-                Medium
-              </DropdownMenuItem>
-              <DropdownMenuItem
+                    Medium
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     className="rounded-[calc(1rem-6px)] text-xs cursor-pointer hover:bg-neutral-100 flex items-center gap-2"
-                onClick={() => setSelectedPerformance("Low")}
-              >
+                    onClick={() => {
+                      setSelectedPerformance("Low");
+                      setOpenMenu(null);
+                    }}
+                  >
                     <CircleDashed size={16} className="opacity-60" />
-                Low
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                    Low
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div>
             <Button
               type="submit"
-              disabled={!input.trim()}
-              className="size-7 p-0 rounded-full bg-[#2BBAEE] hover:bg-[#1a9fd4] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors"
+              disabled={!input.trim() || isLoading}
+              className="size-7 p-0 rounded-full bg-[#2BBAEE] hover:bg-[#1a9fd4] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-colors flex items-center justify-center"
               onClick={handleSubmit}
             >
-              <Send className="size-3 text-white" />
+              {isLoading ? (
+                <Loader2 className="size-3 text-white animate-spin" />
+              ) : (
+                <Send className="size-3 text-white" />
+              )}
             </Button>
           </div>
         </div>

@@ -199,3 +199,6 @@ export interface ClusteringHistoryItem {
   created_at: string;
   result: ClusteringResultData | null;
 }
+
+export type AttachedType = 'forecasting' | 'clustering' | 'table' | null;
+export type TargetTask = 'forecasting' | 'clustering';

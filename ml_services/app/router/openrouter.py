@@ -1,8 +1,18 @@
 from typing import Any, Dict
 from fastapi import APIRouter, BackgroundTasks
 from app.schemas.base import StandardResponse
+from app.core.config import get_settings
+from app.core.utils import generate_from_openrouter
 from app.controller.openrouter import analyze_columns, get_insight_from_data
-from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse, OpenRouterInsightRequest, OpenRouterInsightResponse
+from app.controller.chatbot_controller import generate_chatbot_response
+from app.schemas.openrouter import (
+    DatasetMetadataRequest, 
+    OpenRouterMappingResponse, 
+    OpenRouterInsightRequest, 
+    OpenRouterInsightResponse,
+    ChatbotRequest,
+    ChatbotResponse
+)
 from app.core.utils import call_backend_api, get_dataset_feature_metadata
 
 router = APIRouter(prefix="/openrouter")
@@ -76,3 +86,18 @@ async def generate_insight(request: OpenRouterInsightRequest):
     """
     insight = await get_insight_from_data(request.target_task, request.json_data)
     return OpenRouterInsightResponse(insight=insight)
+
+
+@router.post(
+    "/chatbot",
+    response_model=ChatbotResponse,
+    responses={
+        400: {"model": StandardResponse[Dict[str, Any]], "description": "Bad Request - Invalid Input"},
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"}
+    }
+)
+async def chatbot_endpoint(request: ChatbotRequest):
+    """
+    Endpoint untuk chatbot openrouter.
+    """
+    return await generate_chatbot_response(request)
