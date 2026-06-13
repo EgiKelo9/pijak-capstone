@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from app.schemas.base import StandardResponse
 from app.database.main import Base, engine, create_db
 from app.middleware import cors, static
-from app.router import auth, health, dataset, clustering_router, forecasting_router
+from app.router import auth, health, dataset, clustering_router, forecasting_router, chatbot_router
 
 app = FastAPI(
     title="Beez - Pijak Capstone API",
@@ -26,6 +26,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(dataset.router, prefix="/api/v1", tags=["Dataset Management"])
 app.include_router(clustering_router.router, prefix="/api/v1", tags=["Clustering"])
 app.include_router(forecasting_router.router, prefix="/api/v1", tags=["Forecasting"])
+app.include_router(chatbot_router.router, prefix="/api/v1", tags=["Chatbot"])
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
