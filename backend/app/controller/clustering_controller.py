@@ -5,21 +5,22 @@ from app.shared.transaction_manager import TransactionManager
 from app.models.analysis_history import AnalysisHistory
 from app.models.clustering_result import ClusteringResult
 from app.models.ml_model import MLModel
-from app.models.dataset import Dataset
+from app.models.dataset import Dataset_Bin
 from app.schemas.clustering_schema import ClusteringRunRequest
 from app.schemas.base import StandardResponse
 from app.core.config import get_settings
 
 settings = get_settings()
 
+
 async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Session):
     """Controller untuk menjalankan clustering dan menyimpan hasilnya ke DB."""
     transaction_manager = TransactionManager(db)
 
     # 1. Cek dataset exists
-    dataset = db.query(Dataset).filter(
-        Dataset.id == request.dataset_id,
-        Dataset.deleted_at == None
+    dataset = db.query(Dataset_Bin).filter(
+        Dataset_Bin.id == request.dataset_id,
+        Dataset_Bin.deleted_at == None
     ).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset tidak ditemukan")
@@ -54,12 +55,14 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
                     "col_product": request.col_product,
                     "col_fitur": request.col_fitur,
                     "data": request.data,
-                    "n_clusters": request.n_clusters  # ← terusin pilihan user ke ML service
+                    "n_clusters": request.n_clusters  # terusin pilihan user ke ML service
                 },
                 timeout=120.0
             )
             response.raise_for_status()
             ml_result = response.json()["result"]
+            print("ML RESULT KEYS:", ml_result.keys())
+            print("OPTIMAL K:", ml_result.get("optimal_k"))
 
     except Exception as e:
         with transaction_manager.transaction() as session:
@@ -74,8 +77,12 @@ async def run_clustering(request: ClusteringRunRequest, user_id: int, db: Sessio
         clustering_result = ClusteringResult(
             analysis_id=analysis_id,
             cluster_amount=ml_result["cluster_amount"],
+            optimal_k=ml_result.get("optimal_k"),
             silhouette_score=ml_result["silhouette_score"],
+            silhouette_list=ml_result.get("silhouette_list"),
             wcss_score=ml_result["wcss_score"],
+            wcss_list=ml_result.get("wcss_list"),
+            k_range=ml_result.get("k_range"),
             cluster_data=ml_result["cluster_data"],
             insight_summary=ml_result["insight_summary"]
         )
@@ -128,8 +135,12 @@ async def get_clustering_result(analysis_id: int, user_id: int, db: Session):
             "status": analysis.status,
             "result": {
                 "cluster_amount": result.cluster_amount,
+                "optimal_k": result.optimal_k,
                 "silhouette_score": result.silhouette_score,
+                "silhouette_list": result.silhouette_list,
                 "wcss_score": result.wcss_score,
+                "wcss_list": result.wcss_list,
+                "k_range": result.k_range,
                 "cluster_data": result.cluster_data,
                 "insight_summary": result.insight_summary
             }
@@ -169,8 +180,12 @@ async def get_clustering_history(user_id: int, db: Session):
             "created_at": analysis.created_at.isoformat(),
             "result": {
                 "cluster_amount": result.cluster_amount if result else None,
+                "optimal_k": result.optimal_k if result else None,
                 "silhouette_score": result.silhouette_score if result else None,
+                "silhouette_list": result.silhouette_list if result else None,
                 "wcss_score": result.wcss_score if result else None,
+                "wcss_list": result.wcss_list if result else None,
+                "k_range": result.k_range if result else None,
                 "cluster_data": result.cluster_data if result else None,
                 "insight_summary": result.insight_summary if result else None
             } if result else None

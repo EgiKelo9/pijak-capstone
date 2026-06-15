@@ -2,9 +2,10 @@ import pandas as pd
 import joblib
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import silhouette_score
 from app.controller.gemma import get_insight_from_clustering
+
 
 class ClusteringPipeline:
     def __init__(self, n_clusters: int = 3, random_state: int = 42):
@@ -26,9 +27,7 @@ class ClusteringPipeline:
             sil = silhouette_score(X_scaled, kmeans.labels_)
             silhouette_list.append(round(sil, 4))
 
-        # Pakai silhouette tertinggi untuk tentukan K optimal 
         optimal_k = list(k_range)[np.argmax(silhouette_list)]
-
         return optimal_k, wcss_list, silhouette_list
 
     def train(self, X: pd.DataFrame):
@@ -54,16 +53,20 @@ class ClusteringPipeline:
     async def run(self, input_json: dict) -> dict:
         """Method utama yang dipanggil controller"""
 
-        # Convert JSON
+        # 1. Convert JSON -> DataFrame
         df = pd.DataFrame(input_json["data"])
         col_product = input_json["col_product"]
         col_fitur = input_json["col_fitur"]
         n_clusters_input = input_json.get("n_clusters")
 
-        
+        # 2. Label encoding untuk kolom kategorikal + konversi numerik
+        le = LabelEncoder()
         for col in col_fitur:
+            if df[col].dtype == 'object':
+                df[col] = le.fit_transform(df[col].astype(str))
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
+        # 3. Agregasi per produk
         agg_dict = {}
         for col in col_fitur:
             if col.lower() == "discount":
@@ -73,45 +76,46 @@ class ClusteringPipeline:
 
         df_grouped = df.groupby(col_product).agg(agg_dict).reset_index()
 
-   
+        # 4. Pisahkan fitur
         product_names = df_grouped[col_product].tolist()
         X = df_grouped[col_fitur]
 
-        # Scale data
+        # 5. Scale data
         X_scaled = self.scaler.fit_transform(X)
 
-
+        # 6. Hitung elbow + silhouette untuk semua K
         max_k = min(10, len(df_grouped) - 1)
         optimal_k_auto, wcss_list, silhouette_list = self.find_optimal_k(
             X_scaled, k_range=range(2, max_k + 1)
         )
 
-        # Tentukan K yang dipakai
+        # 7. Tentukan K yang dipakai
         if n_clusters_input:
             optimal_k = n_clusters_input
         else:
             optimal_k = optimal_k_auto
 
-        
+        # 8. Train model dengan K optimal
         self.n_clusters = optimal_k
         self.model = KMeans(n_clusters=optimal_k, random_state=self.random_state)
         self.train(X)
 
-      
+        # 9. Evaluate
         scores = self.evaluate(X)
 
-       
+        # 10. Assign cluster label
         X_scaled_final = self.scaler.transform(X)
         labels = self.model.predict(X_scaled_final).tolist()
         df_grouped["cluster"] = labels
 
+        # 11. Susun cluster_data
         cluster_data = (
             df_grouped
             .rename(columns={col_product: "product"})
             .to_dict(orient="records")
         )
 
-        # Buat ringkasan per cluster untuk LLM
+        # 12. Ringkasan per cluster untuk LLM
         cluster_summary = (
             df_grouped
             .groupby("cluster")[col_fitur]
@@ -120,10 +124,10 @@ class ClusteringPipeline:
             .to_dict()
         )
 
-        # Kirim ke LLM
+        # 13. Kirim ke LLM
         insight = await get_insight_from_clustering(cluster_summary)
 
-        # Return hasil final
+        # 14. Return hasil final
         return {
             "cluster_amount": optimal_k,
             "optimal_k": optimal_k_auto,

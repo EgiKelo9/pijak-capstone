@@ -421,6 +421,13 @@ function GradientLineChart({ data, dataKey, color, endColor, gradientId, label, 
   data: any[]; dataKey: string; color: string; endColor: string; gradientId: string;
   label: string; optimalK?: number; yLabel?: string;
 }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[220px] text-sm text-neutral-400">
+        Data tidak tersedia.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={220}>
       <AreaChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
@@ -615,6 +622,18 @@ function ProductTable({ data, colFitur }: { data: Record<string, any>[]; colFitu
 
 // Metrik Table
 function MetrikTable({ result }: { result: ClusteringResult }) {
+  const kRange = result.k_range ?? [];
+  const wcssList = result.wcss_list ?? [];
+  const silhouetteList = result.silhouette_list ?? [];
+
+  if (kRange.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-10 text-sm text-neutral-400 rounded-xl border border-neutral-100">
+        Data metrik per K tidak tersedia untuk hasil ini.
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-neutral-100">
       <table className="w-full text-xs">
@@ -627,15 +646,15 @@ function MetrikTable({ result }: { result: ClusteringResult }) {
           </tr>
         </thead>
         <tbody>
-          {result.k_range.map((k, i) => {
-            const isOptimal = k === result.optimal_k;
+          {kRange.map((k, i) => {
+            const isOptimal = result.optimal_k != null && k === result.optimal_k;
             const isUsed = k === result.cluster_amount;
             return (
               <tr key={k} className={cn('border-b border-neutral-50 transition-colors',
                 isOptimal ? 'bg-amber-50' : isUsed ? 'bg-[#2BBAEE]/5' : 'hover:bg-neutral-50/60')}>
                 <td className="px-4 py-2 text-center font-bold text-neutral-800">{k}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{result.wcss_list[i]?.toFixed(1)}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{result.silhouette_list[i]?.toFixed(4)}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{wcssList[i]?.toFixed(1) ?? '-'}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-neutral-600">{silhouetteList[i]?.toFixed(4) ?? '-'}</td>
                 <td className="px-4 py-2 text-center">
                   {isOptimal && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">Optimal</span>}
                   {isUsed && !isOptimal && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2BBAEE]/15 text-[#2BBAEE]">Dipakai</span>}
@@ -663,7 +682,9 @@ export default function ClusteringPage() {
   const [filterCluster, setFilterCluster] = React.useState('all');
   const [customK, setCustomK] = React.useState(3);
   const [isReanalyzing, setIsReanalyzing] = React.useState(false);
+  const [lastAnalysisId, setLastAnalysisId] = React.useState<number | null>(null);
 
+  // Load dataset (kolom + raw data) dari sessionStorage saat pertama kali dimuat
   React.useEffect(() => {
     const storedId = sessionStorage.getItem('pijak_active_dataset_id');
     if (storedId) {
@@ -673,50 +694,89 @@ export default function ClusteringPage() {
     }
   }, []);
 
-  const fetchDataset = async (id: number) => {
-  try {
-    const token = localStorage.getItem('access_token');
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/datasets/${id}`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    });
-    if (!res.ok) throw new Error('Gagal fetch dataset');
-    const text = await res.text();
+  // Load hasil clustering terakhir (jika ada) dari sessionStorage saat pertama kali dimuat
+  React.useEffect(() => {
+    const storedClusteringId = sessionStorage.getItem('pijak_last_clustering_id');
+    const storedColProduct = sessionStorage.getItem('pijak_clustering_col_product');
+    const storedColFitur = sessionStorage.getItem('pijak_clustering_col_fitur');
 
-    // Parser CSV robust — handle quoted fields dengan koma di dalamnya
-    const parseCSVLine = (line: string): string[] => {
-      const result: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-          else inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
+    if (storedColProduct) setColProduct(storedColProduct);
+    if (storedColFitur) {
+      try {
+        const parsed = JSON.parse(storedColFitur);
+        if (Array.isArray(parsed)) setColFitur(parsed);
+      } catch (e) {
+        console.error('Gagal parse colFitur dari sessionStorage:', e);
       }
-      result.push(current.trim());
-      return result;
-    };
+    }
 
-    const lines = text.split('\n').filter(Boolean);
-    const headers = parseCSVLine(lines[0]);
-    setColumns(headers);
-    const data = lines.slice(1).map(line => {
-      const vals = parseCSVLine(line);
-      return headers.reduce((acc, h, i) => {
-        const raw = vals[i] ?? '';
-        acc[h] = isNaN(Number(raw)) || raw === '' ? raw.replace(/^"+|"+$/g, '') : Number(raw);
-        return acc;
-      }, {} as Record<string, any>);
-    });
-    setRawData(data);
-  } catch (e) { console.error(e); }
-};
+    if (storedClusteringId) {
+      fetchLastClusteringResult(parseInt(storedClusteringId, 10));
+    }
+  }, []);
+
+  const fetchDataset = async (id: number) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/datasets/${id}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) throw new Error('Gagal fetch dataset');
+      const text = await res.text();
+
+      // Parser CSV robust — handle quoted fields dengan koma di dalamnya
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const lines = text.split('\n').filter(Boolean);
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, ''));
+      setColumns(headers);
+      const data = lines.slice(1).map(line => {
+        const vals = parseCSVLine(line);
+        return headers.reduce((acc, h, i) => {
+          const raw = (vals[i] ?? '').replace(/^"+|"+$/g, '');
+          acc[h] = isNaN(Number(raw)) || raw === '' ? raw : Number(raw);
+          return acc;
+        }, {} as Record<string, any>);
+      });
+      setRawData(data);
+    } catch (e) { console.error(e); }
+  };
+
+  // Ambil hasil clustering terakhir dari backend (untuk persist saat reload)
+  const fetchLastClusteringResult = async (analysisId: number) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/clustering/result/${analysisId}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const resultData = json.data.result;
+      setResult(resultData);
+      setLastAnalysisId(analysisId);
+      setCustomK(resultData.cluster_amount);
+    } catch (e) {
+      console.error('Gagal fetch hasil clustering terakhir:', e);
+    }
+  };
 
   const runClustering = async (nClusters?: number) => {
     if (!colProduct || colFitur.length === 0 || !datasetId) return;
@@ -724,11 +784,11 @@ export default function ClusteringPage() {
     setError(null);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await fetch('http://localhost:8000/ml/v1/model/clustering', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/clustering/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
-          analysis_id: `clustering-${datasetId}-${Date.now()}`,
+          dataset_id: datasetId,
           col_product: colProduct,
           col_fitur: colFitur,
           data: rawData,
@@ -737,8 +797,16 @@ export default function ClusteringPage() {
       });
       if (!res.ok) throw new Error('Clustering gagal');
       const json = await res.json();
-      setResult(json.result);
-      setCustomK(json.result.cluster_amount);
+      const resultData = json.data.result;
+      setResult(resultData);
+      setLastAnalysisId(json.data.analysis_id);
+
+      // Persist analysis_id + konfigurasi kolom agar bisa direstore saat reload
+      sessionStorage.setItem('pijak_last_clustering_id', String(json.data.analysis_id));
+      sessionStorage.setItem('pijak_clustering_col_product', colProduct);
+      sessionStorage.setItem('pijak_clustering_col_fitur', JSON.stringify(colFitur));
+
+      setCustomK(resultData.cluster_amount);
       setActiveTab('hasil');
     } catch (e: any) {
       setError(e.message);
@@ -770,8 +838,13 @@ export default function ClusteringPage() {
     return parts.length > 1 ? parts : uniqueClusters.map(() => text);
   }, [result, uniqueClusters]);
 
-  const elbowData = result?.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] })) ?? [];
-  const silhouetteData = result?.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] })) ?? [];
+  const elbowData = (result?.k_range && result?.wcss_list)
+    ? result.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] }))
+    : [];
+  const silhouetteData = (result?.k_range && result?.silhouette_list)
+    ? result.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] }))
+    : [];
+  const hasMetrikData = !!(result?.k_range && result?.wcss_list && result?.silhouette_list);
 
   if (!datasetId) return <div className="flex flex-col h-full w-full p-4"><ClusteringEmptyState /></div>;
 
@@ -790,17 +863,6 @@ export default function ClusteringPage() {
             </button>
           ))}
         </div>
-        {result && (
-          <Select value={filterCluster} onValueChange={setFilterCluster}>
-            <SelectTrigger className="h-10 w-48 rounded-xl border-neutral-800/20 text-sm shadow-sm">
-              <SelectValue placeholder="Filter Cluster" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Klaster</SelectItem>
-              {uniqueClusters.map(c => <SelectItem key={c} value={String(c)}>Klaster {c + 1}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
       </div>
 
       {/* Konfigurasi */}
@@ -876,7 +938,7 @@ export default function ClusteringPage() {
               style={{ background: 'linear-gradient(135deg, #2BBAEE, #90FDF2)' }}>
               K yang digunakan: {result.cluster_amount}
             </div>
-            {result.cluster_amount !== result.optimal_k && (
+            {result.optimal_k != null && result.cluster_amount !== result.optimal_k && (
               <span className="text-xs text-neutral-400 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
                 K optimal sistem: {result.optimal_k}
               </span>
@@ -899,6 +961,26 @@ export default function ClusteringPage() {
           </AnalysisCard>
 
           <AnalysisCard title="Detail Semua Produk" status="berhasil">
+            {result && (
+              <div className="flex justify-end mb-2">
+                <Select value={filterCluster} onValueChange={setFilterCluster}>
+                  <SelectTrigger className="h-8 w-44 rounded-lg border-neutral-200 bg-neutral-50/50 text-xs">
+                    <SelectValue placeholder="Filter Cluster" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs">Semua Klaster</SelectItem>
+                    {uniqueClusters.map(c => (
+                      <SelectItem key={c} value={String(c)} className="text-xs">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="size-2 rounded-full inline-block" style={{ backgroundColor: CLUSTER_COLORS[c % CLUSTER_COLORS.length] }} />
+                          Klaster {c + 1}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <ProductTable data={filteredData} colFitur={colFitur} />
           </AnalysisCard>
 
@@ -920,29 +1002,37 @@ export default function ClusteringPage() {
         <div className="flex flex-col gap-4">
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <KpiCard title="Silhouette Score" value={result.silhouette_score} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
-            <KpiCard title="WCSS Score" value={result.wcss_score.toFixed(1)} sub="Semakin rendah semakin baik" opacity={0.08} />
-            <KpiCard title="K Optimal" value={result.optimal_k} sub="Rekomendasi sistem" opacity={0.16} />
+            <KpiCard title="Silhouette Score" value={result.silhouette_score?.toFixed(4) ?? '-'} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
+            <KpiCard title="WCSS Score" value={result.wcss_score?.toFixed(1) ?? '-'} sub="Semakin rendah semakin baik" opacity={0.08} />
+            <KpiCard title="K Optimal" value={result.optimal_k ?? '-'} sub="Rekomendasi sistem" opacity={0.16} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
-              <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
-                gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k} yLabel="WCSS" />
-              <p className="text-xs text-neutral-400 text-center mt-1">
-                <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                K optimal = {result.optimal_k}
-              </p>
+          {hasMetrikData ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
+                <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
+                  gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k ?? undefined} yLabel="WCSS" />
+                <p className="text-xs text-neutral-400 text-center mt-1">
+                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                  K optimal = {result.optimal_k ?? '-'}
+                </p>
+              </AnalysisCard>
+              <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
+                <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
+                  gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k ?? undefined} yLabel="Score" />
+                <p className="text-xs text-neutral-400 text-center mt-1">
+                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                  K optimal = {result.optimal_k ?? '-'}
+                </p>
+              </AnalysisCard>
+            </div>
+          ) : (
+            <AnalysisCard title="Analisis Elbow & Silhouette" status="kosong">
+              <div className="flex items-center justify-center py-10 text-sm text-neutral-400">
+                Data elbow/silhouette tidak tersedia untuk hasil ini. Jalankan ulang clustering untuk melihat grafik.
+              </div>
             </AnalysisCard>
-            <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
-              <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
-                gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k} yLabel="Score" />
-              <p className="text-xs text-neutral-400 text-center mt-1">
-                <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                K optimal = {result.optimal_k}
-              </p>
-            </AnalysisCard>
-          </div>
+          )}
 
           <AnalysisCard title="Visualisasi Sebaran Klaster" status="berhasil">
             <ClusterScatterChart result={result} colFitur={colFitur} />
