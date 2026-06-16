@@ -353,7 +353,7 @@ export default function ClusteringPage() {
               )}
             </div>
 
-            <ClusterSummaryCards result={result} colFitur={colFitur} />
+            <ClusterSummaryCards result={result} colFitur={colFitur} categories={parsedInsight.categories} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <AnalysisCard title="Distribusi Produk per Klaster" status="berhasil">

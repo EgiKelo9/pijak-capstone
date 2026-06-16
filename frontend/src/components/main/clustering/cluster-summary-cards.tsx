@@ -1,8 +1,35 @@
 import { useState, useMemo } from 'react';
-import { CLUSTER_COLORS, getSegmentLabel, formatNumber } from '@/lib/utils';
+import { CLUSTER_COLORS, SEGMENT_LABELS, getSegmentLabel, formatNumber } from '@/lib/utils';
 import { ClusteringResultData } from '@/types';
 
-export function ClusterSummaryCards({ result, colFitur }: { result: ClusteringResultData; colFitur: string[] }) {
+/** Resolve a segment style from an AI-generated category string. */
+function getSegmentFromCategory(category: string) {
+  const upper = category.toUpperCase();
+  // Try to match against known SEGMENT_LABELS
+  const match = SEGMENT_LABELS.find(s => upper.includes(s.label.toUpperCase()));
+  if (match) return match;
+  // Fallback broad matching
+  if (upper.includes('FAST')) return SEGMENT_LABELS[0];
+  if (upper.includes('HIGH')) return SEGMENT_LABELS[1];
+  if (upper.includes('GROW')) return SEGMENT_LABELS[2];
+  if (upper.includes('MEDIUM')) return SEGMENT_LABELS[3];
+  if (upper.includes('STEADY')) return SEGMENT_LABELS[4];
+  if (upper.includes('SLOW')) return SEGMENT_LABELS[5];
+  if (upper.includes('LOW')) return SEGMENT_LABELS[6];
+  if (upper.includes('RISK')) return SEGMENT_LABELS[7];
+  if (upper.includes('NEARLY')) return SEGMENT_LABELS[8];
+  if (upper.includes('DEAD')) return SEGMENT_LABELS[9];
+  return { label: category, color: '#6b7280', bg: '#f3f4f6' };
+}
+
+interface ClusterSummaryCardsProps {
+  result: ClusteringResultData;
+  colFitur: string[];
+  /** AI-generated category labels keyed by 0-indexed cluster number */
+  categories?: Record<number, string>;
+}
+
+export function ClusterSummaryCards({ result, colFitur, categories }: ClusterSummaryCardsProps) {
   const mainFitur = colFitur[0] || '';
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
@@ -25,7 +52,10 @@ export function ClusterSummaryCards({ result, colFitur }: { result: ClusteringRe
     <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {sorted.map(([clusterKey, stats], rankIdx) => {
         const c = parseInt(clusterKey);
-        const segment = getSegmentLabel(rankIdx, sorted.length);
+        // Use AI-generated category when available, otherwise fall back to rank-based label
+        const segment = categories && categories[c]
+          ? getSegmentFromCategory(categories[c])
+          : getSegmentLabel(rankIdx, sorted.length);
         const pct = totalProducts > 0 ? Math.round((stats.count / totalProducts) * 100) : 0;
         const salesPct = totalSales > 0 ? Math.round((stats.total / totalSales) * 100) : 0;
         const isHovered = hoveredCard === c;

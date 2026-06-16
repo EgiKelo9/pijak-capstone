@@ -1,16 +1,83 @@
-import { useState, useMemo, MouseEvent, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { CLUSTER_COLORS, formatNumber } from '@/lib/utils';
 import { ClusteringResultData } from '@/types';
 
+type TooltipState = { x: number; y: number; data: Record<string, any> } | null;
+
+function ProductRow({
+  row,
+  barColor,
+  max,
+  mainFitur,
+  onHover,
+  onLeave,
+}: {
+  row: Record<string, any>;
+  barColor: string;
+  max: number;
+  mainFitur: string;
+  onHover: (e: React.MouseEvent, row: Record<string, any>) => void;
+  onLeave: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  const val = Number(row[mainFitur]) || 0;
+  return (
+    <div
+      onMouseEnter={(e) => { setHov(true); onHover(e, row); }}
+      onMouseLeave={() => { setHov(false); onLeave(); }}
+      onMouseMove={(e) => onHover(e, row)}
+      className="flex flex-col gap-1 rounded-lg px-2 py-1.5 cursor-pointer"
+      style={{
+        backgroundColor: hov ? 'rgba(43,186,238,0.06)' : 'transparent',
+        transition: 'background 0.15s ease, transform 0.15s ease',
+        transform: hov ? 'translateX(2px)' : 'translateX(0)',
+      }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-neutral-700 truncate max-w-48 font-medium">{row.product}</span>
+        <span className="text-xs font-bold text-neutral-800 tabular-nums ml-2">{formatNumber(val)}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${(val / max) * 100}%`, backgroundColor: barColor, opacity: hov ? 1 : 0.8 }} />
+      </div>
+    </div>
+  );
+}
+
 export function TopBottomProducts({ result, colFitur }: { result: ClusteringResultData; colFitur: string[] }) {
   const [activeCluster, setActiveCluster] = useState(0);
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; data: Record<string, any> } | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const mainFitur = colFitur[0] || '';
 
+  // Clear tooltip when data/cluster changes
   useEffect(() => {
     setTooltip(null);
   }, [result, activeCluster, colFitur]);
+
+  // Robust: dismiss tooltip when cursor leaves the container via document-level listener
+  useEffect(() => {
+    if (!tooltip) return;
+
+    const handleDocMouseMove = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // 4px margin to avoid flickering at edges
+      if (
+        e.clientX < rect.left - 4 ||
+        e.clientX > rect.right + 4 ||
+        e.clientY < rect.top - 4 ||
+        e.clientY > rect.bottom + 4
+      ) {
+        setTooltip(null);
+      }
+    };
+
+    document.addEventListener('mousemove', handleDocMouseMove);
+    return () => document.removeEventListener('mousemove', handleDocMouseMove);
+  }, [tooltip]);
 
   const uniqueClusters = useMemo(() => 
     [...new Set(result.cluster_data.map(d => d.cluster))].sort((a, b) => a - b),
@@ -30,39 +97,16 @@ export function TopBottomProducts({ result, colFitur }: { result: ClusteringResu
   const top5 = useMemo(() => sorted.slice(0, 5), [sorted]);
   const bottom5 = useMemo(() => sorted.slice(-5).reverse(), [sorted]);
 
-  const handleMouseMove = (e: MouseEvent, row: Record<string, any>) => {
+  const handleHover = useCallback((e: React.MouseEvent, row: Record<string, any>) => {
     setTooltip({ x: e.clientX, y: e.clientY, data: row });
-  };
-  const handleMouseLeave = () => setTooltip(null);
+  }, []);
 
-  const ProductRow = ({ row, barColor, max }: { row: Record<string, any>; barColor: string; max: number }) => {
-    const [hov, setHov] = useState(false);
-    const val = Number(row[mainFitur]) || 0;
-    return (
-      <div
-        onMouseEnter={() => setHov(true)}
-        onMouseLeave={() => { setHov(false); handleMouseLeave(); }}
-        onMouseMove={e => handleMouseMove(e, row)}
-        className="flex flex-col gap-1 rounded-lg px-2 py-1.5 cursor-pointer"
-        style={{
-          backgroundColor: hov ? 'rgba(43,186,238,0.06)' : 'transparent',
-          transition: 'background 0.15s ease, transform 0.15s ease',
-          transform: hov ? 'translateX(2px)' : 'translateX(0)',
-        }}>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-neutral-700 truncate max-w-48 font-medium">{row.product}</span>
-          <span className="text-xs font-bold text-neutral-800 tabular-nums ml-2">{formatNumber(val)}</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${(val / max) * 100}%`, backgroundColor: barColor, opacity: hov ? 1 : 0.8 }} />
-        </div>
-      </div>
-    );
-  };
+  const handleLeave = useCallback(() => {
+    setTooltip(null);
+  }, []);
 
   return (
-    <div className="flex flex-col gap-3 relative">
+    <div ref={containerRef} className="flex flex-col gap-3 relative" onMouseLeave={handleLeave}>
       {tooltip && (
         <div className="fixed z-50 pointer-events-none rounded-xl border border-neutral-200 bg-white shadow-xl p-3 text-xs"
           style={{ left: tooltip.x + 14, top: tooltip.y - 70, minWidth: 190 }}>
@@ -103,7 +147,8 @@ export function TopBottomProducts({ result, colFitur }: { result: ClusteringResu
             <span className="text-xs font-semibold text-neutral-600">Top 5 Produk</span>
           </div>
           {top5.map((row, i) => (
-            <ProductRow key={i} row={row} barColor={CLUSTER_COLORS[activeCluster % CLUSTER_COLORS.length]} max={Number(top5[0]?.[mainFitur]) || 1} />
+            <ProductRow key={row.product ?? i} row={row} barColor={CLUSTER_COLORS[activeCluster % CLUSTER_COLORS.length]}
+              max={Number(top5[0]?.[mainFitur]) || 1} mainFitur={mainFitur} onHover={handleHover} onLeave={handleLeave} />
           ))}
         </div>
         <div className="flex flex-col gap-1">
@@ -112,7 +157,8 @@ export function TopBottomProducts({ result, colFitur }: { result: ClusteringResu
             <span className="text-xs font-semibold text-neutral-600">Bottom 5 Produk</span>
           </div>
           {bottom5.map((row, i) => (
-            <ProductRow key={i} row={row} barColor="#fca5a5" max={Number(top5[0]?.[mainFitur]) || 1} />
+            <ProductRow key={row.product ?? i} row={row} barColor="#fca5a5"
+              max={Number(top5[0]?.[mainFitur]) || 1} mainFitur={mainFitur} onHover={handleHover} onLeave={handleLeave} />
           ))}
         </div>
       </div>
