@@ -150,22 +150,41 @@ async def get_insight_from_clustering(cluster_summary: dict) -> str:
     Diadaptasi dari gemma.py::get_insight_from_clustering.
     Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
     """
+    cluster_ids = []
+    if cluster_summary:
+        first_feature = next(iter(cluster_summary.values()))
+        if isinstance(first_feature, dict):
+            try:
+                cluster_ids = sorted(list(first_feature.keys()), key=lambda x: int(x))
+            except Exception:
+                cluster_ids = sorted(list(first_feature.keys()))
+            
+    klaster_templates_kategori = ""
+    klaster_templates_insight = ""
+    for i in range(len(cluster_ids)):
+        klaster_templates_kategori += f"Klaster {i+1}: [Kategori Klaster {i+1}]\n"
+        klaster_templates_insight += f"Klaster {i+1}: [Insight Klaster {i+1}]\n"
+        
     prompt = (
-        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Kamu adalah Business Analyst untuk wirausaha retail.\n"
         f"Berdasarkan hasil segmentasi produk berikut (rata-rata fitur per klaster):\n"
         f"{json.dumps(cluster_summary, default=str)}\n\n"
-        f"Berikan insight bisnis dalam format berikut. "
-        f"Jangan gunakan markdown formatting seperti ** atau *. "
-        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
-        f"KATEGORI CLUSTER: Kategorikan tiap cluster sebagai Fast Moving, "
-        f"Medium Moving, atau Slow Moving berdasarkan Sales dan Quantity.\n\n"
-        f"INSIGHT PER CLUSTER (maks 2 kalimat per cluster): "
-        f"Sebutkan karakteristik utama dan 1 rekomendasi aksi.\n\n"
+        f"PENTING: Berikan insight bisnis dengan mengikuti format di bawah ini secara persis.\n"
+        f"Jangan gunakan markdown formatting seperti ** atau *. Gunakan plain text saja.\n\n"
+        f"Format output yang WAJIB diikuti secara paten:\n\n"
+        f"KATEGORI CLUSTER:\n"
+        f"{klaster_templates_kategori}\n"
+        f"INSIGHT PER CLUSTER:\n"
+        f"{klaster_templates_insight}\n"
         f"PRIORITAS AKSI BISNIS:\n"
-        f"- Produk yang perlu RESTOCK\n"
-        f"- Produk yang perlu DISKON\n"
-        f"- Produk yang perlu DIEVALUASI\n\n"
-        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+        f"- Produk yang perlu RESTOCK: [Rekomendasi aksi restock]\n"
+        f"- Produk yang perlu DISKON: [Rekomendasi aksi diskon]\n"
+        f"- Produk yang perlu DIEVALUASI: [Rekomendasi aksi evaluasi]\n\n"
+        f"Penjelasan format:\n"
+        f"1. KATEGORI CLUSTER: Kategorikan tiap Klaster 1 s.d. Klaster {len(cluster_ids)} sebagai Fast Moving, "
+        f"Medium Moving, atau Slow Moving berdasarkan nilai Sales dan Quantity yang ada pada data.\n"
+        f"2. INSIGHT PER CLUSTER: Berikan 1-2 kalimat deskripsi karakteristik utama dan rekomendasi aksi untuk masing-masing Klaster.\n"
+        f"3. PRIORITAS AKSI BISNIS: Berikan 1 rekomendasi aksi spesifik untuk masing-masing dari ketiga poin tersebut menggunakan bahasa Indonesia yang mudah dimengerti UMKM."
     )
     try:
         result = await generate_from_openrouter(prompt)
@@ -183,16 +202,23 @@ async def get_insight_from_forecasting(forecast_summary: dict) -> str:
     Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
     """
     prompt = (
-        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Kamu adalah Business Analyst untuk wirausaha retail.\n"
         f"Berdasarkan prediksi penjualan agregat (keseluruhan) berikut:\n"
         f"{json.dumps(forecast_summary, default=str)}\n\n"
-        f"Berikan insight bisnis dalam format berikut. "
-        f"Jangan gunakan markdown formatting seperti ** atau *. "
-        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
-        f"TREN KESELURUHAN: Ringkasan tren prediksi penjualan keseluruhan usaha di masa depan.\n\n"
-        f"ANALISIS PERFORMA: Penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya (berdasarkan data prediksi).\n\n"
-        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang oleh UMKM (seperti alokasi modal, strategi promosi keseluruhan, atau manajemen operasional).\n\n"
-        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+        f"PENTING: Berikan insight bisnis dengan mengikuti format di bawah ini secara persis.\n"
+        f"Jangan gunakan markdown formatting seperti ** atau *. Gunakan plain text saja.\n\n"
+        f"Format output yang WAJIB diikuti secara paten:\n\n"
+        f"TREN KESELURUHAN:\n"
+        f"[Isi ringkasan tren prediksi penjualan keseluruhan usaha di masa depan]\n\n"
+        f"ANALISIS PERFORMA:\n"
+        f"[Isi penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya]\n\n"
+        f"REKOMENDASI AKSI:\n"
+        f"- Optimalisasi Stok & Ketersediaan: [Isi rekomendasi konkret terkait stok, ketersediaan barang, atau restock]\n"
+        f"- Promosi & Program Loyalitas: [Isi rekomendasi konkret terkait promosi penjualan, diskon, atau program loyalitas]\n"
+        f"- Evaluasi & Perbaikan Proses: [Isi rekomendasi konkret terkait evaluasi proses bisnis, operasional, atau pemesanan]\n\n"
+        f"Keterangan:\n"
+        f"1. Gunakan bahasa Indonesia yang singkat, jelas, dan mudah dipahami oleh UMKM.\n"
+        f"2. Pada bagian REKOMENDASI AKSI, wajib ada 3 rekomendasi dengan diawali tanda hubung (-) dan nama kategorinya secara persis seperti contoh di atas (Optimalisasi Stok & Ketersediaan:, Promosi & Program Loyalitas:, Evaluasi & Perbaikan Proses:)."
     )
     try:
         result = await generate_from_openrouter(prompt)
