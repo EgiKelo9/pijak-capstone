@@ -2,7 +2,7 @@ import pandas as pd
 import joblib
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import silhouette_score
 from app.controller.openrouter import get_insight_from_clustering
 
@@ -63,21 +63,22 @@ class ClusteringPipeline:
         n_clusters_input = input_json.get("n_clusters")
 
         
-        # Validasi dan filter col_fitur agar hanya berisi kolom numerik.
-        # Kolom kategorikal (seperti city, state, dll.) tidak akan di-convert ke numeric/0,
-        # melainkan tetap dipertahankan nilai string aslinya dan akan di-aggregate dengan "first".
-        valid_numeric_fitur = []
+        # Validasi dan filter col_fitur agar hanya berisi kolom numerik (melalui Label Encoding untuk kolom kategorikal)
+        le = LabelEncoder()
+        valid_fitur = []
         for col in col_fitur:
             if col in df.columns:
-                if pd.api.types.is_numeric_dtype(df[col]):
-                    valid_numeric_fitur.append(col)
-                    df[col] = df[col].fillna(0)
-                else:
-                    converted = pd.to_numeric(df[col], errors='coerce')
-                    if len(df) > 0 and converted.notna().mean() > 0.5:
-                        valid_numeric_fitur.append(col)
-                        df[col] = converted.fillna(0)
-        col_fitur = valid_numeric_fitur
+                if df[col].dtype == 'object' or pd.api.types.is_object_dtype(df[col]):
+                    try:
+                        df[col] = le.fit_transform(df[col].astype(str))
+                    except Exception:
+                        pass
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                valid_fitur.append(col)
+        col_fitur = valid_fitur
+
+        col_fitur = [col for col in col_fitur if col != col_product]
+
         if not col_fitur:
             numeric_cols = df.select_dtypes(include='number').columns.tolist()
             col_fitur = [col for col in numeric_cols if col != col_product]

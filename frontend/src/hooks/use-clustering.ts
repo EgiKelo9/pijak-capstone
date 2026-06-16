@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getClusteringHistory, getClusteringResult, runClustering } from '@/services/clustering';
-import { getDataset } from '@/services/analysis';
+import { getDataset, getCleanedDatasetIds } from '@/services/analysis';
+import { getDatasetContext } from './use-analysis';
 import { ClusteringResultData } from '@/types';
 
 export function useClustering() {
@@ -10,6 +11,7 @@ export function useClustering() {
   const [colFitur, setColFitur] = useState<string[]>([]);
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [result, setResult] = useState<ClusteringResultData | null>(null);
+  const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'hasil' | 'pengujian'>('hasil');
@@ -31,6 +33,7 @@ export function useClustering() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       const latest = sortedHistory[0];
+      setAnalysisId(latest.analysis_id);
 
       if (latest.status === 'berhasil' && latest.result) {
         setResult(latest.result);
@@ -100,6 +103,7 @@ export function useClustering() {
         if (entry.status === 'berhasil' && entry.result) {
           setResult(entry.result);
           setCustomK(entry.result.cluster_amount);
+          setAnalysisId(newAnalysisId);
           setActiveTab('hasil');
           return;
         } else if (entry.status === 'gagal') {
@@ -121,13 +125,14 @@ export function useClustering() {
   }, [colProduct, colFitur, datasetId]);
 
   useEffect(() => {
-    const storedId = sessionStorage.getItem('pijak_cleaned_clustering_id') || sessionStorage.getItem('pijak_active_dataset_id');
-    if (storedId) {
-      const id = parseInt(storedId, 10);
-      setDatasetId(id);
-
-      const loadData = async () => {
+    const loadDatasetAndData = async () => {
+      const context = getDatasetContext();
+      if (context?.raw_dataset_id) {
         try {
+          const { clustering } = await getCleanedDatasetIds(context.raw_dataset_id);
+          const id = clustering || context.raw_dataset_id;
+          setDatasetId(id);
+
           const csvString = await getDataset(id);
           if (csvString) {
             const parseCSVLine = (line: string): string[] => {
@@ -166,11 +171,10 @@ export function useClustering() {
         } catch (e) {
           console.error("Gagal memuat atau mem-parsing dataset:", e);
         }
-      };
+      }
+    };
 
-      loadData();
-    }
-
+    loadDatasetAndData();
     fetchLatestResult();
   }, [fetchLatestResult]);
 
@@ -215,6 +219,7 @@ export function useClustering() {
     rawData,
     result,
     setResult,
+    analysisId,
     isLoading,
     error,
     activeTab,

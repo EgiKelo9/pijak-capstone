@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset, runAnalysisPipeline } from '@/services/analysis';
-import { ForecastingRunPayload, runForecasting, getForecastingResult } from '@/services/forecasting';
+import { analyzeColumns, getDataset, getDatasetFeatureMetadata, updateDatasetFeatureMetadata, uploadDataset, runAnalysisPipeline, getAnalysisHistory, getCleanedDatasetIds } from '@/services/analysis';
+import { runForecasting, getForecastingResult } from '@/services/forecasting';
 import { runClustering, getClusteringResult } from '@/services/clustering';
-import { useRouter } from 'next/navigation';
 import type { AnalysisMode, AnalysisConfig, TerminalStep, ForecastAggressivenessType, ClusteringConfig } from '@/types';
 import { DataConfigState } from '@/types';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
@@ -19,8 +18,40 @@ function extractColProduct(value: any, fallback = 'product'): string {
   return fallback;
 }
 
+/**
+ * Get the context of the dataset from localStorage
+ */
+export function getDatasetContext(): {
+  raw_dataset_id: number;
+  forecast_config: {
+    dataset_id: number;
+    col_date: string;
+    col_target: string;
+    col_regressors: string[];
+  } | null;
+} | null {
+  try {
+    const raw = localStorage.getItem('pijak_dataset_context');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.raw_dataset_id === 'number') {
+      return parsed as {
+        raw_dataset_id: number;
+        forecast_config: {
+          dataset_id: number;
+          col_date: string;
+          col_target: string;
+          col_regressors: string[];
+        } | null;
+      };
+    }
+  } catch (e) {
+    console.error("Failed to parse dataset context:", e);
+  }
+  return null;
+}
+
 export function useAnalysis() {
-  const router = useRouter();
   const [date, setDate] = useState<DateRange | undefined>();
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AnalysisMode>('both');
@@ -39,17 +70,34 @@ export function useAnalysis() {
   const { logs: terminalLogs, setLogs: setTerminalLogs, setIsAnalysisReady } = useTerminal();
   const [dataConfigStatus, setDataConfigStatus] = useState<'menunggu' | 'berhasil' | 'gagal' | 'kosong'>('menunggu');
   const [rawFeatureMapping, setRawFeatureMapping] = useState<any | null>(null);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   useEffect(() => {
-    const storedId = sessionStorage.getItem('pijak_active_dataset_id');
-    if (storedId) {
-      setActiveDatasetId(parseInt(storedId, 10));
+    const context = getDatasetContext();
+    if (context) {
+      setActiveDatasetId(context.raw_dataset_id);
+    } else {
+      const storedId = localStorage.getItem('pijak_active_dataset_id');
+      if (storedId) {
+        const id = parseInt(storedId, 10);
+        setActiveDatasetId(id);
+        localStorage.setItem('pijak_dataset_context', JSON.stringify({
+          raw_dataset_id: id,
+          forecast_config: null
+        }));
+      }
     }
 
     const handleDatasetChanged = () => {
-      const newStoredId = sessionStorage.getItem('pijak_active_dataset_id');
+      const newStoredId = localStorage.getItem('pijak_active_dataset_id');
       if (newStoredId) {
-        setActiveDatasetId(parseInt(newStoredId, 10));
+        const id = parseInt(newStoredId, 10);
+        setActiveDatasetId(id);
+        localStorage.setItem('pijak_dataset_context', JSON.stringify({
+          raw_dataset_id: id,
+          forecast_config: null
+        }));
       }
     };
     const openUploadModalEvent = () => setIsFileUploadOpen(true);
@@ -234,6 +282,13 @@ export function useAnalysis() {
       const data = await uploadDataset(file);
       console.log("[Dashboard] Upload Success. Dataset ID:", data.dataset_id);
       setTerminalLogs((prev) => prev.map(log => log.stepId === uploadStepId ? { ...log, text: 'File berhasil diunggah.', status: 'success' } : log));
+      
+      // Update session storage context
+      localStorage.setItem('pijak_dataset_context', JSON.stringify({
+        raw_dataset_id: data.dataset_id,
+        forecast_config: null
+      }));
+
       setActiveDatasetId(data.dataset_id);
       setIsFileUploadOpen(false); // Tutup modal unggah setelah berhasil
     } catch (error: any) {
@@ -243,6 +298,20 @@ export function useAnalysis() {
       alert(isAuthError ? "Sesi Anda telah berakhir (Token kedaluwarsa). Silakan muat ulang halaman." : error.message);
     }
   }, [analysisConfig.mode, runPreprocessingPipeline]);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoadingHistory(true);
+    try {
+      const data = await getAnalysisHistory();
+      if (data) {
+        setHistoryData(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch analysis history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
 
   const handleReloadMapping = useCallback(() => {
     if (activeDatasetId !== -1) {
@@ -284,48 +353,6 @@ export function useAnalysis() {
       ));
     }
   }, [activeDatasetId, dataConfig, rawFeatureMapping]);
-
-  const fetchAndParseCleanedDataset = async (id: number): Promise<any[]> => {
-    const token = localStorage.getItem('access_token');
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    const res = await fetch(`${baseUrl}/api/v1/datasets/${id}`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    });
-    if (!res.ok) throw new Error('Gagal mengunduh dataset bersih dari server.');
-    const text = await res.text();
-
-    const parseCSVLine = (line: string): string[] => {
-      const result: string[] = [];
-      let current = '';
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-          else inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          result.push(current.trim());
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      result.push(current.trim());
-      return result;
-    };
-
-    const lines = text.split('\n').filter(Boolean);
-    if (lines.length === 0) return [];
-    const headers = parseCSVLine(lines[0]);
-    return lines.slice(1).map(line => {
-      const vals = parseCSVLine(line);
-      return headers.reduce((acc, h, i) => {
-        const raw = vals[i] ?? '';
-        acc[h] = isNaN(Number(raw)) || raw === '' ? raw.replace(/^"+|"+$/g, '') : Number(raw);
-        return acc;
-      }, {} as Record<string, any>);
-    });
-  };
 
   const trackForecastingProgress = useCallback((analysisId: number) => {
     const startId = `forecast-progress-${Date.now()}`;
@@ -481,18 +508,26 @@ export function useAnalysis() {
     }, 5000);
   }, [setTerminalLogs]);
 
-  const handleRunAnalysis = useCallback(() => {
+  const handleRunAnalysis = useCallback(async () => {
     if (!analysisConfig.dateRange?.from || !analysisConfig.dateRange?.to) {
       console.warn('[Dashboard] Run Analysis aborted: No valid date range selected');
       return;
     }
 
-    const cleanedForecastIdStr = sessionStorage.getItem('pijak_cleaned_forecasting_id');
-    const cleanedClusterIdStr = sessionStorage.getItem('pijak_cleaned_clustering_id');
+    let forecastingId: number | null = null;
+    let clusteringId: number | null = null;
+    if (activeDatasetId !== -1) {
+      try {
+        const cleanedIds = await getCleanedDatasetIds(activeDatasetId);
+        forecastingId = cleanedIds.forecasting;
+        clusteringId = cleanedIds.clustering;
+      } catch (err) {
+        console.error("Failed to fetch cleaned dataset IDs from backend:", err);
+      }
+    }
 
-    const hasCleanedForecast = !!cleanedForecastIdStr;
-    const hasCleanedCluster = !!cleanedClusterIdStr;
-
+    const hasCleanedForecast = forecastingId !== null;
+    const hasCleanedCluster = clusteringId !== null;
 
     const shouldDirectRun =
       (mode === 'forecasting' && hasCleanedForecast) ||
@@ -511,8 +546,8 @@ export function useAnalysis() {
         ]);
 
         try {
-          if ((mode === 'forecasting' || mode === 'both') && cleanedForecastIdStr) {
-            const cleanedForecastId = parseInt(cleanedForecastIdStr, 10);
+          if ((mode === 'forecasting' || mode === 'both') && forecastingId) {
+            const cleanedForecastId = forecastingId;
             const colDate = dataConfig.dateColumn || 'date';
             const colTarget = dataConfig.targetColumn || 'qty';
             const colRegressors = dataConfig.includedColumns || [];
@@ -531,13 +566,20 @@ export function useAnalysis() {
               forecasting_mode: (forecastAggressiveness === 'balance' ? 'balanced' : forecastAggressiveness) as 'conservative' | 'balanced' | 'aggressive',
             };
             const runResp = await runForecasting(forecastPayload);
+            
             // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
-            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
+            const currentContext = getDatasetContext();
+            const contextToSet = currentContext || {
+              raw_dataset_id: activeDatasetId,
+              forecast_config: null
+            };
+            contextToSet.forecast_config = {
               dataset_id: forecastPayload.dataset_id,
               col_date: forecastPayload.col_date,
               col_target: forecastPayload.col_target,
               col_regressors: forecastPayload.col_regressors,
-            }));
+            };
+            localStorage.setItem('pijak_dataset_context', JSON.stringify(contextToSet));
 
             setTerminalLogs((prev) => [
               ...prev.map(l => l.status === 'loading' ? { ...l, text: 'Model forecasting berhasil dijalankan.', status: 'success' as const } : l)
@@ -549,8 +591,8 @@ export function useAnalysis() {
             }
           }
 
-          if ((mode === 'clustering' || mode === 'both') && cleanedClusterIdStr) {
-            const cleanedClusterId = parseInt(cleanedClusterIdStr, 10);
+          if ((mode === 'clustering' || mode === 'both') && clusteringId) {
+            const cleanedClusterId = clusteringId;
             const colProduct = extractColProduct(rawFeatureMapping?.col_product);
             const colFitur = dataConfig.includedColumns || [];
             const colDate = dataConfig.dateColumn || 'date';
@@ -693,13 +735,7 @@ export function useAnalysis() {
     console.debug('[Dashboard] State updated:', { isReady, mode, date });
   }, [isReady, mode, date]);
 
-  useEffect(() => {
-    if (activeDatasetId !== -1) {
-      sessionStorage.setItem('pijak_active_dataset_id', activeDatasetId.toString());
-    } else {
-      sessionStorage.removeItem('pijak_active_dataset_id');
-    }
-  }, [activeDatasetId]);
+
 
   useEffect(() => {
     if (activeDatasetId === -1) {
@@ -854,14 +890,6 @@ export function useAnalysis() {
       const cleanedForecastId = parsed.cleaned_forecast_id;
       const cleanedClusterId = parsed.cleaned_cluster_id;
 
-      // Save to sessionStorage
-      if (cleanedForecastId) {
-        sessionStorage.setItem('pijak_cleaned_forecasting_id', cleanedForecastId.toString());
-      }
-      if (cleanedClusterId) {
-        sessionStorage.setItem('pijak_cleaned_clustering_id', cleanedClusterId.toString());
-      }
-
       // Auto-trigger model pipeline based on current mode
       if ((mode === 'forecasting' || mode === 'both') && cleanedForecastId) {
         const colDate = parsed.feature_metadata?.col_dt_whole || dataConfig.dateColumn;
@@ -900,12 +928,18 @@ export function useAnalysis() {
         runForecasting(forecastPayloadWs)
           .then((runResp) => {
             // Simpan konfigurasi agar halaman Forecasting bisa re-run ulang
-            sessionStorage.setItem('pijak_forecast_config', JSON.stringify({
+            const currentContext = getDatasetContext();
+            const contextToSet = currentContext || {
+              raw_dataset_id: activeDatasetId,
+              forecast_config: null
+            };
+            contextToSet.forecast_config = {
               dataset_id: forecastPayloadWs.dataset_id,
               col_date: forecastPayloadWs.col_date,
               col_target: forecastPayloadWs.col_target,
               col_regressors: forecastPayloadWs.col_regressors,
-            }));
+            };
+            localStorage.setItem('pijak_dataset_context', JSON.stringify(contextToSet));
             const analysisId = (runResp as any)?.analysis_id;
             if (analysisId) {
               trackForecastingProgress(analysisId);
@@ -981,6 +1015,9 @@ export function useAnalysis() {
     handleReloadMapping,
     handleConfirmMapping,
     handleRunAnalysis,
-    handleBackendMessage
+    handleBackendMessage,
+    historyData,
+    isLoadingHistory,
+    fetchHistory
   };
 }

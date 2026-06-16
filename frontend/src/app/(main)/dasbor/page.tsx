@@ -7,10 +7,14 @@ import { useForecasting } from "@/hooks/use-forecasting";
 import { ClusterScatterChart } from "@/components/main/clustering/cluster-scatter-chart";
 import { ProductTable } from "@/components/main/clustering/product-table";
 import { ForecastingChart } from "@/components/main/forecasting/forecasting-chart";
-import { Cpu, TrendingUp, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Cpu, TrendingUp, Loader2, LayoutGrid } from "lucide-react";
+import { useState, useEffect } from "react";
+import { AnalysisLoadingState } from "@/components/analysis-loading-state";
+import { AnalysisEmptyState } from "@/components/analysis-empty-state";
 import ChatBot, { ChatBotProps } from "./chatbot";
-import { sendChatbotMessage } from "@/services/chatbot";
+import { sendChatbotMessage, getChatbotHistory } from "@/services/chatbot";
+import { getDatasetContext } from "@/hooks/use-analysis";
+import { getCleanedDatasetIds } from "@/services/analysis";
 import { AttachedType, TargetTask } from "@/types";
 
 export default function MainDashboard() {
@@ -19,6 +23,7 @@ export default function MainDashboard() {
         colFitur: clusteringColFitur,
         isLoading: isLoadingClustering,
         error: errorClustering,
+        analysisId: clusteringAnalysisId,
     } = useClustering();
 
     const {
@@ -27,6 +32,7 @@ export default function MainDashboard() {
         setTimeFilter,
         isLoading: isLoadingForecasting,
         error: errorForecasting,
+        analysisId: forecastingAnalysisId,
     } = useForecasting();
 
     const mockReceived: ChatBotProps[] = [
@@ -97,6 +103,74 @@ export default function MainDashboard() {
     const [isForecastingChatLoading, setIsForecastingChatLoading] = useState(false);
     const [isClusteringChatLoading, setIsClusteringChatLoading] = useState(false);
 
+    useEffect(() => {
+        if (!forecastingAnalysisId) {
+            setForecastingChats([
+                {
+                    ChatMessages: "Halo! Saya **BeeZ**. Apakah Anda ingin memprediksi tren penjualan bulan depan?",
+                    ChatRole: "assistant",
+                    Model: "Forecasting"
+                }
+            ]);
+            return;
+        }
+
+        const fetchHistory = async () => {
+            try {
+                const history = await getChatbotHistory(forecastingAnalysisId);
+                const initialGreeting: ChatBotProps = {
+                    ChatMessages: "Halo! Saya **BeeZ**. Apakah Anda ingin memprediksi tren penjualan bulan depan?",
+                    ChatRole: "assistant",
+                    Model: "Forecasting"
+                };
+                const chatHistory = history.map(h => ({
+                    ChatMessages: h.message,
+                    ChatRole: h.role,
+                    Model: "Forecasting"
+                }));
+                setForecastingChats([initialGreeting, ...chatHistory]);
+            } catch (err) {
+                console.error("Gagal memuat histori chatbot forecasting:", err);
+            }
+        };
+
+        fetchHistory();
+    }, [forecastingAnalysisId]);
+
+    useEffect(() => {
+        if (!clusteringAnalysisId) {
+            setClusteringChats([
+                {
+                    ChatMessages: "Halo! Saya **BeeZ**, asisten AI Anda. Ada yang bisa saya bantu terkait analisis segmentasi (clustering) hari ini?",
+                    ChatRole: "assistant",
+                    Model: "Clustering"
+                }
+            ]);
+            return;
+        }
+
+        const fetchHistory = async () => {
+            try {
+                const history = await getChatbotHistory(clusteringAnalysisId);
+                const initialGreeting: ChatBotProps = {
+                    ChatMessages: "Halo! Saya **BeeZ**, asisten AI Anda. Ada yang bisa saya bantu terkait analisis segmentasi (clustering) hari ini?",
+                    ChatRole: "assistant",
+                    Model: "Clustering"
+                };
+                const chatHistory = history.map(h => ({
+                    ChatMessages: h.message,
+                    ChatRole: h.role,
+                    Model: "Clustering"
+                }));
+                setClusteringChats([initialGreeting, ...chatHistory]);
+            } catch (err) {
+                console.error("Gagal memuat histori chatbot clustering:", err);
+            }
+        };
+
+        fetchHistory();
+    }, [clusteringAnalysisId]);
+
     const handleSendMessage = async (
         message: string,
         attachedType: AttachedType
@@ -119,26 +193,39 @@ export default function MainDashboard() {
             setIsClusteringChatLoading(true);
         }
 
-        // Gather raw data based on attachedType
+        // Send a lightweight indicator instead of the huge raw JSON/CSV data.
+        // The backend will automatically fetch the complete summary context from the database.
         let attachment: any = null;
-        if (attachedType === 'forecasting') {
-            attachment = forecastData?.trend_data || null;
-        } else if (attachedType === 'clustering') {
-            attachment = clusteringResult || null;
-        } else if (attachedType === 'table') {
-            attachment = clusteringResult?.cluster_data || null;
+        if (attachedType) {
+            attachment = { attached_type: attachedType };
         }
 
         let taskId = 'unknown';
         if (targetTask === 'forecasting') {
-            const storedConfig = sessionStorage.getItem('pijak_forecast_config');
-            if (storedConfig) {
-                try {
-                    taskId = JSON.parse(storedConfig).dataset_id?.toString() || 'unknown';
-                } catch {}
+            if (forecastingAnalysisId) {
+                taskId = forecastingAnalysisId.toString();
+            } else {
+                const context = getDatasetContext();
+                if (context?.forecast_config) {
+                    taskId = context.forecast_config.dataset_id?.toString() || 'unknown';
+                }
             }
         } else {
-            taskId = (clusteringResult as any)?.analysis_id?.toString() || sessionStorage.getItem('pijak_cleaned_clustering_id') || 'unknown';
+            if (clusteringAnalysisId) {
+                taskId = clusteringAnalysisId.toString();
+            } else if ((clusteringResult as any)?.analysis_id) {
+                taskId = (clusteringResult as any).analysis_id.toString();
+            } else {
+                const context = getDatasetContext();
+                if (context?.raw_dataset_id) {
+                    try {
+                        const { clustering } = await getCleanedDatasetIds(context.raw_dataset_id);
+                        taskId = clustering?.toString() || 'unknown';
+                    } catch (err) {
+                        console.error("Failed to fetch cleaned clustering ID for chatbot:", err);
+                    }
+                }
+            }
         }
 
         try {
@@ -188,6 +275,36 @@ export default function MainDashboard() {
         : !clusteringResult
         ? 'kosong'
         : 'berhasil';
+
+    if (isLoadingClustering || isLoadingForecasting) {
+        return (
+            <div className="flex flex-col h-full w-full p-4 pt-12">
+                <AnalysisLoadingState
+                    title="Memuat data dasbor..."
+                    subtitle="Proses ini mungkin memerlukan waktu beberapa saat"
+                />
+            </div>
+        );
+    }
+
+    if (!clusteringResult && !forecastData) {
+        return (
+            <div className="flex flex-col h-full w-full p-4">
+                <AnalysisEmptyState
+                    title="dianalisis (Dasbor)"
+                    description="Belum ada data analisis cluster maupun forecasting yang tersedia. Silakan jalankan analisis terlebih dahulu."
+                    steps={[
+                        'Buka halaman Analisis untuk mengunggah file CSV data penjualan.',
+                        'Tentukan konfigurasi kolom dan jalankan analisis forecasting atau clustering.',
+                        'Kembali ke halaman Dasbor untuk melihat visualisasi hasil analisis dan berkonsultasi dengan BeeZ AI.'
+                    ]}
+                    icon={LayoutGrid}
+                    redirectTo="/analisis"
+                    buttonText="Mulai Analisis"
+                />
+            </div>
+        );
+    }
 
     return (
         <>

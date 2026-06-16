@@ -22,7 +22,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
-import { fetchUserDatasets, runAnalysisPipeline, getDatasetFeatureMetadata } from '@/services/analysis';
+import { fetchUserDatasets, runAnalysisPipeline } from '@/services/analysis';
 import { cn } from '@/lib/utils';
 import { useTerminal } from '@/components/main/layout/main-sidebar';
 import { DATA } from './sidebar-data';
@@ -61,37 +61,12 @@ export function AppSidebarTopbar() {
     }
   };
 
-  const handleDatasetSelect = async (datasetId: number) => {
-    sessionStorage.setItem('pijak_active_dataset_id', datasetId.toString());
-    
-    try {
-      const metadata = await getDatasetFeatureMetadata(datasetId);
-      if (metadata) {
-        if (metadata.cleaned_forecast_dataset_id) {
-          sessionStorage.setItem('pijak_cleaned_forecasting_id', metadata.cleaned_forecast_dataset_id.toString());
-        } else if (metadata.cleaned_dataset_id) {
-          sessionStorage.setItem('pijak_cleaned_forecasting_id', metadata.cleaned_dataset_id.toString());
-        } else {
-          sessionStorage.removeItem('pijak_cleaned_forecasting_id');
-        }
-
-        if (metadata.cleaned_cluster_dataset_id) {
-          sessionStorage.setItem('pijak_cleaned_clustering_id', metadata.cleaned_cluster_dataset_id.toString());
-        } else if (metadata.cleaned_dataset_id) {
-          sessionStorage.setItem('pijak_cleaned_clustering_id', metadata.cleaned_dataset_id.toString());
-        } else {
-          sessionStorage.removeItem('pijak_cleaned_clustering_id');
-        }
-      } else {
-        sessionStorage.removeItem('pijak_cleaned_forecasting_id');
-        sessionStorage.removeItem('pijak_cleaned_clustering_id');
-      }
-    } catch (error) {
-      console.warn("Failed to fetch feature metadata for dataset, clearing cleaned IDs", error);
-      sessionStorage.removeItem('pijak_cleaned_forecasting_id');
-      sessionStorage.removeItem('pijak_cleaned_clustering_id');
-    }
-    
+  const handleDatasetSelect = (datasetId: number) => {
+    localStorage.setItem('pijak_active_dataset_id', datasetId.toString());
+    localStorage.setItem('pijak_dataset_context', JSON.stringify({
+      raw_dataset_id: datasetId,
+      forecast_config: null
+    }));
     window.dispatchEvent(new Event('dataset_changed'));
   };
 

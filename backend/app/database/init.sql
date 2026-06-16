@@ -4,22 +4,22 @@
 
 CREATE DATABASE beez_pijak_db;
 
-DROP TABLE IF EXISTS chat_messages CASCADE;
-DROP TABLE IF EXISTS clustering_results CASCADE;
-DROP TABLE IF EXISTS forecasting_results CASCADE;
-DROP TABLE IF EXISTS analysis_history CASCADE;
-DROP TABLE IF EXISTS ml_models CASCADE;
-DROP TABLE IF EXISTS datasets_bin CASCADE;
-DROP TABLE IF EXISTS datasets CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TYPE IF EXISTS process_status CASCADE;
+-- DROP TABLE IF EXISTS chat_messages CASCADE;
+-- DROP TABLE IF EXISTS clustering_results CASCADE;
+-- DROP TABLE IF EXISTS forecasting_results CASCADE;
+-- DROP TABLE IF EXISTS analysis_history CASCADE;
+-- DROP TABLE IF EXISTS ml_models CASCADE;
+-- DROP TABLE IF EXISTS datasets_bin CASCADE;
+-- DROP TABLE IF EXISTS datasets CASCADE;
+-- DROP TABLE IF EXISTS users CASCADE;
+-- DROP TYPE IF EXISTS process_status CASCADE;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ============================================================
 -- 1. Users
 -- ============================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(100) NOT NULL,
     email       VARCHAR(150) UNIQUE NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE users (
 -- ============================================================
 -- 2. ML Models
 -- ============================================================
-CREATE TABLE ml_models (
+CREATE TABLE IF NOT EXISTS ml_models (
     id          SERIAL PRIMARY KEY,
     name        VARCHAR(100) NOT NULL,
     type        VARCHAR(50) NOT NULL,
@@ -45,17 +45,7 @@ CREATE TABLE ml_models (
 -- ============================================================
 -- 3. Datasets
 -- ============================================================
-CREATE TABLE datasets (
-    id           SERIAL PRIMARY KEY,
-    user_id      INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    dataset_name VARCHAR(255) NOT NULL,
-    file_path    TEXT NOT NULL,
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at   TIMESTAMP NULL
-);
-
-CREATE TABLE datasets_bin (
+CREATE TABLE IF NOT EXISTS datasets_bin (
     id              SERIAL PRIMARY KEY,
     user_id         INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     ori_data_id     INT REFERENCES datasets_bin(id) ON DELETE SET NULL,
@@ -75,7 +65,7 @@ CREATE TABLE datasets_bin (
 -- ============================================================
 CREATE TYPE process_status AS ENUM ('berhasil', 'gagal', 'menunggu');
 
-CREATE TABLE analysis_history (
+CREATE TABLE IF NOT EXISTS analysis_history (
     id          SERIAL PRIMARY KEY,
     user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     dataset_id  INT REFERENCES datasets_bin(id) ON DELETE SET NULL,
@@ -89,7 +79,7 @@ CREATE TABLE analysis_history (
 -- ============================================================
 -- 5. Forecasting Results
 -- ============================================================
-CREATE TABLE forecasting_results (
+CREATE TABLE IF NOT EXISTS forecasting_results (
     id                      SERIAL PRIMARY KEY,
     analysis_id             INT UNIQUE REFERENCES analysis_history(id) ON DELETE CASCADE,
     confidence_percentage   FLOAT,
@@ -111,10 +101,11 @@ CREATE TABLE forecasting_results (
 -- ============================================================
 -- 6. Clustering Results
 -- ============================================================
-CREATE TABLE clustering_results (
+CREATE TABLE IF NOT EXISTS clustering_results (
     id               SERIAL PRIMARY KEY,
     analysis_id      INT UNIQUE REFERENCES analysis_history(id) ON DELETE CASCADE,
     cluster_amount   INT NOT NULL,
+    optimal_k        INT,
     silhouette_score FLOAT,
     wcss_score       FLOAT,
     cluster_data     JSONB NOT NULL,
@@ -130,7 +121,7 @@ CREATE TABLE clustering_results (
 -- ============================================================
 -- 7. Chat Messages
 -- ============================================================
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
     id            SERIAL PRIMARY KEY,
     analysis_id   INT REFERENCES analysis_history(id) ON DELETE CASCADE,
     sender_type   VARCHAR(10) NOT NULL,
@@ -145,51 +136,9 @@ CREATE TABLE chat_messages (
 -- ============================================================
 
 INSERT INTO users (name, email, password) VALUES
-    ('Budi Santoso', 'budi@example.com', crypt('BudiPass123', gen_salt('bf'))),
-    ('Ani Rahayu',   'ani@example.com',  crypt('AniPass123', gen_salt('bf'))),
-    ('Baraja Putra', 'baraja@example.com', crypt('password123', gen_salt('bf'))),
     ('string', 'user@example.com', crypt('string', gen_salt('bf'))),
     ('Admin', 'admin@pijak.com', crypt('admin123', gen_salt('bf')));
 
 INSERT INTO ml_models (name, type, description) VALUES
     ('XGBoost', 'forecasting', 'Extreme Gradient Boosting for time-series forecasting'),
-    ('Prophet', 'forecasting', 'Advanced time-series forecasting developed by Meta'),
-    ('K-Means', 'clustering', 'Unsupervised learning algorithm for partitioning data into K clusters'),
-    ('DBSCAN', 'clustering', 'Density-Based Spatial Clustering of Applications with Noise');
-
-INSERT INTO datasets_bin (user_id, dataset_name, dataset_file, original_encoding, is_cleaned) VALUES
-    (4, 'sales_data_2023.csv', decode('53616c65732044617461', 'hex'), 'utf-8', false),
-    (4, 'customer_segmentation.csv', decode('437573746f6d65722044617461', 'hex'), 'utf-8', false),
-    (4, 'revenue_Q1.csv', decode('526576656e75652044617461', 'hex'), 'utf-8', false);
-
-INSERT INTO analysis_history (user_id, dataset_id, model_id, status) VALUES
-    (4, 1, 1, 'berhasil'),
-    (4, 2, 3, 'berhasil'),
-    (4, 3, 2, 'menunggu'),
-    (4, 1, 2, 'gagal'),
-    (4, 2, 4, 'berhasil'),
-    (4, 3, 1, 'berhasil'),
-    (4, 1, 3, 'menunggu'),
-    (4, 2, 2, 'berhasil'),
-    (4, 3, 4, 'gagal'),
-    (4, 1, 1, 'berhasil');
-
-INSERT INTO forecasting_results (analysis_id, confidence_percentage, confidence_value, mae, mape, mse, rmse, r2, trend_data, insight_summary) VALUES
-    (1, 0.85, 12.5, 10.2, 5.5, 150.0, 12.2, 0.88, '[{"date": "2023-11-01", "value": 150}, {"date": "2023-11-02", "value": 160}]', 'Trend penjualan diperkirakan naik 5%% pada bulan depan. Fokuskan pada penambahan stok barang terlaris.'),
-    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', 'Menunggu giliran antrean untuk dieksekusi oleh pipeline ML.'),
-    (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[]', 'Kolom target tidak ditemukan dalam dataset. Harap periksa kembali konfigurasi data.'),
-    (6, 0.92, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-01-01", "value": 200}]', 'Terdapat tren kenaikan penjualan 15%% untuk kategori elektronik di bulan depan.'),
-    (8, 0.78, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-02-01", "value": 180}]', 'Perkiraan penjualan stabil dengan sedikit fluktuasi di akhir pekan.'),
-    (10, 0.88, NULL, NULL, NULL, NULL, NULL, NULL, '[{"date": "2024-03-01", "value": 210}]', 'Bulan depan diprediksi akan menjadi puncak penjualan untuk kuartal ini.');
-
-INSERT INTO clustering_results (analysis_id, cluster_amount, silhouette_score, wcss_score, cluster_data, insight_summary, wcss_list, silhouette_list, k_range) VALUES
-    (2, 3, 0.65, 1250.50, '[{"cluster": 1, "size": 50, "centroid": [0.5, 0.2]}, {"cluster": 2, "size": 30, "centroid": [0.1, 0.8]}]', 'Kluster 1 memiliki daya beli tinggi. Disarankan untuk menargetkan promosi produk premium pada kelompok ini.', '[2000.0, 1500.0, 1250.50, 1100.0, 1000.0]', '[0.45, 0.55, 0.65, 0.60, 0.58]', '[2, 3, 4, 5, 6]'),
-    (5, 4, 0.72, 980.20, '[{"cluster": 1, "size": 100}]', 'Ditemukan 4 kelompok utama pelanggan dengan pola keluhan yang sama pada pengiriman.', '[1800.0, 1400.0, 1150.0, 980.20, 900.0]', '[0.50, 0.60, 0.68, 0.72, 0.70]', '[2, 3, 4, 5, 6]'),
-    (7, 0, NULL, NULL, '[]', 'Sedang memproses pengelompokan berdasarkan tingkat frekuensi dan nilai transaksi...', NULL, NULL, NULL),
-    (9, 0, NULL, NULL, '[]', 'Dataset memiliki terlalu banyak nilai kosong sehingga gagal dikelompokkan.', NULL, NULL, NULL);
-
-INSERT INTO chat_messages (analysis_id, sender_type, message) VALUES
-    (1, 'user', 'Bagaimana prediksi penjualan untuk akhir tahun?'),
-    (1, 'ai', 'Berdasarkan model ARIMA, perkiraan penjualan akan melonjak di bulan Desember hingga 15% dari rata-rata.'),
-    (2, 'user', 'Siapa saja anggota dari Kluster 1?'),
-    (2, 'ai', 'Kluster 1 terdiri dari 50 pelanggan loyal dengan frekuensi belanja tinggi di akhir pekan.');
+    ('K-Means', 'clustering', 'Unsupervised learning algorithm for partitioning data into K clusters');

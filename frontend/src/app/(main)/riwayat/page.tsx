@@ -4,32 +4,21 @@ import { PerformanceBarChart } from "@/components/bar-chart";
 import { DynamicDataTable, type AnalysisRow } from "@/components/customized/table/table-11";
 import { StatusDonutChart } from "@/components/donut-chart";
 import { AnalysisCard } from "@/components/main-card";
-import { getAnalysisHistory } from "@/lib/middle-man";
-import * as React from "react";
+import { useAnalysis } from "@/hooks/use-analysis";
+import { useEffect, useMemo } from "react";
+import { AnalysisLoadingState } from "@/components/analysis-loading-state";
+import { AnalysisEmptyState } from "@/components/analysis-empty-state";
+import { Clock } from "lucide-react";
 
 export default function History() {
-    const [historyData, setHistoryData] = React.useState<AnalysisRow[]>([]);
-    const [isLoading, setIsLoading] = React.useState(true);
+    const { historyData, isLoadingHistory: isLoading, fetchHistory } = useAnalysis();
 
-    React.useEffect(() => {
-      const fetchHistory = async () => {
-        try {
-          const data = await getAnalysisHistory();
-          if (data) {
-            setHistoryData(data);
-          }
-        } catch (error) {
-          console.error("Failed to fetch analysis history:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
+    useEffect(() => {
       fetchHistory();
-    }, []);
+    }, [fetchHistory]);
 
     // Mengubah riwayat data mentah menjadi data tren untuk Forecasting
-    const forecastingData = React.useMemo(() => {
+    const forecastingData = useMemo(() => {
       return historyData
         .filter((d) => d.metode.toLowerCase() === "forecasting" && d.status === "berhasil" && d.confidence_level != null)
         .slice(0, 10) // Ambil 10 data terbaru
@@ -41,7 +30,7 @@ export default function History() {
     }, [historyData]);
 
     // Mengubah riwayat data mentah menjadi data tren untuk Clustering
-    const clusteringData = React.useMemo(() => {
+    const clusteringData = useMemo(() => {
       return historyData
         .filter((d) => d.metode.toLowerCase() === "clustering" && d.status === "berhasil" && d.silhouette_score != null)
         .slice(0, 10)
@@ -52,15 +41,45 @@ export default function History() {
         }));
     }, [historyData]);
 
-    const forecastingMean = React.useMemo(() => {
+    const forecastingMean = useMemo(() => {
       if (!forecastingData.length) return "0%";
       return Math.round(forecastingData.reduce((acc, curr) => acc + curr.score, 0) / forecastingData.length) + "%";
     }, [forecastingData]);
 
-    const clusteringMean = React.useMemo(() => {
+    const clusteringMean = useMemo(() => {
       if (!clusteringData.length) return "0%";
       return Math.round(clusteringData.reduce((acc, curr) => acc + curr.score, 0) / clusteringData.length) + "%";
     }, [clusteringData]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col h-full w-full p-4 pt-12">
+                <AnalysisLoadingState
+                    title="Memuat riwayat analisis..."
+                    subtitle="Proses ini mungkin memerlukan waktu beberapa saat"
+                />
+            </div>
+        );
+    }
+
+    if (historyData.length === 0) {
+        return (
+            <div className="flex flex-col h-full w-full p-4">
+                <AnalysisEmptyState
+                    title="ditampilkan (Riwayat Analisis)"
+                    description="Belum ada riwayat pengajuan analisis yang tersimpan di database."
+                    steps={[
+                        'Buka halaman Analisis untuk mengunggah file CSV baru.',
+                        'Tentukan konfigurasi kolom dan jalankan analisis forecasting atau clustering.',
+                        'Setelah analisis selesai, riwayat pengajuan dan performa model akan tercatat di halaman ini.'
+                    ]}
+                    icon={Clock}
+                    redirectTo="/analisis"
+                    buttonText="Mulai Analisis Pertama"
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full flex-1 gap-4 min-h-0">

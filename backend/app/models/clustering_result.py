@@ -10,6 +10,7 @@ class ClusteringResult(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     analysis_id = Column(Integer, ForeignKey("analysis_history.id", ondelete="CASCADE"), unique=True, nullable=True)
     cluster_amount = Column(Integer, nullable=False)
+    optimal_k = Column(Integer, nullable=True)
     silhouette_score = Column(Float, nullable=True)
     wcss_score = Column(Float, nullable=True)
     cluster_data = Column(JSONB, nullable=False)

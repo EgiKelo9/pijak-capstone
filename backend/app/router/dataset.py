@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse, ProcessDatasetRequest
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler
+from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler, fetch_cleaned_dataset_ids
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 from fastapi import WebSocket, WebSocketDisconnect
@@ -286,3 +286,24 @@ async def run_preprocess_proxy(
 @router.websocket("/preprocess/ws/{job_id}")
 async def preprocess_websocket_proxy(websocket: WebSocket, job_id: str):
     await preprocess_websocket_handler(websocket, job_id)
+
+@router.get(
+    "/{raw_dataset_id}/cleaned",
+    response_model=StandardResponse[Any],
+    responses={
+        401: {"model": StandardResponse[dict], "description": "Unauthorized"},
+        403: {"model": StandardResponse[dict], "description": "Forbidden"},
+        404: {"model": StandardResponse[dict], "description": "Not Found"},
+        500: {"model": StandardResponse[dict], "description": "Internal Server Error"}
+    }
+)
+async def get_cleaned_dataset_ids_route(
+    raw_dataset_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the forecasting and clustering cleaned dataset IDs associated with a raw dataset.
+    """
+    return await fetch_cleaned_dataset_ids(raw_dataset_id, current_user, db)
+

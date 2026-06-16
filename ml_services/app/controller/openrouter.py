@@ -58,13 +58,24 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             task_str = "Both"
 
         # Build prompt
-        prompt = f"""
-            Please extract features(columns) from the following dataset.
-            The user wants to do {task_str} option from the available service of Clustering and Forecasting.
-            Dataset:
+        prompt = f"""Task: {task_str} (Clustering and/or Forecasting on retail sales data).
+            Map dataset columns to the correct roles. Return ONLY a valid JSON object using JSON schema below, no explanation.
+
+            Field definitions:
+            - cols_to_drop: list of ID/name/irrelevant columns
+            - col_date_time: {{"col_whole":"<col>","col_day":null,"col_month":null,"col_year":null}} — use col_whole if date is combined
+            - col_product: single target column of product/category name columns (e.g. Product_Name, Item_Name)
+            - col_target: single target column (e.g. Sales, Revenue)
+            - col_to_numerical: list of columns to cast as numeric (null if none)
+            - col_to_categorical: list of columns to cast as categorical (null if none)
+            - new_feature_pairing: list of {{"column_1":"","operator":"divide|multiply|subtract|add","column_2":"","new_col_name":""}} or null
+            - reasonings: one short sentence explaining key decisions
+
+            Dataset info:
             {dataset_info}
-        """
-                
+
+            Respond with JSON only."""
+
         # Kirim ke OpenRouter
         llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
@@ -125,15 +136,10 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
 
 async def get_insight_from_data(target_task: str, json_data: Any) -> str:
     """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
-    prompt = f"""
-    Kamu adalah Business Analyst non-teknis untuk wirausaha retail.
-    Task Machine Learning saat ini: "{target_task}"
-    Berdasarkan data prediksi berikut:
-    {json.dumps(json_data, default=str)}
-    Berikan insight bisnis yang konkret, singkat, dan mudah dipahami.
-    Fokus pada stok, barang tak laku, peluang promo, dan tindakan prioritas yang relevan dengan task.
-    Balas hanya dengan teks insight, tanpa markdown berlebihan.
-    """
+    # Prompt ringkas: role + task + data + output spec dalam satu blok
+    prompt = f"""Analyst retail UMKM. Task: {target_task}.
+        Data: {json.dumps(json_data, default=str)}
+        Tulis insight bisnis plain text, max 8 kalimat. Fokus: stok, promo, prioritas aksi. Tanpa markdown."""
     try:
         insight_response = await generate_from_openrouter(prompt)
         if getattr(insight_response, "error", False):
@@ -150,22 +156,41 @@ async def get_insight_from_clustering(cluster_summary: dict) -> str:
     Diadaptasi dari gemma.py::get_insight_from_clustering.
     Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
     """
+    cluster_ids = []
+    if cluster_summary:
+        first_feature = next(iter(cluster_summary.values()))
+        if isinstance(first_feature, dict):
+            try:
+                cluster_ids = sorted(list(first_feature.keys()), key=lambda x: int(x))
+            except Exception:
+                cluster_ids = sorted(list(first_feature.keys()))
+            
+    klaster_templates_kategori = ""
+    klaster_templates_insight = ""
+    for i in range(len(cluster_ids)):
+        klaster_templates_kategori += f"Klaster {i+1}: [Kategori Klaster {i+1}]\n"
+        klaster_templates_insight += f"Klaster {i+1}: [Insight Klaster {i+1}]\n"
+        
     prompt = (
-        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Kamu adalah Business Analyst untuk wirausaha retail.\n"
         f"Berdasarkan hasil segmentasi produk berikut (rata-rata fitur per klaster):\n"
         f"{json.dumps(cluster_summary, default=str)}\n\n"
-        f"Berikan insight bisnis dalam format berikut. "
-        f"Jangan gunakan markdown formatting seperti ** atau *. "
-        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
-        f"KATEGORI CLUSTER: Kategorikan tiap cluster sebagai Fast Moving, "
-        f"Medium Moving, atau Slow Moving berdasarkan Sales dan Quantity.\n\n"
-        f"INSIGHT PER CLUSTER (maks 2 kalimat per cluster): "
-        f"Sebutkan karakteristik utama dan 1 rekomendasi aksi.\n\n"
+        f"PENTING: Berikan insight bisnis dengan mengikuti format di bawah ini secara persis.\n"
+        f"Jangan gunakan markdown formatting seperti ** atau *. Gunakan plain text saja.\n\n"
+        f"Format output yang WAJIB diikuti secara paten:\n\n"
+        f"KATEGORI CLUSTER:\n"
+        f"{klaster_templates_kategori}\n"
+        f"INSIGHT PER CLUSTER:\n"
+        f"{klaster_templates_insight}\n"
         f"PRIORITAS AKSI BISNIS:\n"
-        f"- Produk yang perlu RESTOCK\n"
-        f"- Produk yang perlu DISKON\n"
-        f"- Produk yang perlu DIEVALUASI\n\n"
-        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+        f"- Produk yang perlu RESTOCK: [Rekomendasi aksi restock]\n"
+        f"- Produk yang perlu DISKON: [Rekomendasi aksi diskon]\n"
+        f"- Produk yang perlu DIEVALUASI: [Rekomendasi aksi evaluasi]\n\n"
+        f"Penjelasan format:\n"
+        f"1. KATEGORI CLUSTER: Kategorikan tiap Klaster 1 s.d. Klaster {len(cluster_ids)} sebagai Fast Moving, "
+        f"Medium Moving, atau Slow Moving berdasarkan nilai Sales dan Quantity yang ada pada data.\n"
+        f"2. INSIGHT PER CLUSTER: Berikan 1-2 kalimat deskripsi karakteristik utama dan rekomendasi aksi untuk masing-masing Klaster.\n"
+        f"3. PRIORITAS AKSI BISNIS: Berikan 1 rekomendasi aksi spesifik untuk masing-masing dari ketiga poin tersebut menggunakan bahasa Indonesia yang mudah dimengerti UMKM."
     )
     try:
         result = await generate_from_openrouter(prompt)
@@ -183,16 +208,23 @@ async def get_insight_from_forecasting(forecast_summary: dict) -> str:
     Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
     """
     prompt = (
-        f"Kamu adalah Business Analyst untuk wirausaha retail. "
+        f"Kamu adalah Business Analyst untuk wirausaha retail.\n"
         f"Berdasarkan prediksi penjualan agregat (keseluruhan) berikut:\n"
         f"{json.dumps(forecast_summary, default=str)}\n\n"
-        f"Berikan insight bisnis dalam format berikut. "
-        f"Jangan gunakan markdown formatting seperti ** atau *. "
-        f"Gunakan plain text saja. Maksimal 15 kalimat total.\n\n"
-        f"TREN KESELURUHAN: Ringkasan tren prediksi penjualan keseluruhan usaha di masa depan.\n\n"
-        f"ANALISIS PERFORMA: Penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya (berdasarkan data prediksi).\n\n"
-        f"REKOMENDASI AKSI: 2-3 langkah konkret yang bisa dilakukan sekarang oleh UMKM (seperti alokasi modal, strategi promosi keseluruhan, atau manajemen operasional).\n\n"
-        f"Gunakan bahasa Indonesia yang singkat dan mudah dipahami UMKM."
+        f"PENTING: Berikan insight bisnis dengan mengikuti format di bawah ini secara persis.\n"
+        f"Jangan gunakan markdown formatting seperti ** atau *. Gunakan plain text saja.\n\n"
+        f"Format output yang WAJIB diikuti secara paten:\n\n"
+        f"TREN KESELURUHAN:\n"
+        f"[Isi ringkasan tren prediksi penjualan keseluruhan usaha di masa depan]\n\n"
+        f"ANALISIS PERFORMA:\n"
+        f"[Isi penjelasan singkat mengenai proyeksi penjualan dan tingkat stabilitasnya]\n\n"
+        f"REKOMENDASI AKSI:\n"
+        f"- Optimalisasi Stok & Ketersediaan: [Isi rekomendasi konkret terkait stok, ketersediaan barang, atau restock]\n"
+        f"- Promosi & Program Loyalitas: [Isi rekomendasi konkret terkait promosi penjualan, diskon, atau program loyalitas]\n"
+        f"- Evaluasi & Perbaikan Proses: [Isi rekomendasi konkret terkait evaluasi proses bisnis, operasional, atau pemesanan]\n\n"
+        f"Keterangan:\n"
+        f"1. Gunakan bahasa Indonesia yang singkat, jelas, dan mudah dipahami oleh UMKM.\n"
+        f"2. Pada bagian REKOMENDASI AKSI, wajib ada 3 rekomendasi dengan diawali tanda hubung (-) dan nama kategorinya secara persis seperti contoh di atas (Optimalisasi Stok & Ketersediaan:, Promosi & Program Loyalitas:, Evaluasi & Perbaikan Proses:)."
     )
     try:
         result = await generate_from_openrouter(prompt)

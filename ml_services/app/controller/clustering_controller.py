@@ -29,8 +29,19 @@ async def run_clustering(request: ClusteringRequest):
         existing_features = [col for col in request.col_fitur if col in df.columns]
         col_product = request.col_product
         if col_product not in df.columns:
+            # Coba fallback ke kolom non-numerik yang mengandung kata 'name'/'nama'/'product'/'produk'
             non_numeric = df.select_dtypes(exclude='number').columns.tolist()
-            col_product = non_numeric[0] if non_numeric else df.columns[0]
+            name_keywords = ['product name', 'product_name', 'nama produk', 'nama_produk',
+                             'item name', 'item_name', 'product', 'produk', 'name', 'nama', 'item']
+            fallback_col = None
+            for kw in name_keywords:
+                for col in non_numeric:
+                    if kw in col.lower():
+                        fallback_col = col
+                        break
+                if fallback_col:
+                    break
+            col_product = fallback_col or (non_numeric[0] if non_numeric else df.columns[0])
             logger.warning(f"col_product '{request.col_product}' not found in dataset. Falling back to '{col_product}'")
 
         input_json = {

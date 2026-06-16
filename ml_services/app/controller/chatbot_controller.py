@@ -9,10 +9,13 @@ async def generate_chatbot_response(request: ChatbotRequest) -> ChatbotResponse:
     message = request.message
     attachment_str = ""
     if request.attachment is not None:
-        try:
-            attachment_str = json.dumps(request.attachment, default=str, indent=2)
-        except Exception:
-            attachment_str = str(request.attachment)
+        if isinstance(request.attachment, str):
+            attachment_str = request.attachment
+        else:
+            try:
+                attachment_str = json.dumps(request.attachment, default=str, indent=2)
+            except Exception:
+                attachment_str = str(request.attachment)
 
     prompt = f"""
     Kamu adalah BeeZ, asisten AI Business Intelligence yang cerdas untuk wirausaha retail/UMKM.

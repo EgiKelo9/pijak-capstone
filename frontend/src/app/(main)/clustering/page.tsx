@@ -76,92 +76,133 @@ export default function ClusteringPage() {
   }, [result]);
 
   const parsedInsight = useMemo(() => {
-    if (!result) return { categories: {}, insights: {}, priorities: [] };
+    if (!result) return { categories: {} as Record<number, string>, insights: {} as Record<number, string>, priorities: [] as string[] };
     const text = result.insight_summary || '';
     
     const categories: Record<number, string> = {};
     const insights: Record<number, string> = {};
     const priorities: string[] = [];
     
-    // Split text by section titles
+    // ── Strategy 1: Split by well-known section headers ────────────────────
     const sections = text.split(/(?=KATEGORI CLUSTER:|INSIGHT PER CLUSTER:|PRIORITAS AKSI BISNIS:)/gi);
     
     sections.forEach(section => {
       const cleanSec = section.trim();
+
+      // ── KATEGORI CLUSTER ────────────────────────────────────────────────
       if (cleanSec.toUpperCase().startsWith("KATEGORI CLUSTER:")) {
-        const lines = cleanSec.split('\n');
-        lines.forEach(line => {
-          const match = line.match(/(?:Cluster|Klaster)\s*(\d+)\s*:\s*(.*)/i);
-          if (match) {
-            categories[parseInt(match[1])] = match[2].trim();
-          }
-        });
-      } else if (cleanSec.toUpperCase().startsWith("INSIGHT PER CLUSTER:")) {
-        const lines = cleanSec.replace("INSIGHT PER CLUSTER:", "").trim().split('\n');
-        let currentCluster: number | null = null;
-        let currentText = '';
-        
-        lines.forEach(line => {
-          const match = line.match(/^\s*(?:Cluster|Klaster)\s*(\d+)\s*(.*)/i);
-          if (match) {
-            if (currentCluster !== null) {
-              insights[currentCluster] = currentText.trim();
-            }
-            currentCluster = parseInt(match[1]);
-            let rest = match[2].trim();
-            if (rest.startsWith(":")) rest = rest.substring(1).trim();
-            currentText = rest;
-          } else if (currentCluster !== null) {
-            currentText += '\n' + line;
-          }
-        });
-        if (currentCluster !== null) {
-          insights[currentCluster] = currentText.trim();
+        const content = cleanSec.replace(/KATEGORI CLUSTER:\s*/i, '');
+        // Try line-by-line first
+        const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+        const tempCats: { num: number; val: string }[] = [];
+
+        if (lines.length > 1) {
+          // Multi-line format: each line is "Klaster N: Category"
+          lines.forEach(line => {
+            const m = line.match(/(?:Cluster|Klaster)\s*(\d+)\s*:\s*(.*)/i);
+            if (m) tempCats.push({ num: parseInt(m[1]), val: m[2].trim() });
+          });
+        } else {
+          // Single-line format: "Klaster 1: Slow Moving Klaster 2: Fast Moving"
+          const parts = content.split(/(?=(?:Cluster|Klaster)\s*\d+\s*:)/gi).filter(Boolean);
+          parts.forEach(part => {
+            const m = part.match(/(?:Cluster|Klaster)\s*(\d+)\s*:\s*(.*)/i);
+            if (m) tempCats.push({ num: parseInt(m[1]), val: m[2].trim() });
+          });
         }
-      } else if (cleanSec.toUpperCase().startsWith("PRIORITAS AKSI BISNIS:")) {
-        const lines = cleanSec.replace("PRIORITAS AKSI BISNIS:", "").trim().split('\n');
+        
+        // Auto-detect 1-indexed and normalize to 0-indexed
+        const nums = tempCats.map(x => x.num);
+        const isOneIndexed = nums.length > 0 && Math.min(...nums) === 1 && !nums.includes(0);
+        tempCats.forEach(({ num, val }) => {
+          categories[isOneIndexed ? num - 1 : num] = val;
+        });
+      }
+
+      // ── INSIGHT PER CLUSTER ─────────────────────────────────────────────
+      else if (cleanSec.toUpperCase().startsWith("INSIGHT PER CLUSTER")) {
+        const content = cleanSec.replace(/INSIGHT PER CLUSTER[^:]*:\s*/i, '');
+        const tempInsights: { num: number; val: string }[] = [];
+
+        // Split on "Klaster N:" boundaries
+        const parts = content.split(/(?=(?:Cluster|Klaster)\s*\d+\s*:)/gi).filter(Boolean);
+        parts.forEach(part => {
+          const m = part.match(/(?:Cluster|Klaster)\s*(\d+)\s*:\s*([\s\S]*)/i);
+          if (m) tempInsights.push({ num: parseInt(m[1]), val: m[2].trim() });
+        });
+
+        const nums = tempInsights.map(x => x.num);
+        const isOneIndexed = nums.length > 0 && Math.min(...nums) === 1 && !nums.includes(0);
+        tempInsights.forEach(({ num, val }) => {
+          insights[isOneIndexed ? num - 1 : num] = val;
+        });
+      }
+
+      // ── PRIORITAS AKSI BISNIS ───────────────────────────────────────────
+      else if (cleanSec.toUpperCase().startsWith("PRIORITAS AKSI BISNIS")) {
+        const content = cleanSec.replace(/PRIORITAS AKSI BISNIS[^:]*:\s*/i, '');
+        // Try line-by-line first (original working approach)
+        const lines = content.split('\n');
         lines.forEach(line => {
           const trimmed = line.trim();
           if (trimmed.startsWith('-') || trimmed.startsWith('*') || /^\d+\./.test(trimmed)) {
             priorities.push(trimmed);
           }
         });
+        // Fallback for single-line: split on " - Produk" boundaries
+        if (priorities.length === 0 && content.includes('- ')) {
+          const parts = content.split(/\s+(?=-\s*Produk)/gi).filter(Boolean);
+          parts.forEach(part => {
+            const trimmed = part.trim();
+            if (trimmed) priorities.push(trimmed);
+          });
+        }
       }
     });
+    
+    // ── Strategy 2 (fallback): if section headers were not found, ─────────
+    //    try to extract per-cluster insights from the raw text directly
+    if (Object.keys(insights).length === 0 && text.length > 0) {
+      const parts = text.split(/(?=(?:Cluster|Klaster)\s*\d+)/gi).filter(Boolean);
+      parts.forEach(part => {
+        const m = part.match(/(?:Cluster|Klaster)\s*(\d+)\s*[:\-]?\s*([\s\S]*)/i);
+        if (m) {
+          const num = parseInt(m[1]);
+          const val = m[2].trim();
+          if (val) insights[num] = val;
+        }
+      });
+      // Normalize to 0-indexed if needed
+      const nums = Object.keys(insights).map(Number);
+      if (nums.length > 0 && Math.min(...nums) === 1 && !nums.includes(0)) {
+        const copy = { ...insights };
+        Object.keys(copy).forEach(k => {
+          const n = Number(k);
+          delete insights[n];
+          insights[n - 1] = copy[n];
+        });
+      }
+    }
     
     return { categories, insights, priorities };
   }, [result]);
 
-  const clusterInsights = useMemo(() => {
-    if (!result) return [];
-    
-    const parsed = parsedInsight;
-    return uniqueClusters.map(c => {
-      if (parsed.insights[c]) {
-        const cat = parsed.categories[c];
-        const prefix = cat ? `**Kategori: ${cat}**\n\n` : '';
-        return prefix + parsed.insights[c];
-      }
-      
-      const text = result.insight_summary || '';
-      const parts = text.split(/(?=Cluster \d+|Klaster \d+)/gi).filter(Boolean);
-      const matchingPart = parts.find(p => {
-        const match = p.match(/(?:Cluster|Klaster)\s*(\d+)/i);
-        return match && parseInt(match[1]) === c;
-      });
-      if (matchingPart) return matchingPart;
-      
-      return text;
-    });
-  }, [result, parsedInsight, uniqueClusters]);
-
   const elbowData = useMemo(() =>
-    result?.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] })) ?? [],
+    (result?.k_range && result?.wcss_list)
+      ? result.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] }))
+      : [],
     [result]
   );
 
   const silhouetteData = useMemo(() =>
-    result?.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] })) ?? [],
+    (result?.k_range && result?.silhouette_list)
+      ? result.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] }))
+      : [],
+    [result]
+  );
+
+  const hasMetrikData = useMemo(() =>
+    !!(result?.k_range && result?.wcss_list && result?.silhouette_list),
     [result]
   );
 
@@ -305,14 +346,14 @@ export default function ClusteringPage() {
                 style={{ background: 'linear-gradient(135deg, #2BBAEE, #90FDF2)' }}>
                 K yang digunakan: {result.cluster_amount}
               </div>
-              {result.cluster_amount !== result.optimal_k && (
+              {result.optimal_k != null && result.cluster_amount !== result.optimal_k && (
                 <span className="text-xs text-neutral-400 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
                   K optimal sistem: {result.optimal_k}
                 </span>
               )}
             </div>
 
-            <ClusterSummaryCards result={result} colFitur={colFitur} />
+            <ClusterSummaryCards result={result} colFitur={colFitur} categories={parsedInsight.categories} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               <AnalysisCard title="Distribusi Produk per Klaster" status="berhasil">
@@ -343,7 +384,8 @@ export default function ClusteringPage() {
                       <ClusterAccordion key={c} clusterIndex={c}
                         color={CLUSTER_COLORS[i % CLUSTER_COLORS.length]}
                         productCount={clusterSizes[c] || 0}
-                        insight={clusterInsights[i] || result.insight_summary} />
+                        category={parsedInsight.categories[c]}
+                        insight={parsedInsight.insights[c] || ''} />
                     ))}
                   </div>
 
@@ -395,29 +437,37 @@ export default function ClusteringPage() {
             activeTab === 'pengujian' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'
           )}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <KpiCard title="Silhouette Score" value={result.silhouette_score} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
-              <KpiCard title="WCSS Score" value={result.wcss_score.toFixed(1)} sub="Semakin rendah semakin baik" opacity={0.08} />
-              <KpiCard title="K Optimal" value={result.optimal_k} sub="Rekomendasi sistem" opacity={0.16} />
+              <KpiCard title="Silhouette Score" value={result.silhouette_score?.toFixed(4) ?? '-'} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
+              <KpiCard title="WCSS Score" value={result.wcss_score?.toFixed(1) ?? '-'} sub="Semakin rendah semakin baik" opacity={0.08} />
+              <KpiCard title="K Optimal" value={result.optimal_k ?? '-'} sub="Rekomendasi sistem" opacity={0.16} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
-                <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
-                  gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k} yLabel="WCSS" />
-                <p className="text-xs text-neutral-400 text-center mt-1">
-                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                  K optimal = {result.optimal_k}
-                </p>
+            {hasMetrikData ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
+                  <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
+                    gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k ?? undefined} yLabel="WCSS" />
+                  <p className="text-xs text-neutral-400 text-center mt-1">
+                    <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                    K optimal = {result.optimal_k ?? '-'}
+                  </p>
+                </AnalysisCard>
+                <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
+                  <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
+                    gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k ?? undefined} yLabel="Score" />
+                  <p className="text-xs text-neutral-400 text-center mt-1">
+                    <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                    K optimal = {result.optimal_k ?? '-'}
+                  </p>
+                </AnalysisCard>
+              </div>
+            ) : (
+              <AnalysisCard title="Analisis Elbow & Silhouette" status="kosong">
+                <div className="flex items-center justify-center py-10 text-sm text-neutral-400">
+                  Data elbow/silhouette tidak tersedia untuk hasil ini. Jalankan ulang clustering untuk melihat grafik.
+                </div>
               </AnalysisCard>
-              <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
-                <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
-                  gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k} yLabel="Score" />
-                <p className="text-xs text-neutral-400 text-center mt-1">
-                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                  K optimal = {result.optimal_k}
-                </p>
-              </AnalysisCard>
-            </div>
+            )}
 
             <div>
               <AnalysisCard title="Visualisasi Sebaran Klaster" status="berhasil">
