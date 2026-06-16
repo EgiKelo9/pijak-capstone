@@ -272,6 +272,184 @@ def extract_response(response):
         "col_year": col_year
     }
 
+def _col_matches(col_lower: str, keywords: list) -> bool:
+    """Cek apakah nama kolom (lowercase) mengandung salah satu keyword."""
+    return any(kw in col_lower for kw in keywords)
+
+
+def resolve_col_product(col_product, df_columns: list) -> str | None:
+    """
+    Resolve col_product dari list ke satu column name terbaik untuk clustering.
+    Prioritas: kolom yang mengandung kata 'name/nama' lebih diutamakan daripada ID.
+
+    Args:
+        col_product: str atau list of str dari LLM.
+        df_columns:  daftar kolom yang tersedia di DataFrame saat ini.
+    Returns:
+        Nama kolom terbaik sebagai string, atau None jika tidak ada yang tersedia.
+    """
+    if not col_product:
+        return None
+    if isinstance(col_product, str):
+        return col_product if col_product in df_columns else None
+
+    name_priority = [
+        'product name', 'product_name', 'nama produk', 'nama_produk',
+        'item name',    'item_name',    'nama barang', 'nama_barang',
+        'nama item',    'nama_item',
+        'product',      'produk',       'item',
+        'goods',        'barang',       'name',        'nama',
+    ]
+
+    available = {col.lower(): col for col in col_product if col in df_columns}
+    for kw in name_priority:
+        for col_lower, col_orig in available.items():
+            if kw in col_lower:
+                return col_orig
+
+    # Fallback: kembalikan kolom pertama yang masih ada di df
+    for col in col_product:
+        if col in df_columns:
+            return col
+    return None
+
+
+def auto_drop_uninformative_cols(
+    df: pd.DataFrame,
+    preserve_cols: list | None = None,
+) -> tuple:
+    """
+    Otomatis mendeteksi dan mendrop kolom yang tidak informatif untuk ML.
+
+    Aturan drop:
+    1. Kolom ID generik  — row_id, customer_id, order_id, dsb. (kecuali yang dipreserve)
+    2. Kolom tanggal/waktu yang bukan kolom datetime utama
+    3. Kolom alamat yang terlalu rinci — postal code, street, address, zip, dsb.
+    4. Kolom lokasi yang terlalu generik — country, negara, dsb. (city/state/region tetap)
+
+    Args:
+        df:            DataFrame input.
+        preserve_cols: Kolom yang TIDAK boleh didrop (datetime utama, target, product, dsb.).
+    Returns:
+        (df_cleaned, list_of_actually_dropped_columns)
+    """
+    preserve_lower = {c.lower() for c in (preserve_cols or []) if c}
+
+    # --- ID patterns ---
+    ID_EXACT    = {'id'}
+    ID_SUFFIXES = (' id', '_id')
+    ID_CONTAINS = ['row id', 'row_id', 'rowid']
+
+    # --- Date/time patterns (non-main date column) ---
+    DATE_CONTAINS = [
+        'date', 'time', 'timestamp', 'datetime',
+        'tanggal', 'waktu', 'tgl',
+        'created_at', 'updated_at', 'deleted_at',
+    ]
+
+    # --- Overly detailed address ---
+    ADDRESS_CONTAINS = [
+        'address', 'alamat', 'postal', 'zip', 'street', 'jalan', 'road',
+        'avenue', 'blvd', 'lane', 'kodepos', 'kode pos', 'postcode', 'zipcode',
+        'suite', 'apt ', ' unit',
+    ]
+
+    # --- Too-generic location (country-level, drop these) ---
+    GENERIC_LOC_CONTAINS = ['country', 'negara', 'nation', 'countries']
+
+    cols_to_drop = []
+    for col in df.columns:
+        col_lower = col.lower().strip()
+
+        if col_lower in preserve_lower:
+            continue
+
+        # 1. Generic ID columns
+        if col_lower in ID_EXACT:
+            cols_to_drop.append(col); continue
+        if col_lower.endswith(ID_SUFFIXES[0]) or col_lower.endswith(ID_SUFFIXES[1]):
+            cols_to_drop.append(col); continue
+        if _col_matches(col_lower, ID_CONTAINS):
+            cols_to_drop.append(col); continue
+
+        # 2. Date/time columns (non-main)
+        if _col_matches(col_lower, DATE_CONTAINS):
+            cols_to_drop.append(col); continue
+
+        # 3. Overly detailed address columns
+        if _col_matches(col_lower, ADDRESS_CONTAINS):
+            cols_to_drop.append(col); continue
+
+        # 4. Generic location columns (country-level)
+        if _col_matches(col_lower, GENERIC_LOC_CONTAINS):
+            cols_to_drop.append(col); continue
+
+    actual_dropped = [c for c in cols_to_drop if c in df.columns]
+    if actual_dropped:
+        print(f"[INFO] auto_drop_uninformative_cols dropped: {actual_dropped}", flush=True)
+        df = df.drop(columns=actual_dropped)
+
+    return df, actual_dropped
+
+
+def build_forecast_metadata(extracted: dict) -> dict:
+    """
+    Derivasi feature_metadata untuk cleaned forecasting dataset dari extracted raw metadata.
+
+    Aturan:
+    - col_dt_whole  → dipertahankan (wajib untuk time-series)
+    - col_target    → dipertahankan
+    - col_pairing   → dipertahankan (fitur baru sudah ada di df, tapi metadata tetap dicatat)
+    - col_to_num    → dipertahankan
+    - col_to_cat    → dipertahankan
+    - col_product   → dikosongkan (sudah di-drop dari df_forecast)
+    - cols_to_drop  → dikosongkan (sudah dieksekusi di raw pipeline)
+    - is_whole / col_day / col_month / col_year → dipertahankan sesuai extracted
+    """
+    return {
+        "is_whole":     extracted.get("is_whole", False),
+        "col_dt_whole": extracted.get("col_dt_whole"),
+        "col_day":      extracted.get("col_day"),
+        "col_month":    extracted.get("col_month"),
+        "col_year":     extracted.get("col_year"),
+        "col_target":   extracted.get("col_target"),
+        "col_to_cat":   extracted.get("col_to_cat") or [],
+        "col_to_num":   extracted.get("col_to_num") or [],
+        "col_pairing":  extracted.get("col_pairing") or [],
+        "col_product":  None,
+        "cols_to_drop": extracted.get("cols_to_drop") or [],
+    }
+
+
+def build_cluster_metadata(extracted: dict, col_product_resolved: str | None = None) -> dict:
+    """
+    Derivasi feature_metadata untuk cleaned clustering dataset dari extracted raw metadata.
+
+    Aturan:
+    - col_product   → di-resolve ke SATU kolom nama produk terbaik (str, bukan list)
+    - col_target    → dipertahankan (Sales / Revenue sebagai fitur numerik clustering)
+    - col_to_cat    → dipertahankan
+    - col_to_num    → dipertahankan
+    - col_pairing   → dipertahankan (fitur baru sudah ada di df)
+    - col_dt_whole  → dikosongkan (sudah di-drop dari df_cluster)
+    - is_whole / col_day / col_month / col_year → di-reset (tidak relevan untuk clustering)
+    - cols_to_drop  → record semua kolom yang di-drop selama pipeline
+    """
+    return {
+        "is_whole":     False,
+        "col_dt_whole": None,
+        "col_day":      None,
+        "col_month":    None,
+        "col_year":     None,
+        "col_target":   None,
+        "col_product":  col_product_resolved or "",
+        "col_to_cat":   extracted.get("col_to_cat") or [],
+        "col_to_num":   extracted.get("col_to_num") or [],
+        "col_pairing":  extracted.get("col_pairing") or [],
+        "cols_to_drop": extracted.get("cols_to_drop") or [],
+    }
+
+
 async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     shapes = []
     
@@ -279,9 +457,12 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
     shapes.append(df.shape)
 
     mapping_res = await get_dataset_feature_metadata(dataset_id)
-    # print(mapping_res)
+    if mapping_res is None:
+        print(f"[WARN] feature_metadata for dataset {dataset_id} returned None — preprocessing will use empty defaults. Check if ML service has access to this dataset's feature-metadata endpoint.", flush=True)
+    else:
+        print(f"[INFO] feature_metadata fetched: {mapping_res}", flush=True)
     extracted = extract_response(mapping_res or {})
-    # print(extracted)
+    print(f"[INFO] extracted: {extracted}", flush=True)
 
     step1_id = f"{job_id}-step1"
     await manager.send(job_id, {"stepId": step1_id, "text": "Menyiapkan worker: memindai anomali dan membersihkan noise data...", "status": "loading"})
@@ -292,6 +473,29 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         df = (
             df.pipe(drop_cols, cols_to_drop)
         )
+
+        # Auto-drop: kolom ID generik, tanggal non-utama, alamat rinci, lokasi terlalu generik
+        # Preserve: datetime utama, target, serta semua product columns agar tersedia untuk fork clustering
+        preserve_always = list(filter(None, [
+            extracted.get("col_dt_whole"),
+            extracted.get("col_target"),
+            extracted.get("col_day"),
+            extracted.get("col_month"),
+            extracted.get("col_year"),
+        ] + as_list(extracted.get("col_product"))))
+        df, auto_dropped = auto_drop_uninformative_cols(df, preserve_cols=preserve_always)
+
+        # Hapus kolom yang sudah di-drop dari col_to_cat dan col_to_num agar metadata konsisten
+        auto_dropped_set = set(auto_dropped)
+        if extracted.get("col_to_cat"):
+            extracted["col_to_cat"] = [c for c in extracted["col_to_cat"] if c not in auto_dropped_set]
+        if extracted.get("col_to_num"):
+            extracted["col_to_num"] = [c for c in (extracted["col_to_num"] or []) if c not in auto_dropped_set]
+
+        # Update record lengkap semua kolom yang di-drop (LLM-recommended + auto-drop)
+        all_dropped = list(dict.fromkeys(cols_to_drop + auto_dropped))
+        extracted["cols_to_drop"] = all_dropped
+
         await manager.send(job_id, {"stepId": step1_id, "text": "Anomali dan noise data berhasil dibersihkan.", "status": "success"})
 
         step2_id = f"{job_id}-step2"
@@ -354,24 +558,33 @@ async def temp_pipeline(dataset_id:int, model: str, job_id: str):
         if model.lower() == 'both':
             prod_cols = as_list(extracted.get("col_product"))
             df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
-            upload_forecast = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
+            forecast_metadata = build_forecast_metadata(extracted)
+            upload_forecast = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', forecast_metadata)
             cleaned_forecast_id = upload_forecast.get("data", {}).get("dataset_id")
 
             df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
             df_cluster = ensure_clustering_columns(df_cluster)
-            upload_cluster = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            # Resolve col_product ke satu string nama produk terbaik setelah ensure_clustering_columns
+            col_product_single = resolve_col_product(prod_cols, list(df_cluster.columns))
+            cluster_metadata = build_cluster_metadata(extracted, col_product_resolved=col_product_single)
+            upload_cluster = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', cluster_metadata)
             cleaned_cluster_id = upload_cluster.get("data", {}).get("dataset_id")
             print(f"Upload successful: forecast_id={cleaned_forecast_id}, cluster_id={cleaned_cluster_id}")
         elif model.lower() == 'forecasting':
             prod_cols = as_list(extracted.get("col_product"))
             df_forecast = df.drop(columns=[col for col in prod_cols if col in df.columns])
-            upload_result = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', extracted)
+            forecast_metadata = build_forecast_metadata(extracted)
+            upload_result = await upload_cleaned_dataset(df_forecast, dataset_id, 'Forecasting', forecast_metadata)
             cleaned_forecast_id = upload_result.get("data", {}).get("dataset_id")
             print(f"Upload successful: forecast_id={cleaned_forecast_id}")
         else:
+            prod_cols = as_list(extracted.get("col_product"))
             df_cluster = df.drop(columns=[extracted['col_dt_whole']] if extracted.get('col_dt_whole') and extracted['col_dt_whole'] in df.columns else [])
             df_cluster = ensure_clustering_columns(df_cluster)
-            upload_result = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', extracted)
+            # Resolve col_product ke satu string nama produk terbaik setelah ensure_clustering_columns
+            col_product_single = resolve_col_product(prod_cols, list(df_cluster.columns))
+            cluster_metadata = build_cluster_metadata(extracted, col_product_resolved=col_product_single)
+            upload_result = await upload_cleaned_dataset(df_cluster, dataset_id, 'Clustering', cluster_metadata)
             cleaned_cluster_id = upload_result.get("data", {}).get("dataset_id")
             print(f"Upload successful: cluster_id={cleaned_cluster_id}")
 

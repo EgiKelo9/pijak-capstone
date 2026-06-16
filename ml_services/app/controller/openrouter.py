@@ -58,13 +58,24 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             task_str = "Both"
 
         # Build prompt
-        prompt = f"""
-            Please extract features(columns) from the following dataset.
-            The user wants to do {task_str} option from the available service of Clustering and Forecasting.
-            Dataset:
+        prompt = f"""Task: {task_str} (Clustering and/or Forecasting on retail sales data).
+            Map dataset columns to the correct roles. Return ONLY a valid JSON object using JSON schema below, no explanation.
+
+            Field definitions:
+            - cols_to_drop: list of ID/name/irrelevant columns
+            - col_date_time: {{"col_whole":"<col>","col_day":null,"col_month":null,"col_year":null}} — use col_whole if date is combined
+            - col_product: single target column of product/category name columns (e.g. Product_Name, Item_Name)
+            - col_target: single target column (e.g. Sales, Revenue)
+            - col_to_numerical: list of columns to cast as numeric (null if none)
+            - col_to_categorical: list of columns to cast as categorical (null if none)
+            - new_feature_pairing: list of {{"column_1":"","operator":"divide|multiply|subtract|add","column_2":"","new_col_name":""}} or null
+            - reasonings: one short sentence explaining key decisions
+
+            Dataset info:
             {dataset_info}
-        """
-                
+
+            Respond with JSON only."""
+
         # Kirim ke OpenRouter
         llm_response = await generate_from_openrouter(prompt, schema=Feature)
         
@@ -125,15 +136,10 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
 
 async def get_insight_from_data(target_task: str, json_data: Any) -> str:
     """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
-    prompt = f"""
-    Kamu adalah Business Analyst non-teknis untuk wirausaha retail.
-    Task Machine Learning saat ini: "{target_task}"
-    Berdasarkan data prediksi berikut:
-    {json.dumps(json_data, default=str)}
-    Berikan insight bisnis yang konkret, singkat, dan mudah dipahami.
-    Fokus pada stok, barang tak laku, peluang promo, dan tindakan prioritas yang relevan dengan task.
-    Balas hanya dengan teks insight, tanpa markdown berlebihan.
-    """
+    # Prompt ringkas: role + task + data + output spec dalam satu blok
+    prompt = f"""Analyst retail UMKM. Task: {target_task}.
+        Data: {json.dumps(json_data, default=str)}
+        Tulis insight bisnis plain text, max 8 kalimat. Fokus: stok, promo, prioritas aksi. Tanpa markdown."""
     try:
         insight_response = await generate_from_openrouter(prompt)
         if getattr(insight_response, "error", False):

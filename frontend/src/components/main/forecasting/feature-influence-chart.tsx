@@ -15,13 +15,9 @@ interface FeatureInfluenceChartProps {
  * Kemudian ambil top 5 setelah penggabungan.
  */
 function sortedFeatures(features: FeatureDetail[]): FeatureDetail[] {
-  const numerics = features
-    .filter((f) => !f.is_categorical)
-    .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence));
-  const categoricals = features
-    .filter((f) => f.is_categorical)
-    .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence));
-  return [...numerics, ...categoricals].slice(0, 5);
+  return [...features]
+    .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence))
+    .slice(0, 5);
 }
 
 export function FeatureInfluenceChart({ features = [] }: FeatureInfluenceChartProps) {
@@ -32,7 +28,6 @@ export function FeatureInfluenceChart({ features = [] }: FeatureInfluenceChartPr
     return {
       name: f.name.replace(/^'|'$/g, ''),
       value: isPercentage ? f.influence : f.influence * 100,
-      is_categorical: f.is_categorical ?? false,
     };
   });
 
@@ -57,23 +52,17 @@ export function FeatureInfluenceChart({ features = [] }: FeatureInfluenceChartPr
             <Tooltip
               cursor={{ fill: 'rgba(0,0,0,0.05)' }}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-              formatter={(value: any, _: any, props: any) => {
-                const isCat = props?.payload?.is_categorical;
+              formatter={(value: any) => {
                 const label = typeof value === 'number'
-                  ? `${value.toFixed(1)}%${isCat ? ' (kategorik)' : ''}`
+                  ? `${value.toFixed(1)}%`
                   : String(value);
                 return [label, 'Pengaruh'];
               }}
             />
             <Bar dataKey="value" radius={[4, 4, 4, 4]}>
               {data.map((entry, index) => {
-                // Numerik positif → sky, numerik negatif → slate, kategorik → indigo (terang/redup)
-                let fill: string;
-                if (entry.is_categorical) {
-                  fill = entry.value >= 0 ? '#818cf8' : '#c7d2fe';
-                } else {
-                  fill = entry.value >= 0 ? '#0284c7' : '#94a3b8';
-                }
+                // Positif -> sky, negatif -> slate
+                const fill = entry.value >= 0 ? '#0284c7' : '#94a3b8';
                 return <Cell key={`cell-${index}`} fill={fill} />;
               })}
             </Bar>
@@ -83,9 +72,8 @@ export function FeatureInfluenceChart({ features = [] }: FeatureInfluenceChartPr
 
       {/* Mini legend */}
       <div className="flex items-center gap-3 justify-center mt-1 pb-1 text-[10px] text-neutral-400">
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-[#0284c7]" />Numerik (+)</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-[#94a3b8]" />Numerik (−)</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-[#818cf8]" />Kategorik</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-[#0284c7]" />Pengaruh (+)</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-[#94a3b8]" />Pengaruh (−)</span>
       </div>
     </AnalysisCard>
   );

@@ -188,12 +188,21 @@ export default function ClusteringPage() {
   }, [result]);
 
   const elbowData = useMemo(() =>
-    result?.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] })) ?? [],
+    (result?.k_range && result?.wcss_list)
+      ? result.k_range.map((k, i) => ({ k, wcss: result.wcss_list[i] }))
+      : [],
     [result]
   );
 
   const silhouetteData = useMemo(() =>
-    result?.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] })) ?? [],
+    (result?.k_range && result?.silhouette_list)
+      ? result.k_range.map((k, i) => ({ k, silhouette: result.silhouette_list[i] }))
+      : [],
+    [result]
+  );
+
+  const hasMetrikData = useMemo(() =>
+    !!(result?.k_range && result?.wcss_list && result?.silhouette_list),
     [result]
   );
 
@@ -337,7 +346,7 @@ export default function ClusteringPage() {
                 style={{ background: 'linear-gradient(135deg, #2BBAEE, #90FDF2)' }}>
                 K yang digunakan: {result.cluster_amount}
               </div>
-              {result.cluster_amount !== result.optimal_k && (
+              {result.optimal_k != null && result.cluster_amount !== result.optimal_k && (
                 <span className="text-xs text-neutral-400 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
                   K optimal sistem: {result.optimal_k}
                 </span>
@@ -428,29 +437,37 @@ export default function ClusteringPage() {
             activeTab === 'pengujian' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'
           )}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <KpiCard title="Silhouette Score" value={result.silhouette_score} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
-              <KpiCard title="WCSS Score" value={result.wcss_score.toFixed(1)} sub="Semakin rendah semakin baik" opacity={0.08} />
-              <KpiCard title="K Optimal" value={result.optimal_k} sub="Rekomendasi sistem" opacity={0.16} />
+              <KpiCard title="Silhouette Score" value={result.silhouette_score?.toFixed(4) ?? '-'} sub="Semakin tinggi semakin baik (maks 1)" opacity={0.12} />
+              <KpiCard title="WCSS Score" value={result.wcss_score?.toFixed(1) ?? '-'} sub="Semakin rendah semakin baik" opacity={0.08} />
+              <KpiCard title="K Optimal" value={result.optimal_k ?? '-'} sub="Rekomendasi sistem" opacity={0.16} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
-                <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
-                  gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k} yLabel="WCSS" />
-                <p className="text-xs text-neutral-400 text-center mt-1">
-                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                  K optimal = {result.optimal_k}
-                </p>
+            {hasMetrikData ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <AnalysisCard title="Analisis Elbow (WCSS)" status="berhasil">
+                  <GradientLineChart data={elbowData} dataKey="wcss" color="#2BBAEE" endColor="#90FDF2"
+                    gradientId="elbowGrad" label="WCSS" optimalK={result.optimal_k ?? undefined} yLabel="WCSS" />
+                  <p className="text-xs text-neutral-400 text-center mt-1">
+                    <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                    K optimal = {result.optimal_k ?? '-'}
+                  </p>
+                </AnalysisCard>
+                <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
+                  <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
+                    gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k ?? undefined} yLabel="Score" />
+                  <p className="text-xs text-neutral-400 text-center mt-1">
+                    <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
+                    K optimal = {result.optimal_k ?? '-'}
+                  </p>
+                </AnalysisCard>
+              </div>
+            ) : (
+              <AnalysisCard title="Analisis Elbow & Silhouette" status="kosong">
+                <div className="flex items-center justify-center py-10 text-sm text-neutral-400">
+                  Data elbow/silhouette tidak tersedia untuk hasil ini. Jalankan ulang clustering untuk melihat grafik.
+                </div>
               </AnalysisCard>
-              <AnalysisCard title="Analisis Silhouette Score" status="berhasil">
-                <GradientLineChart data={silhouetteData} dataKey="silhouette" color="#10b981" endColor="#86efac"
-                  gradientId="silhouetteGrad" label="Silhouette" optimalK={result.optimal_k} yLabel="Score" />
-                <p className="text-xs text-neutral-400 text-center mt-1">
-                  <span className="inline-block size-2.5 rounded-full bg-amber-400 mr-1.5 align-middle" />
-                  K optimal = {result.optimal_k}
-                </p>
-              </AnalysisCard>
-            </div>
+            )}
 
             <div>
               <AnalysisCard title="Visualisasi Sebaran Klaster" status="berhasil">

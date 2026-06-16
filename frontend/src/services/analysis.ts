@@ -99,3 +99,16 @@ export async function runAnalysisPipeline(jobId: string, datasetId: number, mode
     throw new Error(error.response?.data?.message || "Failed to start analysis pipeline");
   }
 }
+
+export async function getCleanedDatasetIds(rawDatasetId: number): Promise<{
+  forecasting: number | null;
+  clustering: number | null;
+}> {
+  try {
+    const response = await axiosInstance.get(`/datasets/${rawDatasetId}/cleaned`);
+    return response.data.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to fetch cleaned dataset IDs");
+  }
+}
+

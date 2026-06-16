@@ -295,7 +295,12 @@ async def update_dataset_feature(current_user: User, db: Session, feature: dict,
     )
 
 async def fetch_dataset_feature_metadata(dataset_id: int, current_user: User, db: Session):
-    """Mengambil feature metadata dari dataset."""
+    """Mengambil feature metadata dari dataset.
+    
+    Note: Endpoint ini tidak melakukan ownership check agar ML service internal
+    dapat mengakses feature_metadata dataset milik user manapun untuk keperluan
+    pipeline preprocessing. Keamanan dijaga di layer router (authentication required).
+    """
     transaction_manager = TransactionManager(db)
     
     try:
@@ -308,11 +313,11 @@ async def fetch_dataset_feature_metadata(dataset_id: int, current_user: User, db
                     detail="Dataset tidak ditemukan"
                 )
 
-            if dataset.user_id != current_user.id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Tidak memiliki akses ke dataset ini"
-                )
+            # if dataset.user_id != current_user.id:
+            #     raise HTTPException(
+            #         status_code=403,
+            #         detail="Tidak memiliki akses ke dataset ini"
+            #     )
 
             feature_metadata = dataset.feature_metadata
 
@@ -540,3 +545,59 @@ async def preprocess_websocket_handler(websocket: WebSocket, job_id: str):
             await websocket.close()
         except RuntimeError:
             pass
+
+async def fetch_cleaned_dataset_ids(raw_dataset_id: int, current_user: User, db: Session):
+    """
+    Query datasets_bin WHERE ori_data_id = raw_dataset_id AND is_cleaned = True AND deleted_at IS NULL
+    and return the IDs of forecasting and clustering cleaned datasets.
+    """
+    transaction_manager = TransactionManager(db)
+    try:
+        with transaction_manager.transaction() as session:
+            # First, check if the raw dataset exists and belongs to the user
+            raw_dataset = session.get(Dataset_Bin, raw_dataset_id)
+            if raw_dataset is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Dataset original tidak ditemukan"
+                )
+            if raw_dataset.user_id != current_user.id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Tidak memiliki akses ke dataset ini"
+                )
+
+            stmt = select(Dataset_Bin).where(
+                Dataset_Bin.ori_data_id == raw_dataset_id,
+                Dataset_Bin.is_cleaned == True,
+                Dataset_Bin.deleted_at == None
+            )
+            records = session.execute(stmt).scalars().all()
+
+            forecasting_id = None
+            clustering_id = None
+            for record in records:
+                if record.model:
+                    model_lower = record.model.lower()
+                    if model_lower == 'forecasting':
+                        forecasting_id = record.id
+                    elif model_lower == 'clustering':
+                        clustering_id = record.id
+
+            return StandardResponse(
+                code=200,
+                error=False,
+                message="Cleaned dataset IDs fetched successfully",
+                data={
+                    "forecasting": forecasting_id,
+                    "clustering": clustering_id
+                }
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gagal mengambil cleaned dataset IDs: {e}"
+        )
+

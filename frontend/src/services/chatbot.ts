@@ -19,3 +19,16 @@ export const sendChatbotMessage = async (
   const response = await axiosInstance.post(`/chatbot/${targetTask}`, payload);
   return response.data.data;
 };
+
+export interface ChatMessageData {
+  message: string;
+  role: 'user' | 'assistant';
+  created_at: string;
+}
+
+export const getChatbotHistory = async (
+  analysisId: number
+): Promise<ChatMessageData[]> => {
+  const response = await axiosInstance.get(`/chatbot/history/${analysisId}`);
+  return response.data.data;
+};

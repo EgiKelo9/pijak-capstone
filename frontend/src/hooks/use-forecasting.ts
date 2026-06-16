@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getForecastingHistory, getForecastingResult, runForecasting } from '@/services/forecasting';
+import { getDatasetContext } from './use-analysis';
 import { ForecastingResultData, ForecastingHistoryItem } from '@/types';
 
 export type TimeFilter = 'daily' | 'weekly';
@@ -7,24 +8,15 @@ export type AggType = 'mean' | 'sum';
 export type ConfidenceType = 'percentage' | 'value';
 export type ForecastAggressiveness = 'aggressive' | 'balance' | 'conservative';
 
-/** Baca konfigurasi forecasting terakhir dari sessionStorage */
+/** Baca konfigurasi forecasting terakhir dari localStorage */
 function loadForecastConfig() {
-  try {
-    const raw = sessionStorage.getItem('pijak_forecast_config');
-    if (!raw) return null;
-    return JSON.parse(raw) as {
-      dataset_id: number;
-      col_date: string;
-      col_target: string;
-      col_regressors: string[];
-    };
-  } catch {
-    return null;
-  }
+  const context = getDatasetContext();
+  return context?.forecast_config || null;
 }
 
 export function useForecasting() {
   const [data, setData] = useState<ForecastingResultData | null>(null);
+  const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isRerunning, setIsRerunning] = useState<boolean>(false);
@@ -50,6 +42,7 @@ export function useForecasting() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       const latest = sortedHistory[0];
+      setAnalysisId(latest.analysis_id);
 
       if (latest.status === 'berhasil' && latest.result) {
         setData(latest.result);
@@ -116,6 +109,7 @@ export function useForecasting() {
 
         if (entry.status === 'berhasil' && entry.result) {
           setData(entry.result);
+          setAnalysisId(newAnalysisId);
           return;
         } else if (entry.status === 'gagal') {
           throw new Error("Proses analisis ulang gagal di server.");
@@ -141,6 +135,7 @@ export function useForecasting() {
 
   return {
     data,
+    analysisId,
     isLoading,
     error,
     isRerunning,

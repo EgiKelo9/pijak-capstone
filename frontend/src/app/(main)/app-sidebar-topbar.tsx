@@ -54,7 +54,11 @@ export function AppSidebarTopbar() {
   };
 
   const handleDatasetSelect = (datasetId: number) => {
-    sessionStorage.setItem('pijak_active_dataset_id', datasetId.toString());
+    localStorage.setItem('pijak_active_dataset_id', datasetId.toString());
+    localStorage.setItem('pijak_dataset_context', JSON.stringify({
+      raw_dataset_id: datasetId,
+      forecast_config: null
+    }));
     window.dispatchEvent(new Event('dataset_changed'));
   };
 
