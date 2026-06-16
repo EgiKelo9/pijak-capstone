@@ -19,16 +19,16 @@ export function formatDate(dateString?: string | Date) {
 export const CLUSTER_COLORS = ['#2BBAEE', '#5DD9C1', '#94a3b8', '#7dd3fc', '#a5b4fc', '#86efac', '#fcd34d', '#f9a8d4', '#c4b5fd'];
 
 export const SEGMENT_LABELS = [
-  { label: 'Fast Moving',   color: '#10b981', bg: '#d1fae5' },
-  { label: 'High Moving',   color: '#34d399', bg: '#ecfdf5' },
+  { label: 'Fast Moving',   color: '#047857', bg: '#ecfdf5' },
+  { label: 'High Moving',   color: '#059669', bg: '#d1fae5' },
   { label: 'Growing',       color: '#2BBAEE', bg: '#e0f7ff' },
-  { label: 'Medium Moving', color: '#60a5fa', bg: '#eff6ff' },
+  { label: 'Medium Moving', color: '#b45309', bg: '#fffbeb' },
   { label: 'Steady',        color: '#a78bfa', bg: '#f5f3ff' },
-  { label: 'Slowing Down',  color: '#f59e0b', bg: '#fef3c7' },
+  { label: 'Slowing Down',  color: '#ea580c', bg: '#fff7ed' },
   { label: 'Low Moving',    color: '#fb923c', bg: '#fff7ed' },
-  { label: 'At Risk',       color: '#f87171', bg: '#fef2f2' },
-  { label: 'Nearly Dead',   color: '#ef4444', bg: '#fee2e2' },
-  { label: 'Dead Stock',    color: '#991b1b', bg: '#fecaca' },
+  { label: 'At Risk',       color: '#e11d48', bg: '#fff1f2' },
+  { label: 'Nearly Dead',   color: '#be123c', bg: '#ffe4e6' },
+  { label: 'Dead Stock',    color: '#9f1239', bg: '#fecdd3' },
 ];
 
 export function getSegmentLabel(rank: number, total: number) {
