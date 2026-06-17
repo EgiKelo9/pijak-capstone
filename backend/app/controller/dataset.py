@@ -1,15 +1,12 @@
-import os
-import time
-import shutil
 from typing import Optional
-from fastapi import HTTPException, UploadFile, Form
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, text
-from sqlalchemy import select, text, update
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 from app.models.dataset import Dataset_Bin
 from app.models.user import User
 from app.schemas.base import StandardResponse
-from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
+from app.schemas.dataset import DatasetUploadResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
 from app.shared.transaction_manager import TransactionManager
 from fastapi.responses import StreamingResponse
 from io import BytesIO
@@ -49,7 +46,7 @@ async def upload_bin(
         detected = chardet.detect(raw_bytes)
         detected_encoding = detected["encoding"]
 
-        if detected_encoding is not "utf-8": 
+        if detected_encoding != "utf-8": 
             if detected_encoding is None:
                 raise HTTPException(
                     status_code=400,
@@ -58,7 +55,7 @@ async def upload_bin(
             
             try:
                 text_content = raw_bytes.decode(detected_encoding)
-            except:
+            except Exception:
                 raise HTTPException(
                     status_code=400,
                     detail="File memiliki encoding tidak valid"
@@ -109,7 +106,7 @@ async def upload_bin(
                     if isinstance(orig_meta, str):
                         try:
                             orig_meta = json.loads(orig_meta)
-                        except:
+                        except Exception:
                             orig_meta = {}
                     
                     if not isinstance(orig_meta, dict):
@@ -567,4 +564,3 @@ async def fetch_cleaned_dataset_ids(raw_dataset_id: int, current_user: User, db:
             status_code=500,
             detail=f"Gagal mengambil cleaned dataset IDs: {e}"
         )
-

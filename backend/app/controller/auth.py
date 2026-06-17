@@ -18,7 +18,7 @@ async def register(user: UserRegisterRequest, db: Session):
             session.add(new_user)
             session.flush()
 
-    except IntegrityError as e:
+    except IntegrityError:
         raise HTTPException(
             status_code=400,
             detail="Email already registered"

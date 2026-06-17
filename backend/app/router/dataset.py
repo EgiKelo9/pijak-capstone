@@ -9,10 +9,7 @@ from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, Dat
 from app.controller.dataset import upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler, fetch_cleaned_dataset_ids
 from app.shared.dependencies import get_current_user, get_api_key_or_user
 from app.models.user import User
-from fastapi import WebSocket, WebSocketDisconnect
-import websockets
-import asyncio
-import httpx
+from fastapi import WebSocket
 from app.core.config import get_settings
 
 settings = get_settings()
