@@ -1,13 +1,14 @@
+# docker-compose.prod.yml
+# Digunakan oleh server production.
+# Image di-pull dari GitHub Container Registry (ghcr.io), BUKAN di-build lokal.
+# Ganti egikelo9 dengan username GitHub kamu.
+
 version: "3.8"
 
 services:
   # 1. Next.js Front-End
   frontend:
-    build:
-      context: ./frontend
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-        - NEXT_PUBLIC_ML_API_URL=${NEXT_PUBLIC_ML_API_URL}
+    image: ghcr.io/egikelo9/pijak-frontend:latest
     ports:
       - "3000:3000"
     restart: unless-stopped
@@ -19,7 +20,7 @@ services:
 
   # 2. FastAPI Back-End
   backend:
-    build: ./backend
+    image: ghcr.io/egikelo9/pijak-backend:latest
     ports:
       - "5000:5000"
     restart: unless-stopped
@@ -42,9 +43,8 @@ services:
   # 3. PostgreSQL Database
   db:
     image: postgres:15-alpine
-    # Bind to localhost to prevent public internet access to database port
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Bind ke localhost saja, lebih aman
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -53,14 +53,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 4. ML Services (Time-Series Forecasting & LLM)
+  # 4. ML Services
   ml_services:
-    build: ./ml_services
+    image: ghcr.io/egikelo9/pijak-ml-services:latest
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -69,18 +69,17 @@ services:
       - PORT=8000
       - OPEN_ROUTER_BASE_URL=${OPEN_ROUTER_BASE_URL:-https://openrouter.ai/api/v1/chat/completions}
       - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
-      - LLM_MODEL=${LLM_MODEL:-openrouter/free}
+      - LLM_MODEL=${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
       - BACKEND_BASE_URL=${BACKEND_BASE_URL}
       - ML_API_KEY=${ML_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
 
-  # 5. Adminer (Database Admin Tool)
+  # 5. Adminer (Database Admin Tool) – akses via SSH tunnel
   adminer:
     image: adminer
     restart: unless-stopped
-    # Bind to localhost to prevent public access. Use SSH tunneling to access if remote.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"  # Bind ke localhost saja
 
 volumes:
   postgres_data:

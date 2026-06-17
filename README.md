@@ -38,7 +38,6 @@ pijak_capstone/
 │   │   ├── router/             # Definisi API routes (openrouter.py, model.py)
 │   │   ├── pipeline/           # Fungsi dan Class untuk pipeline machine learning
 │   │   └── schemas/            # Pydantic schemas
-│   ├── artifacts/              # File binary / saved model (h5, pkl, dsb.)
 │   ├── .env
 │   ├── Dockerfile
 │   └── requirements.txt
@@ -185,16 +184,6 @@ source .venv/bin/activate        # Linux/macOS
 
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
----
-
-## 🤖 Machine Learning Models
-
-File binary model (`.h5`, `.pt`, `.pkl`, dll.) tidak di-include dalam repository karena ukurannya besar. Letakkan file model yang sudah dilatih ke dalam direktori berikut sebelum menjalankan aplikasi:
-
-```
-ml_services/artifacts/
 ```
 
 ---

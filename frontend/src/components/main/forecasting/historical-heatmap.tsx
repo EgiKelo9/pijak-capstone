@@ -6,6 +6,8 @@ import { TrendDataPoint } from '@/types';
 
 interface HistoricalHeatmapProps {
   data?: Record<string, TrendDataPoint[]>;
+  timeFilter?: 'daily' | 'weekly';
+  hideFilterButtons?: boolean;
 }
 
 // Helper to get week of year (1 to 53)
@@ -17,12 +19,18 @@ const getWeekOfYear = (date: Date) => {
   return Math.ceil(dayOfYear / 7);
 };
 
-export function HistoricalHeatmap({ data = {} }: HistoricalHeatmapProps) {
+export function HistoricalHeatmap({ 
+  data = {}, 
+  timeFilter = 'daily',
+  hideFilterButtons = false,
+}: HistoricalHeatmapProps) {
   const [localFilter, setLocalFilter] = useState<'daily' | 'weekly'>('daily');
   const days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
+  const activeFilter = hideFilterButtons ? timeFilter : localFilter;
+
   // 1. Get raw points for selected local filter
-  const rawPoints = data[localFilter] ?? [];
+  const rawPoints = data[activeFilter] ?? [];
 
   // 2. Filter and sort historical points
   const historicalPoints = useMemo(() => {
@@ -56,7 +64,7 @@ export function HistoricalHeatmap({ data = {} }: HistoricalHeatmapProps) {
 
   // 4. Build daily calendar cell data (entire range of weeks in dataset)
   const dailyCellData = useMemo(() => {
-    if (localFilter !== 'daily') return [];
+    if (activeFilter !== 'daily') return [];
     
     const valueMap = new Map<string, number>();
     if (!isDummy) {
@@ -120,11 +128,11 @@ export function HistoricalHeatmap({ data = {} }: HistoricalHeatmapProps) {
       grid.push(weekCells);
     }
     return grid;
-  }, [sortedPoints, isDummy, localFilter]);
+  }, [sortedPoints, isDummy, activeFilter]);
 
   // 5. Build weekly grid data (years as rows, 53 weeks as columns)
   const weeklyCellData = useMemo(() => {
-    if (localFilter !== 'weekly') return { years: [], grid: [] };
+    if (activeFilter !== 'weekly') return { years: [], grid: [] };
 
     const years = !isDummy 
       ? [...new Set(sortedPoints.map(p => new Date(p.date).getFullYear()))].sort((a, b) => a - b)
@@ -162,7 +170,7 @@ export function HistoricalHeatmap({ data = {} }: HistoricalHeatmapProps) {
     });
 
     return { years, grid };
-  }, [sortedPoints, isDummy, localFilter]);
+  }, [sortedPoints, isDummy, activeFilter]);
 
   // 6. Get Tailwind classes based on intensity
   const getBgColor = (val: number | null) => {
@@ -179,29 +187,39 @@ export function HistoricalHeatmap({ data = {} }: HistoricalHeatmapProps) {
   return (
     <AnalysisCard title="Pola Historis Penjualan" className="flex flex-col h-full w-full overflow-hidden">
       {/* Local Filter Tabs & Description */}
-      <div className="flex items-center justify-between mb-4 w-full gap-2 flex-wrap shrink-0">
-        <div className="flex bg-sky-100/50 p-1 rounded-lg border border-neutral-200/60">
-          {(['daily', 'weekly'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setLocalFilter(filter)}
-              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
-                localFilter === filter
-                  ? 'bg-white text-neutral-800 shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700'
-              }`}
-            >
-              {filter === 'daily' ? 'Harian' : 'Mingguan'}
-            </button>
-          ))}
+      {!hideFilterButtons && (
+        <div className="flex items-center justify-between mb-4 w-full gap-2 flex-wrap shrink-0">
+          <div className="flex bg-sky-100/50 p-1 rounded-lg border border-neutral-200/60">
+            {(['daily', 'weekly'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setLocalFilter(filter)}
+                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  localFilter === filter
+                    ? 'bg-white text-neutral-800 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                {filter === 'daily' ? 'Harian' : 'Mingguan'}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-neutral-400 font-medium">
+            * Rata-rata nominal penjualan per {localFilter === 'daily' ? 'hari' : 'minggu'}
+          </span>
         </div>
-        <span className="text-[10px] text-neutral-400 font-medium">
-          * Rata-rata nominal penjualan per {localFilter === 'daily' ? 'hari' : 'minggu'}
-        </span>
-      </div>
+      )}
+
+      {hideFilterButtons && (
+        <div className="flex items-center justify-end mb-4 w-full shrink-0">
+          <span className="text-[10px] text-neutral-400 font-medium">
+            * Rata-rata nominal penjualan per {activeFilter === 'daily' ? 'hari' : 'minggu'}
+          </span>
+        </div>
+      )}
 
       <div className="flex-1 w-full overflow-auto pb-2 min-h-0">
-        {localFilter === 'daily' ? (
+        {activeFilter === 'daily' ? (
           /* DAILY CALENDAR HEATMAP (entire range of weeks in dataset) */
           <div className="flex gap-2 min-w-max pr-4">
             {/* Day labels */}

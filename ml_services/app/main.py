@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.base import StandardResponse
-from app.router import openrouter, model, health, gemini, preprocess
+from app.router import openrouter, model, health, preprocess
 from app.middleware import cors
 
 app = FastAPI(
@@ -20,7 +20,6 @@ cors.add(app)
 app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])
 app.include_router(preprocess.router, prefix="/ml/v1", tags=["Preprocess Endpoints"])
 app.include_router(openrouter.router, prefix="/ml/v1", tags=["OpenRouter Endpoints"])
-app.include_router(gemini.router, prefix="/ml/v1", tags=["Gemini Endpoints"])
 app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
 
 @app.exception_handler(HTTPException)

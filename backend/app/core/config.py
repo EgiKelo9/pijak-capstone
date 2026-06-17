@@ -12,18 +12,21 @@ class Settings:
     ALGORITHM = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440))
     ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
+    ML_API_KEY = os.getenv("ML_API_KEY", "")
 
 class DevSettings(Settings):
     """Development settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "example_dev")
     ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
+    ML_API_KEY = os.getenv("ML_API_KEY", "")
 
 class TestSettings(Settings):
     """Test settings class"""
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db/")
     DATABASE_NAME = os.getenv("DATABASE_NAME", "example_test")
     ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "http://localhost:8000")
+    ML_API_KEY = os.getenv("ML_API_KEY", "")
 
 @lru_cache
 def get_settings():

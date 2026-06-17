@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse, ProcessDatasetRequest
-from app.controller.dataset import upload, upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler, fetch_cleaned_dataset_ids
-from app.shared.dependencies import get_current_user
+from app.controller.dataset import upload_bin, fetch_dataset_bin, fetch_datasets_bin_by_user, soft_delete_cleaned_datasets, fetch_analysis_history_by_user, update_dataset_feature, analyze_dataset_columns, preprocess_dataset_run, fetch_dataset_feature_metadata, preprocess_websocket_handler, fetch_cleaned_dataset_ids
+from app.shared.dependencies import get_current_user, get_api_key_or_user
 from app.models.user import User
 from fastapi import WebSocket, WebSocketDisconnect
 import websockets
@@ -36,7 +36,7 @@ async def upload_dataset(
     model: Optional[str] = Form(None),
     feature_metadata: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_api_key_or_user)
 ):
     """
     Upload a CSV dataset for the authenticated user.
@@ -75,7 +75,7 @@ async def upload_dataset(
 async def fetch_dataset(
     dataset_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_api_key_or_user)
 ):
     """
     Fetch a dataset for the authenticated user.
@@ -83,17 +83,15 @@ async def fetch_dataset(
     Args:
         dataset_id (int): The ID of the dataset to fetch.
         db (Session, optional): Database session injected by FastAPI.
-        current_user (User, optional): Currently authenticated user from the access token.
+        current_user: Currently authenticated user (JWT) or ML service sentinel.
 
     Returns:
         StandardResponse[DatasetFetchResponse]: Dataset containing metadata and data_url.
 
     Raises:
         HTTPException: 400 if the dataset ID is invalid.
-        HTTPException: 401 if the user is not authenticated.
+        HTTPException: 401 if not authenticated.
         HTTPException: 404 if the dataset is not found.
-        HTTPException: 500 if the dataset cannot be fetched.
-        HTTPException: 422 if request validation fails.
     """
     return await fetch_dataset_bin(dataset_id, current_user, db)
 
@@ -141,7 +139,7 @@ async def fetch_datasets_by_user(
 async def get_dataset_feature_metadata(
     dataset_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_api_key_or_user)
 ):
     """
     Fetch the feature metadata analysis for a specific dataset.
@@ -169,7 +167,7 @@ async def update_dataset_feature_metadata(
     dataset_id: int,
     feature: dict = Body(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_api_key_or_user)
 ):
     """
     Fetch a dataset for the authenticated user.
@@ -203,7 +201,7 @@ async def invalidate_cleaned_datasets(
     ori_data_id: int,
     model: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_api_key_or_user)
 ):
     """
     Soft-delete semua record cleaned dataset aktif (deleted_at IS NULL)
