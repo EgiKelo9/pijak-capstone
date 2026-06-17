@@ -131,49 +131,31 @@ jobs:
           echo "==> Testing TCP port 22 on deploy host..."
           nc -zv -w 10 ${{ secrets.DEPLOY_HOST }} 22 && echo "Port 22 is OPEN" || echo "ERROR: Port 22 is NOT reachable"
 
-      # Tulis SSH key ke file temp, lalu deploy via native ssh
-      # DEPLOY_SSH_KEY harus disimpan sebagai base64 (satu baris) di GitHub Secret
-      - name: Deploy via SSH (native)
-        env:
-          SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          GHCR_TOKEN: ${{ secrets.DEPLOY_GHCR_TOKEN }}
-          GHCR_USER: ${{ secrets.DEPLOY_GHCR_USER }}
-        run: |
-          # ── 1. Decode dan tulis SSH key ke file temp ──
-          KEY_FILE=$(mktemp)
-          echo "$SSH_KEY_B64" | base64 -d > "$KEY_FILE"
-          chmod 600 "$KEY_FILE"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}        # Tailscale IP atau hostname server kamu
+          username: ${{ secrets.DEPLOY_USER }}    # e.g. ubuntu
+          key: ${{ secrets.DEPLOY_SSH_KEY }}      # Private key untuk SSH
+          port: 22
+          debug: true                             # tampilkan debug SSH log
 
-          # ── 2. Verifikasi key bisa dibaca ──
-          ssh-keygen -l -f "$KEY_FILE" && echo "Key OK" || { echo "ERROR: invalid key"; rm -f "$KEY_FILE"; exit 1; }
+          script: |
+            set -e
+            echo "==> Navigating to project directory"
+            cd ${{ secrets.DEPLOY_PATH }}         # e.g. /home/ubuntu/pijak-capstone
 
-          # ── 3. SSH ke server dan jalankan deploy script ──
-          ssh -i "$KEY_FILE" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -p 22 \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s << EOF
-          set -e
-          echo "==> Navigating to project directory"
-          cd "${DEPLOY_PATH}"
+            echo "==> Logging in to GitHub Container Registry"
+            echo "${{ secrets.DEPLOY_GHCR_TOKEN }}" | docker login ghcr.io \
+              -u ${{ secrets.DEPLOY_GHCR_USER }} --password-stdin
 
-          echo "==> Logging in to GitHub Container Registry"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            echo "==> Pulling latest images"
+            docker compose -f docker-compose.prod.yml pull
 
-          echo "==> Pulling latest images"
-          docker compose -f docker-compose.prod.yml pull
+            echo "==> Restarting services with zero-downtime"
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-          echo "==> Restarting services with zero-downtime"
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            echo "==> Cleaning up dangling images"
+            docker image prune -f
 
-          echo "==> Cleaning up dangling images"
-          docker image prune -f
-
-          echo "✅ Deployment complete!"
-          EOF
-
-          # ── 4. Hapus key file setelah selesai ──
-          rm -f "$KEY_FILE"
+            echo "✅ Deployment complete!"
