@@ -2,7 +2,7 @@ name: CD – Build, Push & Deploy
 
 on:
   push:
-    branches: ["main"]
+    branches: ["master"]
   # Bisa juga di-trigger manual dari GitHub UI
   workflow_dispatch:
 
