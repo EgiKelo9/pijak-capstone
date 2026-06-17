@@ -121,6 +121,16 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
+      # Tunggu Tailscale siap & verifikasi host reachable
+      - name: Wait for Tailscale & verify connectivity
+        run: |
+          echo "==> Waiting for Tailscale to stabilize..."
+          sleep 5
+          echo "==> Pinging deploy host..."
+          ping -c 3 ${{ secrets.DEPLOY_HOST }} || echo "WARNING: host unreachable via ping (may still work)"
+          echo "==> Testing TCP port 22 on deploy host..."
+          nc -zv -w 10 ${{ secrets.DEPLOY_HOST }} 22 && echo "Port 22 is OPEN" || echo "ERROR: Port 22 is NOT reachable"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -128,6 +138,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}    # e.g. ubuntu
           key: ${{ secrets.DEPLOY_SSH_KEY }}      # Private key untuk SSH
           port: 22
+          debug: true                             # tampilkan debug SSH log
           script: |
             set -e
             echo "==> Navigating to project directory"
