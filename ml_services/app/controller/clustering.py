@@ -1,4 +1,3 @@
-import traceback
 import httpx
 import logging
 from app.core.utils import get_dataset

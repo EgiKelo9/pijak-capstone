@@ -1,4 +1,4 @@
-from typing import Any, Optional, Literal
+from typing import Optional, Literal
 from pydantic import BaseModel
 from app.schemas.base import StandardResponse
 

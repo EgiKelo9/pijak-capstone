@@ -1,8 +1,6 @@
 from typing import Any, Dict
 from fastapi import APIRouter, BackgroundTasks
 from app.schemas.base import StandardResponse
-from app.core.config import get_settings
-from app.core.utils import generate_from_openrouter
 from app.controller.openrouter import analyze_columns
 from app.controller.chatbot import generate_chatbot_response
 from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse, ChatbotRequest, ChatbotResponse

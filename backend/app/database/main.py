@@ -41,7 +41,7 @@ def wait_for_db(url: str, retries: int = 5, delay: int = 3):
         try:
             temp_engine = create_engine(url)
             with temp_engine.connect():
-                print(f"✅ Successfully connected to PostgreSQL server.")
+                print("✅ Successfully connected to PostgreSQL server.")
                 temp_engine.dispose()
                 return
         except OperationalError:
@@ -63,8 +63,8 @@ def create_db():
         with db_engine_default.connect() as conn:
             conn.execute(text(f"CREATE DATABASE {setting.DATABASE_NAME};"))
             print(f"✅ Database '{setting.DATABASE_NAME}' created successfully.")
-    except Exception as e:
-        print(f"ℹ️ Info: Database creation skipped (might already exist).")
+    except Exception:
+        print("ℹ️ Info: Database creation skipped (might already exist).")
     finally:
         db_engine_default.dispose()
 

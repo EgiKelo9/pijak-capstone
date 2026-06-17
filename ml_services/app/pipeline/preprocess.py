@@ -1,8 +1,6 @@
 import asyncio
 import pandas as pd
 import numpy as np
-from typing import Tuple
-from app.schemas.features import Feature
 from app.core.utils import get_dataset, upload_cleaned_dataset, get_dataset_feature_metadata
 from app.core.websocket_manager import manager
 
@@ -104,7 +102,8 @@ def adjust_date_time(df, is_whole, col_day, col_month, col_year, col_dt_whole):
     return df, col_dt_whole
 
 def as_list(item):
-    if not item: return []
+    if not item:
+        return []
     return [item] if isinstance(item, str) else item
 
 def adjust_data_types(df, col_to_cat, col_product, col_to_num):
@@ -331,23 +330,29 @@ def auto_drop_uninformative_cols(
 
         # 1. Generic ID columns
         if col_lower in ID_EXACT:
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
         if col_lower.endswith(ID_SUFFIXES[0]) or col_lower.endswith(ID_SUFFIXES[1]):
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
         if _col_matches(col_lower, ID_CONTAINS):
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
 
         # 2. Date/time columns (non-main)
         if _col_matches(col_lower, DATE_CONTAINS):
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
 
         # 3. Overly detailed address columns
         if _col_matches(col_lower, ADDRESS_CONTAINS):
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
 
         # 4. Generic location columns (country-level)
         if _col_matches(col_lower, GENERIC_LOC_CONTAINS):
-            cols_to_drop.append(col); continue
+            cols_to_drop.append(col)
+            continue
 
     actual_dropped = [c for c in cols_to_drop if c in df.columns]
     if actual_dropped:

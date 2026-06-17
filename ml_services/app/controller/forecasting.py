@@ -161,8 +161,6 @@ async def run_forecasting(
         col_date = request.col_date
         col_product = request.col_product
         col_target = request.col_target
-        col_regressors = request.col_regressors
-
         prod_cols = []
         if col_product:
             prod_cols = [col_product] if isinstance(col_product, str) else list(col_product)

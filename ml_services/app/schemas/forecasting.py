@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, Optional, Literal
+from typing import Optional, Literal
 
 
 # ================================

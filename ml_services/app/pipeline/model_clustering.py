@@ -1,5 +1,4 @@
 import pandas as pd
-import joblib
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -99,7 +98,6 @@ class ClusteringPipeline:
         df_grouped = df.groupby(col_product).agg(agg_dict).reset_index()
 
    
-        product_names = df_grouped[col_product].tolist()
         X = df_grouped[col_fitur]
 
         # Scale data
