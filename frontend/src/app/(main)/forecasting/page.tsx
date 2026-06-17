@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/animate-ui/components/animate/tabs";
-import { useForecasting } from '@/hooks/use-forecasting';
+import { useForecasting, TimeFilter } from '@/hooks/use-forecasting';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfidenceCard } from '@/components/main/forecasting/confidence-card';
 import { FeatureInfluenceChart } from '@/components/main/forecasting/feature-influence-chart';
 import { FeatureDetailTable } from '@/components/main/forecasting/feature-detail-table';
@@ -152,6 +153,21 @@ export default function ForecastingDashboardPage() {
         </Tabs>
       </div>
 
+      {/* Floating Dropdown Time Filter */}
+      {data && (
+        <div className="absolute top-0 right-0 z-20">
+          <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+            <SelectTrigger className="h-9 w-44 rounded-xl border-neutral-800/20 text-xs shadow-sm bg-white/80 backdrop-blur-sm">
+              <SelectValue placeholder="Pilih Periode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Harian</SelectItem>
+              <SelectItem value="weekly">Mingguan</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="relative flex-1 h-auto w-full mt-2">
         {/* Tab: Hasil */}
         <div className={`absolute inset-0 transition-opacity duration-300 flex flex-col gap-4 h-auto overflow-y-auto pb-6 ${activeTab === 'hasil' ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none z-0'}`}>
@@ -175,6 +191,7 @@ export default function ForecastingDashboardPage() {
               data={data?.trend_data} 
               timeFilter={timeFilter} 
               setTimeFilter={setTimeFilter}
+              hideFilterButtons={true}
             />
           </div>
 
@@ -278,7 +295,11 @@ export default function ForecastingDashboardPage() {
 
           {/* Row 2: Supporting Chart (Historical Heatmap) */}
           <div className="w-full h-auto shrink-0">
-            <HistoricalHeatmap data={data?.trend_data} />
+            <HistoricalHeatmap 
+              data={data?.trend_data} 
+              timeFilter={timeFilter}
+              hideFilterButtons={true}
+            />
           </div>
         </div>
       </div>

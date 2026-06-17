@@ -354,8 +354,10 @@ export default function MainDashboard() {
                     ) : (
                         <ForecastingChart 
                             data={forecastData.trend_data} 
-                            timeFilter={timeFilter} 
-                            setTimeFilter={setTimeFilter} 
+                            timeFilter="weekly" 
+                            setTimeFilter={() => {}} 
+                            isFixedFilter={true}
+                            hideFilterButtons={true}
                         />
                     )}
                     

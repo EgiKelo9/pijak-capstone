@@ -16,12 +16,14 @@ import {
 } from 'recharts';
 import { TimeFilter } from '@/hooks/use-forecasting';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ForecastingChartProps {
   data?: Record<string, TrendDataPoint[]>;
   timeFilter: TimeFilter;
   setTimeFilter: (v: TimeFilter) => void;
   isFixedFilter?: boolean;
+  hideFilterButtons?: boolean;
 }
 
 // ─── Custom Tooltip ────────────────────────────────────────────────────────────
@@ -55,6 +57,7 @@ export function ForecastingChart({
   timeFilter,
   setTimeFilter,
   isFixedFilter = false,
+  hideFilterButtons = false,
 }: ForecastingChartProps) {
   const freqKey = timeFilter as FreqKey;
   const rawData: TrendDataPoint[] = data[freqKey] ?? [];
@@ -186,24 +189,26 @@ export function ForecastingChart({
       className="flex flex-col relative w-full overflow-hidden"
     >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-3 w-full gap-2 flex-wrap">
+      <div className={cn("flex items-center justify-between mb-3 w-full gap-2 flex-wrap", hideFilterButtons && "justify-end")}>
         {/* Filter tab */}
-        <div className="flex bg-neutral-100/50 p-1 rounded-lg border border-neutral-200/60">
-          {(['daily', 'weekly'] as TimeFilter[]).map((filter) => (
-            <button
-              key={filter}
-              disabled={isFixedFilter}
-              onClick={() => setTimeFilter(filter)}
-              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
-                timeFilter === filter
-                  ? 'bg-white text-neutral-800 shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed'
-              }`}
-            >
-              {FILTER_LABELS[filter]}
-            </button>
-          ))}
-        </div>
+        {!hideFilterButtons && (
+          <div className="flex bg-neutral-100/50 p-1 rounded-lg border border-neutral-200/60">
+            {(['daily', 'weekly'] as TimeFilter[]).map((filter) => (
+              <button
+                key={filter}
+                disabled={isFixedFilter}
+                onClick={() => setTimeFilter(filter)}
+                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  timeFilter === filter
+                    ? 'bg-white text-neutral-800 shadow-sm'
+                    : 'text-neutral-500 hover:text-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed'
+                }`}
+              >
+                {FILTER_LABELS[filter]}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           {/* Legend */}
