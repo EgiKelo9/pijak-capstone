@@ -3,15 +3,17 @@ version: "3.8"
 services:
   # 1. Next.js Front-End
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_ML_API_URL=${NEXT_PUBLIC_ML_API_URL}
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    restart: unless-stopped
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - WATCHPACK_POLLING=true
+      - NEXT_PUBLIC_ML_API_URL=${NEXT_PUBLIC_ML_API_URL}
     depends_on:
       - backend
 
@@ -20,14 +22,17 @@ services:
     build: ./backend
     ports:
       - "5000:5000"
-    volumes:
-      - ./backend:/app
+    restart: unless-stopped
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - DATABASE_NAME=${DATABASE_NAME}
       - ML_SERVICE_URL=${ML_SERVICE_URL:-http://ml_services:8000}
       - BACKEND_BASE_URL=${BACKEND_BASE_URL}
-      - ENV=dev
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=${ALGORITHM}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - ENV=prod
+      - ML_API_KEY=${ML_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -37,8 +42,10 @@ services:
   # 3. PostgreSQL Database
   db:
     image: postgres:15-alpine
+    # Bind to localhost to prevent public internet access to database port
     ports:
       - "5432:5432"
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -46,7 +53,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,19 +63,24 @@ services:
     build: ./ml_services
     ports:
       - "8000:8000"
-    volumes:
-      - ./ml_services:/app
+    restart: unless-stopped
     environment:
+      - ENV=prod
+      - PORT=8000
       - OPEN_ROUTER_BASE_URL=${OPEN_ROUTER_BASE_URL:-https://openrouter.ai/api/v1/chat/completions}
       - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
       - LLM_MODEL=${LLM_MODEL:-openrouter/free}
+      - BACKEND_BASE_URL=${BACKEND_BASE_URL}
+      - ML_API_KEY=${ML_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
   # 5. Adminer (Database Admin Tool)
   adminer:
     image: adminer
-    restart: always
+    restart: unless-stopped
+    # Bind to localhost to prevent public access. Use SSH tunneling to access if remote.
     ports:
-      - 8080:8080
+      - "8080:8080"
 
 volumes:
   postgres_data:

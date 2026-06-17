@@ -4,7 +4,7 @@ from collections import defaultdict
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.core.config import get_settings
-from app.schemas.chatbot_schema import ChatbotFrontendRequest, ChatbotFrontendResponse
+from app.schemas.chatbot import ChatbotFrontendRequest, ChatbotFrontendResponse
 from app.schemas.base import StandardResponse
 from app.models.analysis_history import AnalysisHistory
 from app.models.forecasting_result import ForecastingResult

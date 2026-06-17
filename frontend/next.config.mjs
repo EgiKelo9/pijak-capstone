@@ -7,7 +7,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 // Read the .env file from one folder up (the root directory)
-dotenv.config({ path: path.resolve(process.cwd(), '../ml_services/.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

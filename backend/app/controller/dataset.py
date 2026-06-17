@@ -6,7 +6,7 @@ from fastapi import HTTPException, UploadFile, Form
 from sqlalchemy import select, text
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
-from app.models.dataset import Dataset, Dataset_Bin
+from app.models.dataset import Dataset_Bin
 from app.models.user import User
 from app.schemas.base import StandardResponse
 from app.schemas.dataset import DatasetUploadResponse, DatasetFetchResponse, DatasetFetchByUserResponse, DatasetFeatureMetadataUpdateResponse
@@ -19,63 +19,6 @@ from app.core.config import get_settings
 from fastapi import WebSocket
 import websockets
 import asyncio
-
-UPLOAD_DIR = "static/datasets"
-
-async def upload(file: UploadFile, current_user: User, db: Session):
-    """Mengunggah file dataset baru."""
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=400, 
-            detail="Hanya file CSV yang diizinkan"
-        )
-
-    if not os.path.exists(UPLOAD_DIR):
-        os.makedirs(UPLOAD_DIR)
-
-    file_location = f"{UPLOAD_DIR}/{current_user.id}_{file.filename}_{time.time()}.csv"
-    
-    try:
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Gagal menyimpan file: {str(e)}"
-        )
-
-    transaction_manager = TransactionManager(db)
-    
-    try:
-        with transaction_manager.transaction() as session:
-            new_dataset = Dataset(
-                user_id=current_user.id,
-                dataset_name=file.filename,
-                file_path=file_location
-            )
-            session.add(new_dataset)
-            session.flush()
-            
-            dataset_id = new_dataset.id
-            dataset_name = new_dataset.dataset_name
-            
-    except Exception as e:
-        if os.path.exists(file_location):
-            os.remove(file_location)
-        raise HTTPException(
-            status_code=500, 
-            detail="Gagal menyimpan metadata dataset ke database"
-        )
-
-    return StandardResponse(
-        code=200,
-        error=False,
-        message="File berhasil diunggah",
-        data=DatasetUploadResponse(
-            dataset_id=dataset_id,
-            filename=dataset_name
-        )
-    )
 
 async def upload_bin(
     file: UploadFile, 
@@ -126,8 +69,24 @@ async def upload_bin(
             utf8_bytes = raw_bytes
 
         with transaction_manager.transaction() as session:
+            if isinstance(current_user, str) and current_user == "ml_service":
+                if not ori_data_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="ori_data_id wajib disertakan jika diunggah oleh ML service"
+                    )
+                orig_dataset = session.get(Dataset_Bin, ori_data_id)
+                if not orig_dataset:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Dataset original dengan ID {ori_data_id} tidak ditemukan"
+                    )
+                user_id = orig_dataset.user_id
+            else:
+                user_id = current_user.id
+
             new_dataset = Dataset_Bin(
-                user_id=current_user.id,
+                user_id=user_id,
                 dataset_name=file.filename,
                 dataset_file=utf8_bytes,
                 original_encoding=detected_encoding,

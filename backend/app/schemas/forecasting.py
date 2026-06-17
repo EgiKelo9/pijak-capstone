@@ -44,6 +44,7 @@ class FeatureDetail(BaseModel):
     max: float
     min: float
     influence: float
+    is_categorical: bool = False
 
 
 class ForecastingMetrics(BaseModel):

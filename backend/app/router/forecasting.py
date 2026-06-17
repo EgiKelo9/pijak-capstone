@@ -3,14 +3,15 @@ from sqlalchemy.orm import Session
 from fastapi import Depends, APIRouter
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.forecasting_schema import ForecastingRunRequest, ForecastingCallbackRequest
-from app.controller.forecasting_controller import (
+from app.schemas.forecasting import ForecastingRunRequest, ForecastingCallbackRequest
+from app.controller.forecasting import (
     run_forecasting,
     get_forecasting_result,
     get_forecasting_history,
     handle_forecasting_callback
 )
 from app.shared.dependencies import get_current_user
+from app.shared.api_key import verify_api_key
 from app.models.user import User
 
 router = APIRouter(prefix="/forecasting")
@@ -57,12 +58,12 @@ async def run_forecasting_endpoint(
 )
 async def forecasting_callback_endpoint(
     request: ForecastingCallbackRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
     """Menerima callback dari ML service setelah proses forecasting selesai/gagal.
     
-    Endpoint ini bersifat internal dan idealnya diproteksi, tapi untuk prototype
-    langsung menerima request dan memperbarui status di database.
+    Endpoint ini diproteksi dengan API Key — hanya ML service internal yang bisa mengaksesnya.
     """
     return await handle_forecasting_callback(request, db)
 

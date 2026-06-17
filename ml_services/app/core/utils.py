@@ -1,32 +1,13 @@
+import json
 import httpx
 import logging
-from io import BytesIO
-
 import pandas as pd
-import json
+from io import BytesIO
 from app.schemas.base import StandardResponse
 from app.schemas.features import Feature
 from app.core.config import get_settings
 
 logger = logging.getLogger("uvicorn.error")
-
-
-async def _get_backend_token(client: httpx.AsyncClient, settings) -> str:
-    """
-    Login ke backend dan kembalikan access token.
-    Fungsi internal — tidak untuk dipanggil langsung dari luar modul.
-    """
-    auth_url = f"{settings.BACKEND_BASE_URL}/api/v1/auth/login"
-    auth_response = await client.post(
-        auth_url,
-        json={
-            "email": settings.BACKEND_USER_EMAIL,
-            "password": settings.BACKEND_USER_PASSWORD,
-        },
-        timeout=15.0,
-    )
-    auth_response.raise_for_status()
-    return auth_response.json()["data"]["access_token"]
 
 
 async def call_backend_api(
@@ -40,12 +21,11 @@ async def call_backend_api(
     """
     Centralized HTTP caller untuk pemanggilan endpoint ke backend internal.
 
-    Fungsi ini secara otomatis melakukan autentikasi (login → access token)
-    sebelum mengirim request ke endpoint yang dituju, sehingga setiap caller
-    tidak perlu mengelola token secara manual.
+    Fungsi ini menggunakan API Key (header `X-API-Key`) untuk autentikasi,
+    menggantikan mekanisme login email/password sebelumnya.
 
     Args:
-        method:  HTTP method — "GET" atau "POST".
+        method:  HTTP method — "GET", "POST", "DELETE", atau "PATCH".
         path:    Path endpoint tanpa base URL, contoh: "/api/v1/datasets/1".
         json:    Payload JSON untuk request body (opsional).
         files:   File dict untuk multipart/form-data upload (opsional).
@@ -57,7 +37,7 @@ async def call_backend_api(
 
     Raises:
         httpx.HTTPStatusError: Jika response backend mengembalikan status error.
-        Exception: Jika autentikasi atau request gagal.
+        ValueError: Jika method HTTP tidak didukung.
 
     Example:
         # Fetch dataset sebagai CSV
@@ -80,11 +60,9 @@ async def call_backend_api(
     """
     settings = get_settings()
     url = f"{settings.BACKEND_BASE_URL}{path}"
+    headers = {"X-API-Key": settings.ML_API_KEY}
 
     async with httpx.AsyncClient() as client:
-        token = await _get_backend_token(client, settings)
-        headers = {"Authorization": f"Bearer {token}"}
-
         logger.info("Calling backend API: %s %s", method.upper(), url)
 
         if method.upper() == "GET":

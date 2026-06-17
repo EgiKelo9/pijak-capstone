@@ -5,8 +5,6 @@ from app.pipeline.preprocess import temp_pipeline, test_ws
 from app.schemas.openrouter import PreprocessRequest, PreprocessResponse
 from app.schemas.features import Feature
 from app.core.websocket_manager import manager
-from pydantic import UUID5
-# from app.schemas.model import TestRun
 
 router = APIRouter(prefix="/preprocess")
 

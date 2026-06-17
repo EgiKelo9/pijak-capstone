@@ -1,8 +1,7 @@
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import React, { useState } from "react";
 
 import { useTheme } from "@/components/ui/theme-provider";
-import { useInput } from "@/hooks/use-input";
 
 export interface CheckboxGroupOption {
   value: string;

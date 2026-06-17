@@ -2,12 +2,9 @@ import traceback
 import httpx
 import logging
 from app.core.utils import get_dataset
+from app.core.config import get_settings
 from app.pipeline.model_clustering import ClusteringPipeline
-from app.schemas.clustering_schema import (
-    ClusteringRequest,
-    ClusteringResponse,
-    ClusteringErrorResponse
-)
+from app.schemas.clustering import ClusteringRequest, ClusteringResponse, ClusteringErrorResponse
 
 logger = logging.getLogger("uvicorn.error")
 pipeline = ClusteringPipeline()
@@ -62,10 +59,15 @@ async def run_clustering(request: ClusteringRequest):
             status="completed",
             result=result
         )
+        settings = get_settings()
+        headers = {"X-API-Key": settings.ML_API_KEY}
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.patch(
-                    callback_url, json=response_payload.model_dump(), timeout=15.0
+                    callback_url,
+                    json=response_payload.model_dump(),
+                    headers=headers,
+                    timeout=15.0,
                 )
                 logger.info(f"Success callback sent, response status: {resp.status_code}")
         except Exception as callback_err:
@@ -80,9 +82,14 @@ async def run_clustering(request: ClusteringRequest):
         )
         try:
             logger.info("Attempting to send error callback")
+            settings = get_settings()
+            headers = {"X-API-Key": settings.ML_API_KEY}
             async with httpx.AsyncClient() as client:
                 resp = await client.patch(
-                    callback_url, json=error_payload.model_dump(), timeout=15.0
+                    callback_url,
+                    json=error_payload.model_dump(),
+                    headers=headers,
+                    timeout=15.0,
                 )
                 logger.info(f"Error callback sent, response status: {resp.status_code}")
         except Exception as callback_err:

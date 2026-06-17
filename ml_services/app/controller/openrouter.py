@@ -4,7 +4,7 @@ from app.core.config import get_settings
 from app.core.utils import generate_from_openrouter
 from app.schemas.openrouter import DatasetMetadataRequest, OpenRouterMappingResponse
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info, update_dataset_feature_metadata, get_dataset_feature_metadata, call_backend_api
+from app.core.utils import get_dataset, get_dataset_info, get_dataset_feature_metadata, call_backend_api
 
 settings = get_settings()
 LLM_MODEL = settings.LLM_MODEL
@@ -132,29 +132,11 @@ async def analyze_columns(req: DatasetMetadataRequest) -> OpenRouterMappingRespo
             task=req.model_type,
             suggested_mapping=FALLBACK_FEATURE
         )
-
-
-async def get_insight_from_data(target_task: str, json_data: Any) -> str:
-    """Mendapatkan insight bisnis dari OpenRouter berdasarkan data yang diberikan."""
-    # Prompt ringkas: role + task + data + output spec dalam satu blok
-    prompt = f"""Analyst retail UMKM. Task: {target_task}.
-        Data: {json.dumps(json_data, default=str)}
-        Tulis insight bisnis plain text, max 8 kalimat. Fokus: stok, promo, prioritas aksi. Tanpa markdown."""
-    try:
-        insight_response = await generate_from_openrouter(prompt)
-        if getattr(insight_response, "error", False):
-            return f"OpenRouter error: {insight_response.message}"
-        return insight_response.data.get("response", "") if insight_response.data else ""
-
-    except Exception as e:
-        return f"OpenRouter error: {str(e)}"
         
 
 async def get_insight_from_clustering(cluster_summary: dict) -> str:
-    """Mendapatkan insight bisnis dari hasil clustering via OpenRouter.
-    
-    Diadaptasi dari gemma.py::get_insight_from_clustering.
-    Semua caller harus menggunakan fungsi ini (bukan dari gemma.py).
+    """
+    Mendapatkan insight bisnis dari hasil clustering via OpenRouter.
     """
     cluster_ids = []
     if cluster_summary:

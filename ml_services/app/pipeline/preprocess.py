@@ -1,46 +1,11 @@
+import asyncio
 import pandas as pd
 import numpy as np
 from typing import Tuple
-from pydantic import UUID5
 from app.schemas.features import Feature
-from app.core.utils import get_dataset, get_dataset_info, upload_cleaned_dataset, get_dataset_feature_metadata
-from app.controller.openrouter import analyze_columns
-from app.schemas.openrouter import DatasetMetadataRequest
+from app.core.utils import get_dataset, upload_cleaned_dataset, get_dataset_feature_metadata
 from app.core.websocket_manager import manager
 
-import asyncio
-
-def drop_missing_values(df: pd.DataFrame) -> pd.DataFrame:
-    """Membersihkan raw data dari missing values"""
-    return df.dropna().reset_index(drop=True)
-
-def preprocess_dates(df: pd.DataFrame, date_column: str) -> pd.DataFrame:
-    """Mengubah format string menjadi datetime object"""
-    df_clean = df.copy()
-    df_clean[date_column] = pd.to_datetime(df_clean[date_column])
-    return df_clean
-
-# Tambahkan lagi fungsi preprocessing khusus untuk clustering, forecasting, dsb. sesuai kebutuhan
-
-def prepare_clustering_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Fungsi wrapper untuk menjalankan beberapa preprocessing
-    secara berurutan khusus untuk clustering.
-    """
-    df = drop_missing_values(df)
-    # Lakukan agregasi atau fitur engineering spesifik untuk clustering
-    return df
-
-def prepare_forecasting_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Fungsi wrapper untuk preprocessing data time-series.
-    """
-    df = drop_missing_values(df)
-    df = preprocess_dates(df, 'date')
-    # Set index ke datetime, resampling harian/mingguan, dsb.
-    return df
-
-# ------------------------------------- Baroe --------------------------------------------
 
 def should_preserve_column(col_name: str) -> bool:
     name_lower = col_name.lower()

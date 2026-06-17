@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.chatbot_schema import ChatbotFrontendRequest, ChatbotFrontendResponse
-from app.controller.chatbot_controller import handle_chatbot_request, get_chatbot_history
+from app.schemas.chatbot import ChatbotFrontendRequest, ChatbotFrontendResponse
+from app.controller.chatbot import handle_chatbot_request, get_chatbot_history
 from app.shared.dependencies import get_current_user
 from app.models.user import User
 

@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from fastapi import Depends, APIRouter
 from app.database.main import get_db
 from app.schemas.base import StandardResponse
-from app.schemas.clustering_schema import ClusteringRunRequest, ClusteringCallbackRequest
-from app.controller.clustering_controller import run_clustering, get_clustering_result, get_clustering_history, handle_clustering_callback
+from app.schemas.clustering import ClusteringRunRequest, ClusteringCallbackRequest
+from app.controller.clustering import run_clustering, get_clustering_result, get_clustering_history, handle_clustering_callback
 from app.shared.dependencies import get_current_user
+from app.shared.api_key import verify_api_key
 from app.models.user import User
 
 router = APIRouter(prefix="/clustering")
@@ -35,9 +36,13 @@ async def run_clustering_endpoint(
 )
 async def clustering_callback_endpoint(
     request: ClusteringCallbackRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_api_key)
 ):
-    """Menerima callback dari ML service setelah proses clustering selesai/gagal."""
+    """Menerima callback dari ML service setelah proses clustering selesai/gagal.
+    
+    Endpoint ini diproteksi dengan API Key — hanya ML service internal yang bisa mengaksesnya.
+    """
     return await handle_clustering_callback(request, db)
 
 

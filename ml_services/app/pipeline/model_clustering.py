@@ -163,20 +163,6 @@ class ClusteringPipeline:
             "insight_summary": insight
         }
 
-    def save(self, filepath: str):
-        joblib.dump({
-            'model': self.model,
-            'scaler': self.scaler,
-            'config': {'n_clusters': self.n_clusters}
-        }, filepath)
-
-    def load(self, filepath: str):
-        data = joblib.load(filepath)
-        self.model = data['model']
-        self.scaler = data['scaler']
-        self.n_clusters = data['config']['n_clusters']
-        self.is_fitted = True
-
     def predict(self, X: pd.DataFrame) -> list:
         if not self.is_fitted:
             raise ValueError("Model belum ditraining!")
