@@ -6,13 +6,11 @@ export default function LandingPageLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
-        <div className="fixed top-0 left-0 w-full z-50">
-          <NavbarDemo />
-        </div>
-        {children}
-      </body>
-    </html>
-  );
+  <div>
+    <div className="fixed top-0 left-0 w-full z-50">
+      <NavbarDemo />
+    </div>
+    {children}
+  </div>
+)
 }

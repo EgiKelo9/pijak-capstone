@@ -1,3 +1,10 @@
 node_modules
 .next
 .git
+.env
+.env.*
+.gitignore
+.prettierrc
+.prettierignore
+eslint.config.mjs
+tsconfig.tsbuildinfo

@@ -1,9 +1,10 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.base import StandardResponse
+from app.router import openrouter, model, health, preprocess
 from app.middleware import cors
-from app.router import gemma, model, health
 
 app = FastAPI(
     title="Beez - Pijak Capstone ML Service",
@@ -16,9 +17,10 @@ if not os.getenv("ENV"):
 
 cors.add(app)
 
-app.include_router(gemma.router, prefix="/ml/v1", tags=["Gemma Endpoints"])
-app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
 app.include_router(health.router, prefix="/ml/v1", tags=["Health Endpoints"])
+app.include_router(preprocess.router, prefix="/ml/v1", tags=["Preprocess Endpoints"])
+app.include_router(openrouter.router, prefix="/ml/v1", tags=["OpenRouter Endpoints"])
+app.include_router(model.router, prefix="/ml/v1", tags=["Model Endpoints"])
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -34,4 +36,4 @@ async def http_exception_handler(request, exc):
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Beez - Pijak Capstone ML Service. Akses /docs untuk melihat dokumentasi interaktif."}
+    return {"message": "Welcome to Beez - Pijak Capstone ML Service."}

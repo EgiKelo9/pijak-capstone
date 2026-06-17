@@ -8,7 +8,7 @@ class AnalysisHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    dataset_id = Column(Integer, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True)
+    dataset_id = Column(Integer, ForeignKey("datasets_bin.id", ondelete="SET NULL"), nullable=True)
     model_id = Column(Integer, ForeignKey("ml_models.id", ondelete="RESTRICT"), nullable=True)
     status = Column(String(50), default="completed")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -16,7 +16,7 @@ class AnalysisHistory(Base):
     deleted_at = Column(DateTime, nullable=True)
 
     user = relationship("User", backref="analyses")
-    dataset = relationship("Dataset", backref="analyses")
+    dataset = relationship("Dataset_Bin", backref="analyses")
     model = relationship("MLModel", backref="analyses")
 
     def delete(self):

@@ -1,10 +1,11 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from app.schemas.base import StandardResponse
 from app.database.main import Base, engine, create_db
-from app.middleware import cors, static
-from app.router import auth, health, dataset
+from app.middleware import cors
+from app.router import auth, health, dataset, clustering, forecasting, chatbot
 
 app = FastAPI(
     title="Beez - Pijak Capstone API",
@@ -16,14 +17,15 @@ if not os.getenv("ENV"):
     os.environ["ENV"] = "dev"
 
 cors.add(app)
-static.add(app)
-
 create_db()
 Base.metadata.create_all(bind=engine)
 
+app.include_router(health.router, prefix="/api/v1", tags=["System Check"])
 app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(dataset.router, prefix="/api/v1", tags=["Dataset Management"])
-app.include_router(health.router, prefix="/api/v1", tags=["System Check"])
+app.include_router(clustering.router, prefix="/api/v1", tags=["Clustering"])
+app.include_router(forecasting.router, prefix="/api/v1", tags=["Forecasting"])
+app.include_router(chatbot.router, prefix="/api/v1", tags=["Chatbot"])
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -34,6 +36,26 @@ async def http_exception_handler(request, exc):
             error=True,
             message=exc.detail,
             data=None
+        ).model_dump()
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    logger.error(f"❌ Validation Error on {request.url.path}: {exc.errors()}")
+    try:
+        body = await request.json()
+        logger.error(f"❌ Invalid Request Body: {body}")
+    except Exception:
+        pass
+    return JSONResponse(
+        status_code=422,
+        content=StandardResponse(
+            code=422,
+            error=True,
+            message="Validation Error: " + str(exc.errors()),
+            data=exc.errors()
         ).model_dump()
     )
 

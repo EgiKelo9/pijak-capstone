@@ -17,5 +17,24 @@ RUN pnpm install --frozen-lockfile
 # Copy the rest of the application
 COPY . .
 
-# Start the development server
-CMD ["pnpm", "run", "dev"]
+# Set build-time environment variables for Next.js compilation
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+ARG NEXT_PUBLIC_ML_API_URL
+ENV NEXT_PUBLIC_ML_API_URL=$NEXT_PUBLIC_ML_API_URL
+
+ARG BACKEND_USER_EMAIL
+ENV BACKEND_USER_EMAIL=$BACKEND_USER_EMAIL
+
+ARG BACKEND_USER_PASSWORD
+ENV BACKEND_USER_PASSWORD=$BACKEND_USER_PASSWORD
+
+# Build the application
+RUN pnpm run build
+
+# Expose production port
+EXPOSE 3000
+
+# Start the production server
+CMD ["pnpm", "run", "start"]

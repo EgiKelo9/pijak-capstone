@@ -1,8 +1,5 @@
-import httpx
 from app.schemas.base import StandardResponse
-from app.core.config import get_settings
-
-settings = get_settings()
+from app.core.utils import generate_from_openrouter
 
 def check_health() -> StandardResponse[dict]:
     """Health check untuk memastikan layanan berjalan dengan baik."""
@@ -13,28 +10,32 @@ def check_health() -> StandardResponse[dict]:
         data={"status": "ok"}
     )
     
-async def check_gemma_health() -> StandardResponse[dict]:
-    """Health check untuk memastikan Gemma (LLM) berjalan dengan baik melalui Ollama."""
+async def check_llm_health() -> StandardResponse[dict]:
+    """Health check untuk memastikan LLM berjalan dengan baik melalui OpenRouter."""
     try:
-        payload = {
-            "model": settings.LLM_MODEL,
-            "prompt": "Balas hanya dengan kata 'OK' atau 'Healthy'.",
-            "stream": False
-        }
-        async with httpx.AsyncClient() as client:
-            response = await client.post(settings.OLLAMA_BASE_URL, json=payload, timeout=10.0)
-            response.raise_for_status()
-            data = response.json()
+        llm_response = await generate_from_openrouter(
+            "Balas hanya dengan kata 'OK' atau 'Healthy'."
+        )
+
+        if getattr(llm_response, "error", False):
             return StandardResponse(
-                code=200,
-                error=False,
-                message="Gemma is healthy",
-                data={"status": data.get("response", "").strip()}
+                code=500,
+                error=True,
+                message=f"LLM health check failed: {llm_response.message}",
+                data={"status": "error"}
             )
+
+        reply = llm_response.data.get("response", "") if llm_response.data else ""
+        return StandardResponse(
+            code=200,
+            error=False,
+            message="LLM (OpenRouter) is healthy",
+            data={"status": reply}
+        )
     except Exception as e:
         return StandardResponse(
             code=500,
             error=True,
-            message=f"Gemma health check failed: {str(e)}",
+            message=f"LLM health check failed: {str(e)}",
             data={"status": "error"}
         )
