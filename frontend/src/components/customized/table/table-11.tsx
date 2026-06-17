@@ -60,6 +60,14 @@ export interface AnalysisRow {
   insight: string;
   confidence_level?: number | null;
   silhouette_score?: number | null;
+  mae?: number | null;
+  mape?: number | null;
+  mse?: number | null;
+  rmse?: number | null;
+  r2?: number | null;
+  cluster_amount?: number | null;
+  optimal_k?: number | null;
+  wcss_score?: number | null;
 }
 
 // ── Status config — dot only, NO background pill ──────────────────────────────
@@ -185,8 +193,8 @@ function buildColumns(
               "text-xs truncate max-w-[150px] sm:max-w-[220px] md:max-w-[300px] lg:max-w-[400px]",
               // gagal    → rose bold (error message style)
               s === "gagal"    && "text-rose-500 font-semibold",
-              // menunggu / berjalan → amber (in-progress)
-              (s === "menunggu" || s === "berjalan") && "text-amber-500",
+              // menunggu → amber (in-progress)
+              s === "menunggu" && "text-amber-500",
               // berhasil → plain neutral
               s === "berhasil" && "text-neutral-600",
             )}
@@ -467,11 +475,85 @@ export function DynamicDataTable({
                 <X className="size-5" />
               </button>
             </div>
-            <div className="p-6 md:p-8 max-h-[60vh] overflow-y-auto">
-              <div className="rounded-xl bg-[#2BBAEE]/5 border border-[#2BBAEE]/20 p-5">
-                <p className="text-sm md:text-base text-neutral-700 leading-relaxed font-medium">
-                  {detailRow.insight || "Belum ada insight yang dihasilkan untuk analisis ini."}
-                </p>
+            <div className="p-6 md:p-8 max-h-[60vh] overflow-y-auto flex flex-col gap-4">
+              {/* Metrics Section */}
+              {detailRow.status === "berhasil" && (
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">Metrik Model</span>
+                  
+                  {detailRow.metode.toLowerCase().includes("forecasting") && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">Confidence</span>
+                        <span className="text-sm font-bold text-[#2BBAEE]">
+                          {detailRow.confidence_level != null ? `${Math.round(detailRow.confidence_level * 100)}%` : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">R² Score</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.r2 != null ? detailRow.r2.toFixed(3) : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">MAPE</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.mape != null ? `${(detailRow.mape > 1 ? detailRow.mape : detailRow.mape * 100).toFixed(1)}%` : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80 col-span-1">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">RMSE</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.rmse != null ? detailRow.rmse.toFixed(1) : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80 col-span-2">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">MAE</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.mae != null ? detailRow.mae.toFixed(1) : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {detailRow.metode.toLowerCase().includes("clustering") && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">Silhouette Score</span>
+                        <span className="text-sm font-bold text-[#2BBAEE]">
+                          {detailRow.silhouette_score != null ? detailRow.silhouette_score.toFixed(4) : '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">K Optimal</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.optimal_k ?? '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">Jumlah Klaster (K)</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.cluster_amount ?? '-'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-neutral-50 rounded-xl border border-neutral-100/80">
+                        <span className="text-[10px] text-neutral-500 font-medium mb-0.5">WCSS Score</span>
+                        <span className="text-sm font-bold text-neutral-800">
+                          {detailRow.wcss_score != null ? detailRow.wcss_score.toFixed(1) : '-'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">Insight Summary</span>
+                <div className="rounded-xl bg-[#2BBAEE]/5 border border-[#2BBAEE]/20 p-5">
+                  <p className="text-sm md:text-base text-neutral-700 leading-relaxed font-medium whitespace-pre-wrap">
+                    {detailRow.insight || "Belum ada insight yang dihasilkan untuk analisis ini."}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
