@@ -37,7 +37,7 @@ async def handle_chatbot_request(
                 AnalysisHistory.id == analysis_id,
                 AnalysisHistory.user_id == user_id,
                 AnalysisHistory.status == "berhasil",
-                AnalysisHistory.deleted_at == None
+                AnalysisHistory.deleted_at.is_(None)
             ).first()
             
         # 2. If not found, try querying as dataset_id
@@ -48,7 +48,7 @@ async def handle_chatbot_request(
                 AnalysisHistory.dataset_id == dataset_id,
                 AnalysisHistory.status == "berhasil",
                 MLModel.type == model_type,
-                AnalysisHistory.deleted_at == None
+                AnalysisHistory.deleted_at.is_(None)
             ).order_by(AnalysisHistory.created_at.desc()).first()
 
         # 3. Format the result summary
@@ -205,7 +205,7 @@ async def get_chatbot_history(analysis_id: int, user_id: int, db: Session) -> St
     analysis = db.query(AnalysisHistory).filter(
         AnalysisHistory.id == analysis_id,
         AnalysisHistory.user_id == user_id,
-        AnalysisHistory.deleted_at == None
+        AnalysisHistory.deleted_at.is_(None)
     ).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis tidak ditemukan")
@@ -213,7 +213,7 @@ async def get_chatbot_history(analysis_id: int, user_id: int, db: Session) -> St
     # Fetch messages
     messages = db.query(ChatMessage).filter(
         ChatMessage.analysis_id == analysis_id,
-        ChatMessage.deleted_at == None
+        ChatMessage.deleted_at.is_(None)
     ).order_by(ChatMessage.created_at.asc()).all()
 
     data = []

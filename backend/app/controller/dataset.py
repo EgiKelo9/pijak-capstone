@@ -183,7 +183,7 @@ async def fetch_datasets_bin_by_user(current_user: User, db: Session):
             # Cari dataset yang terkait dengan user saat ini dengan relasi ori data null untuk menandakan data asli
             stmt = select(Dataset_Bin.dataset_name, Dataset_Bin.id).where(
                 Dataset_Bin.user_id  == current_user.id,
-                Dataset_Bin.ori_data_id == None
+                Dataset_Bin.ori_data_id.is_(None)
             )
             datasets = session.execute(stmt).mappings().all()
 
@@ -316,8 +316,8 @@ async def soft_delete_cleaned_datasets(
                 .filter(
                     Dataset_Bin.ori_data_id == ori_data_id,
                     Dataset_Bin.model == model,
-                    Dataset_Bin.is_cleaned == True,
-                    Dataset_Bin.deleted_at == None,
+                    Dataset_Bin.is_cleaned.is_(True),
+                    Dataset_Bin.deleted_at.is_(None),
                 )
                 .all()
             )
@@ -533,8 +533,8 @@ async def fetch_cleaned_dataset_ids(raw_dataset_id: int, current_user: User, db:
 
             stmt = select(Dataset_Bin).where(
                 Dataset_Bin.ori_data_id == raw_dataset_id,
-                Dataset_Bin.is_cleaned == True,
-                Dataset_Bin.deleted_at == None
+                Dataset_Bin.is_cleaned.is_(True),
+                Dataset_Bin.deleted_at.is_(None)
             )
             records = session.execute(stmt).scalars().all()
 

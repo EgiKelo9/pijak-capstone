@@ -29,9 +29,9 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
     # 1. Cek dataset exists
     dataset = db.query(Dataset_Bin).filter(
         Dataset_Bin.id == request.dataset_id,
-        Dataset_Bin.is_cleaned == True,
+        Dataset_Bin.is_cleaned.is_(True),
         Dataset_Bin.model == "Forecasting",
-        Dataset_Bin.deleted_at == None
+        Dataset_Bin.deleted_at.is_(None)
     ).first()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset tidak ditemukan")
@@ -39,7 +39,7 @@ async def run_forecasting(request: ForecastingRunRequest, user_id: int, db: Sess
     # 2. Cek ml_model untuk forecasting
     ml_model = db.query(MLModel).filter(
         MLModel.type == "forecasting",
-        MLModel.deleted_at == None
+        MLModel.deleted_at.is_(None)
     ).first()
     if not ml_model:
         raise HTTPException(status_code=404, detail="ML model forecasting tidak ditemukan")
@@ -226,7 +226,7 @@ async def get_forecasting_result(analysis_id: int, user_id: int, db: Session):
     analysis = db.query(AnalysisHistory).filter(
         AnalysisHistory.id == analysis_id,
         AnalysisHistory.user_id == user_id,
-        AnalysisHistory.deleted_at == None
+        AnalysisHistory.deleted_at.is_(None)
     ).first()
     if not analysis:
         raise HTTPException(status_code=404, detail="Analysis tidak ditemukan")
@@ -278,7 +278,7 @@ async def get_forecasting_history(user_id: int, db: Session):
     # 1. Ambil semua analysis_history forecasting milik user
     analyses = db.query(AnalysisHistory).join(MLModel).filter(
         AnalysisHistory.user_id == user_id,
-        AnalysisHistory.deleted_at == None,
+        AnalysisHistory.deleted_at.is_(None),
         MLModel.type == "forecasting"
     ).order_by(AnalysisHistory.created_at.desc()).all()
 
