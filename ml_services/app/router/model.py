@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from app.controller.clustering import run_clustering
 from app.controller.forecasting import run_forecasting
 from app.schemas.clustering import ClusteringRequest

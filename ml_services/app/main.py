@@ -1,7 +1,6 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.base import StandardResponse
 from app.router import openrouter, model, health, preprocess
 from app.middleware import cors

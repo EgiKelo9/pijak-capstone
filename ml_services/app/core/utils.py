@@ -97,7 +97,6 @@ async def call_backend_api(
 
 async def update_dataset_feature_metadata(dataset_id:int, feature: Feature):
     """Update feature metadata, digunakan setelah analyze column untuk menyimpan hasil analisis kolom oleh LLM"""
-    feature_dump = feature.model_dump()
     response = await call_backend_api(
         "PATCH",
         f"/api/v1/datasets/feature-metadata-update/{dataset_id}",

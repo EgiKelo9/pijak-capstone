@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.schemas.base import StandardResponse
-from app.pipeline.preprocess import temp_pipeline, test_ws
+from app.pipeline.preprocess import temp_pipeline
 from app.schemas.openrouter import PreprocessRequest, PreprocessResponse
 from app.schemas.features import Feature
 from app.core.websocket_manager import manager

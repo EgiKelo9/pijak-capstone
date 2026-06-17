@@ -1,5 +1,4 @@
 from fastapi import WebSocket
-from pydantic import UUID5
 
 class ProgressManager:
     def __init__(self):

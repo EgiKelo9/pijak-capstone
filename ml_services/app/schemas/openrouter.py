@@ -1,5 +1,5 @@
-from pydantic import BaseModel, UUID5
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from typing import Optional, Dict, Any
 from app.schemas.features import Feature
     
 class DatasetMetadataRequest(BaseModel):

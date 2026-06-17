@@ -1,5 +1,4 @@
 import json
-from typing import Any, Dict, Optional
 from app.schemas.openrouter import ChatbotRequest, ChatbotResponse
 from app.core.utils import generate_from_openrouter
 
