@@ -8,6 +8,7 @@ from app.schemas.clustering_schema import (
     ClusteringResponse,
     ClusteringErrorResponse
 )
+from app.core.config import get_settings
 
 logger = logging.getLogger("uvicorn.error")
 pipeline = ClusteringPipeline()
@@ -64,8 +65,9 @@ async def run_clustering(request: ClusteringRequest):
         )
         try:
             async with httpx.AsyncClient() as client:
+                settings = get_settings()
                 resp = await client.patch(
-                    callback_url, json=response_payload.model_dump(), timeout=15.0
+                    f"{settings.BACKEND_BASE_URL}{callback_url}", json=response_payload.model_dump(), timeout=15.0
                 )
                 logger.info(f"Success callback sent, response status: {resp.status_code}")
         except Exception as callback_err:
