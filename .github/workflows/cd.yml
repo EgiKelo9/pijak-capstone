@@ -160,6 +160,9 @@ jobs:
           echo "==> Navigating to project directory"
           cd "${DEPLOY_PATH}"
 
+          echo "==> Pulling latest changes from Git"
+          git pull origin master
+
           echo "==> Logging in to GitHub Container Registry"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
 
