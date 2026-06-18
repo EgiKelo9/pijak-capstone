@@ -1,12 +1,15 @@
-
+import Image from "next/image"
 import { BentoCard, BentoGrid } from "@/components/ui/bento-grid"
 const features = [
   {
     Icon: ({ className }: { className?: string }) => (
-      <img 
-        src="/icons8/icons8-rescan-document-100.png" 
-        alt="Rescan Document" 
-        className={`${className} object-contain`} 
+      <Image
+        src="/icons8/icons8-rescan-document-100.png"
+        alt="Rescan Document"
+        width={48}
+        height={48}
+        className={`${className} object-contain`}
+        unoptimized
       />
     ),
     name: "Bereskan Data Kusam Tanpa Pusing",
@@ -19,17 +22,20 @@ const features = [
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
           // Added a fallback dark color (#2c2c2c) in case the image fails to load
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 63.webp') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle%2063.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
   },
   {
     Icon: ({ className }: { className?: string }) => (
-      <img 
-        src="/icons8/icons8-graph-100.png" 
-        alt="Graph" 
-        className={`${className} object-contain`} 
+      <Image
+        src="/icons8/icons8-graph-100.png"
+        alt="Graph"
+        width={48}
+        height={48}
+        className={`${className} object-contain`}
+        unoptimized
       />
     ),
     name: "Prediksi Penjualan Masa Depan",
@@ -41,17 +47,20 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(45, 45, 45, 0.96) 53.37%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 64.webp') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(45, 45, 45, 0.96) 53.37%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle%2064.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
   },
   {
     Icon: ({ className }: { className?: string }) => (
-      <img 
-        src="/icons8/icons8-mind-map-100.png" 
-        alt="Connected Graph" 
-        className={`${className} object-contain`} 
+      <Image
+        src="/icons8/icons8-mind-map-100.png"
+        alt="Connected Graph"
+        width={48}
+        height={48}
+        className={`${className} object-contain`}
+        unoptimized
       />
     ),
     name: "Ketahui Performa Produkmu",
@@ -63,17 +72,20 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 65.webp') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle%2065.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
   },
   {
     Icon: ({ className }: { className?: string }) => (
-      <img 
-        src="/icons8/icons8-time24-100.png" 
-        alt="24/7" 
-        className={`${className} object-contain`} 
+      <Image
+        src="/icons8/icons8-time24-100.png"
+        alt="24/7"
+        width={48}
+        height={48}
+        className={`${className} object-contain`}
+        unoptimized
       />
     ),
     name: "Konsultan Bisnis Pribadi 24/7",
@@ -85,7 +97,7 @@ const features = [
       <div 
         className="absolute inset-0 w-full h-full bg-cover bg-center grayscale transition-all duration-300 ease-out group-hover:scale-105"
         style={{
-          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle 66.webp') center/cover no-repeat, #2c2c2c`,
+          background: `linear-gradient(90deg, #272727 0%, #2C2C2C 38.95%, rgba(51, 51, 51, 0.84) 100%), url('/carousel/Rectangle%2066.webp') center/cover no-repeat, #2c2c2c`,
         }}
       />
     ),
