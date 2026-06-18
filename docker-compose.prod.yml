@@ -72,7 +72,6 @@ services:
       - LLM_MODEL=${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b:free}
       - BACKEND_BASE_URL=${BACKEND_BASE_URL}
       - ML_API_KEY=${ML_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
   # 5. Adminer (Database Admin Tool)
   adminer:

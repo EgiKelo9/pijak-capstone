@@ -81,7 +81,7 @@ Buat file `.env` di root project sebelum menjalankan docker-compose (atau salin 
 cp .env.example .env
 ```
 
-Isi variabel penting seperti `SECRET_KEY`, `OPEN_ROUTER_API_KEY`, dan `GEMINI_API_KEY` pada file `.env` tersebut.
+Isi variabel penting seperti `SECRET_KEY` dan `OPEN_ROUTER_API_KEY` pada file `.env` tersebut.
 
 ---
 
