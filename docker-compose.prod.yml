@@ -74,12 +74,12 @@ services:
       - ML_API_KEY=${ML_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
 
-  # 5. Adminer (Database Admin Tool) – akses via SSH tunnel
+  # 5. Adminer (Database Admin Tool)
   adminer:
     image: adminer
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"  # Bind ke localhost saja
+      - "8080:8080" 
 
 volumes:
   postgres_data:
