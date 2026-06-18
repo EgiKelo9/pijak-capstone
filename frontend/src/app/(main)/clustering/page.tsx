@@ -236,11 +236,13 @@ export default function ClusteringPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full h-auto relative pt-12">
+    <div className="flex flex-col gap-4 w-full h-auto relative pt-16 sm:pt-12">
 
-      {/* Tabs Header - Absolute positioned at top like in Forecasting */}
+      {/* Combined header row: Tabs (centered) + Cluster Filter (right) */}
       {result && (
-        <div className="absolute top-0 inset-x-0 z-20 flex justify-center">
+        <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between gap-2 px-1">
+          {/* Left spacer for centering */}
+          <div className="flex-1" />
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as 'hasil' | 'pengujian')}
@@ -262,21 +264,20 @@ export default function ClusteringPage() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
-      )}
-
-      {/* Floating Dropdown Filter Cluster (Hanya muncul di Tab Hasil) */}
-      {result && activeTab === 'hasil' && (
-        <div className="absolute top-0 right-0 z-20">
-          <Select value={filterCluster} onValueChange={setFilterCluster}>
-            <SelectTrigger className="h-9 w-44 rounded-xl border-neutral-800/20 text-xs shadow-sm bg-white/80 backdrop-blur-sm">
-              <SelectValue placeholder="Filter Cluster" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Klaster</SelectItem>
-              {uniqueClusters.map(c => <SelectItem key={c} value={String(c)}>Klaster {c + 1}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {/* Cluster filter - right side (only on hasil tab) */}
+          <div className="flex-1 flex justify-end">
+            {activeTab === 'hasil' && (
+              <Select value={filterCluster} onValueChange={setFilterCluster}>
+                <SelectTrigger className="h-9 w-36 sm:w-44 rounded-xl border-neutral-800/20 text-xs shadow-sm bg-white/80 backdrop-blur-sm">
+                  <SelectValue placeholder="Filter Cluster" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Klaster</SelectItem>
+                  {uniqueClusters.map(c => <SelectItem key={c} value={String(c)}>Klaster {c + 1}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
       )}
 
