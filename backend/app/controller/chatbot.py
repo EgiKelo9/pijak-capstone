@@ -116,7 +116,7 @@ async def handle_chatbot_request(
                         f"- **Waktu Analisis**: {analysis.created_at.strftime('%Y-%m-%d %H:%M:%S') if analysis.created_at else '-'}",
                         f"- **Jumlah Cluster**: {result.cluster_amount}",
                         f"- **Optimal K**: {result.optimal_k or result.cluster_amount}",
-                        f"- **Silhouette Score**: {result.silhouette_score:.4f if result.silhouette_score is not None else '-'}",
+                        f"- **Silhouette Score**: {f'{result.silhouette_score:.4f}' if result.silhouette_score is not None else '-'}",
                     ]
                     
                     if result.cluster_data and isinstance(result.cluster_data, list):
