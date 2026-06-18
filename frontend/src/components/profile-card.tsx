@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { CometCard } from "@/components/ui/comet-card";
 
 interface ProfileCardProps {
@@ -30,27 +31,29 @@ export function ProfileCard({ name, badge, image }: ProfileCardProps) {
         >
           {/* Badge */}
           <div
-            className="absolute top-4 z-20 flex px-3 py-1 items-center justify-center rounded-full shadow-sm"
+            className="absolute bottom-4 z-20 flex px-3 py-1 items-center justify-center rounded-full shadow-sm"
             style={{
               background: "linear-gradient(180deg, #90FDF2 0%, #2BBAEE 100%)",
               transform: "translateZ(30px)", 
             }}
           >
-          <span className="font-sans text-[0.6rem] md:text-xs 2xl:text-sm font-[510] text-black leading-none whitespace-nowrap">
+            <span className="font-sans text-[0.6rem] md:text-xs 2xl:text-sm font-[510] text-black leading-none whitespace-nowrap">
               {badge}
             </span>
           </div>
 
           {/* Profile Image (Transparent PNG) */}
-          <img
+          <Image
+            fill
             loading="lazy"
             draggable={false}
             alt={`Formal Photo of ${name}`}
             src={image}
-            className="absolute bottom-0 z-10 h-full w-full object-cover object-bottom"
+            className="absolute bottom-0 z-10 object-cover object-bottom"
             style={{
               transform: "translateZ(10px)",
             }}
+            unoptimized
           />
         </div>
 

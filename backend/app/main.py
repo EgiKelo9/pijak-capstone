@@ -1,40 +1,64 @@
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.api import predict, health, auth
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from app.schemas.base import StandardResponse
+from app.database.main import Base, engine, create_db
+from app.middleware import cors
+from app.router import auth, health, dataset, clustering, forecasting, chatbot
 
-# Environment variables untuk konfigurasi service
-ML_SERVICE_URL  = os.getenv("ML_SERVICE_URL",  "http://ml_services:8000")
-DATABASE_URL    = os.getenv("DATABASE_URL",    "")
-
-# Inisiasi FastAPI app
 app = FastAPI(
-    title="Pijak Capstone API",
-    description="API Capstone Project untuk AI Business Intelligence",
+    title="Beez - Pijak Capstone API",
+    description="API Capstone Project untuk Beez - AI Business Intelligence",
     version="1.0.0"
 )
 
-# Konfigurasi CORS untuk mengizinkan frontend React (port 3000) dan domain produksi
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://0.0.0.0:3000",
-    "https://pijak-capstone.aryadanabaraja.my.id"
-]
+if not os.getenv("ENV"):
+    os.environ["ENV"] = "dev"
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors.add(app)
+create_db()
+Base.metadata.create_all(bind=engine)
 
-# Include API routers
-app.include_router(auth.router, prefix="/api", tags=["Authentication"])
-app.include_router(predict.router, prefix="/api", tags=["Prediction"])
-app.include_router(health.router, prefix="/api", tags=["System Check"])
+app.include_router(health.router, prefix="/api/v1", tags=["System Check"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(dataset.router, prefix="/api/v1", tags=["Dataset Management"])
+app.include_router(clustering.router, prefix="/api/v1", tags=["Clustering"])
+app.include_router(forecasting.router, prefix="/api/v1", tags=["Forecasting"])
+app.include_router(chatbot.router, prefix="/api/v1", tags=["Chatbot"])
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=StandardResponse(
+            code=exc.status_code,
+            error=True,
+            message=exc.detail,
+            data=None
+        ).model_dump()
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    logger.error(f"❌ Validation Error on {request.url.path}: {exc.errors()}")
+    try:
+        body = await request.json()
+        logger.error(f"❌ Invalid Request Body: {body}")
+    except Exception:
+        pass
+    return JSONResponse(
+        status_code=422,
+        content=StandardResponse(
+            code=422,
+            error=True,
+            message="Validation Error: " + str(exc.errors()),
+            data=exc.errors()
+        ).model_dump()
+    )
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Pijak Capstone API. Akses /docs untuk melihat dokumentasi interaktif."}
+    return {"message": "Welcome to Beez - Pijak Capstone API. Akses /docs untuk melihat dokumentasi interaktif."}

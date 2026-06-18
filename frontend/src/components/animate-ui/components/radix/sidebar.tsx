@@ -307,8 +307,10 @@ function SidebarTrigger({ className, onClick, ...props }: SidebarTriggerProps) {
       }}
       {...props}
     >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <>
+        <PanelLeftIcon />
+        <span className="sr-only">Toggle Sidebar</span>
+      </>
     </Button>
   );
 }
@@ -416,7 +418,7 @@ function SidebarContent({ className, ...props }: SidebarContentProps) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        'flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden',
+        'flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-visible',
         className,
       )}
       {...props}
