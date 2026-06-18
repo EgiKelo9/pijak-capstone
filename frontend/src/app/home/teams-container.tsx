@@ -7,39 +7,39 @@ import { useEffect, useRef, useState } from "react";
 const TEAM_MEMBERS = [
     {
       id: 1,
-      name: "A. Wirasena",
+      name: "Ananda W.",
       badge: "UI Sculptor",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Ananda.png",
     },
     {
       id: 2,
-      name: "A. Rian",
+      name: "Akira R.",
       badge: "Logic Lord",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Akira.png",
     },
     {
       id: 3,
-      name: "A. Baraja",
+      name: "Baraja P.",
       badge: "Flow Orchestrator",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Baraja.png",
     },
     {
       id: 4,
-      name: "C. Valentino",
+      name: "Christian V.",
       badge: "Bug Hunter",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Christian.png",
     },
     {
       id: 5,
-      name: "R. Astarani",
+      name: "Riyana A.",
       badge: "Data Dweller",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Riyana.png",
     },
     {
       id: 6,
-      name: "R. Astarani",
+      name: "Riyani A.",
       badge: "Model Maker",
-      image: "/teams/Placeholder.png",
+      image: "/teams/Riyani.png",
     },
   ];
 

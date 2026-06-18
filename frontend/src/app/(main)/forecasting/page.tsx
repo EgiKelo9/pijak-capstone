@@ -127,9 +127,11 @@ export default function ForecastingDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full relative pt-12">
-      {/* Tabs Header - Absolute positioned at top like in Analisis */}
-      <div className="absolute top-0 inset-x-0 z-20 flex justify-center">
+    <div className="flex flex-col gap-4 w-full h-full relative pt-16 sm:pt-12">
+      {/* Tabs Header + Time Filter - combined row to prevent overlap on mobile */}
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between gap-2 px-1">
+        {/* Spacer so tabs stay centered */}
+        <div className="flex-1" />
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as 'hasil' | 'pengujian')}
@@ -151,22 +153,21 @@ export default function ForecastingDashboardPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-      </div>
-
-      {/* Floating Dropdown Time Filter */}
-      {data && (
-        <div className="absolute top-0 right-0 z-20">
-          <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
-            <SelectTrigger className="h-9 w-44 rounded-xl border-neutral-800/20 text-xs shadow-sm bg-white/80 backdrop-blur-sm">
-              <SelectValue placeholder="Pilih Periode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Harian</SelectItem>
-              <SelectItem value="weekly">Mingguan</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Time Filter - right side */}
+        <div className="flex-1 flex justify-end">
+          {data && (
+            <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as TimeFilter)}>
+              <SelectTrigger className="h-9 w-36 sm:w-44 rounded-xl border-neutral-800/20 text-xs shadow-sm bg-white/80 backdrop-blur-sm">
+                <SelectValue placeholder="Pilih Periode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Harian</SelectItem>
+                <SelectItem value="weekly">Mingguan</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="relative flex-1 h-auto w-full mt-2">
         {/* Tab: Hasil */}

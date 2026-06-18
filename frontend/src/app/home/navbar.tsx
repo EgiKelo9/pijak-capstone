@@ -50,7 +50,7 @@ export default function NavbarDemo() {
           {/* Replaced NavbarLogo with your native SVG request */}
           <a href="/">
             <Image 
-              src="./Logo.svg" 
+              src="/Logo.svg" 
               alt="BeeZ Logo" 
               width={96} 
               height={40} 

@@ -309,7 +309,7 @@ export default function MainDashboard() {
   return (
     <>
       {/* Main Container */}
-      <div className="flex gap-4 w-full h-full p-4 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-4 w-full h-full p-4 overflow-hidden">
         {/* Left */}
         <div className="flex flex-col gap-4 flex-1 h-full max-h-[85vh] overflow-y-auto pr-2 pb-6">
           <div className="flex flex-col gap-4 w-full shrink-0">
@@ -382,7 +382,7 @@ export default function MainDashboard() {
           </div>
         </div>
         {/* Right */}
-        <aside className="w-[24vw] h-full max-h-[85vh] shrink-0">
+        <aside className="w-full lg:w-[24vw] h-[60vh] lg:h-full lg:max-h-[85vh] shrink-0">
           <AnalysisCard
             title="Tanya BeeZ AI"
             className="h-full w-full"

@@ -216,7 +216,7 @@ export default function LandingPage() {
                 mulai bertindak.
             </h2>
             
-            <Link href="/dashboard">
+            <Link href="/dasbor">
               <Button className="px-6 py-4 md:px-8 md:py-7 2xl:px-12 2xl:py-10 text-xl md:text-2xl 2xl:text-3xl rounded-full bg-[#272727] hover:bg-[#333333] border-[0.4px] border-[#5D5D5D] shadow-xl hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 hover:-translate-y-1.5 cursor-pointer">
                 <span className="bg-linear-to-b from-[#90FDF2] to-primary bg-clip-text text-transparent">
                   Mulai Lebih eZ
