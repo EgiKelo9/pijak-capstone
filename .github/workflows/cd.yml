@@ -166,8 +166,8 @@ jobs:
           echo "==> Logging in to GitHub Container Registry"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
 
-          echo "==> Pulling latest images"
-          docker compose -f docker-compose.prod.yml pull
+          echo "==> Pulling latest images from GHCR"
+          docker compose -f docker-compose.prod.yml pull backend frontend ml_services
 
           echo "==> Restarting services with zero-downtime"
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
