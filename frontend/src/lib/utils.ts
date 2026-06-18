@@ -57,3 +57,7 @@ export function setCookie(name: string, value: string, maxAge: number, options?:
 export function deleteCookie(name: string): void {
   document.cookie = `${name}=; path=/; max-age=0`;
 }
+
+export function deleteLocalStorage(name: string): void {
+  localStorage.removeItem(name);
+}

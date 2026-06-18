@@ -1,6 +1,6 @@
 import { User } from "@/types";
 import { useRouter } from 'next/navigation';
-import { deleteCookie, setCookie } from '@/lib/utils';
+import { deleteCookie, setCookie, deleteLocalStorage } from '@/lib/utils';
 import { useCallback, useEffect, useState } from 'react';
 import { register, login, logout } from "@/services/auth";
 
@@ -69,6 +69,10 @@ export const useAuth = () => {
       const response = await login(email, password);
       const data = response.data
       console.log(data)
+
+      deleteLocalStorage('pijak_active_dataset_id');
+      deleteLocalStorage('pijak_dataset_context');
+
       const userData = {
         id: data.id,
         name: data.name,
@@ -117,6 +121,9 @@ export const useAuth = () => {
       deleteCookie('token_type');
       deleteCookie('name');
       deleteCookie('email');
+
+      deleteLocalStorage('pijak_active_dataset_id');
+      deleteLocalStorage('pijak_dataset_context');
 
       setUser(null);
       setLoading(false);

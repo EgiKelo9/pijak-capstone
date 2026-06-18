@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { CLUSTER_COLORS, SEGMENT_LABELS, getSegmentLabel, formatNumber } from '@/lib/utils';
 import { ClusteringResultData } from '@/types';
 
@@ -32,6 +32,7 @@ interface ClusterSummaryCardsProps {
 export function ClusterSummaryCards({ result, colFitur, categories }: ClusterSummaryCardsProps) {
   const mainFitur = colFitur[0] || '';
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const clusterStats = useMemo(() => {
     const stats: Record<number, { count: number; total: number }> = {};
@@ -48,8 +49,24 @@ export function ClusterSummaryCards({ result, colFitur, categories }: ClusterSum
   const totalSales = Object.values(clusterStats).reduce((s, v) => s + v.total, 0);
   const cols = Math.min(result.cluster_amount, 5);
 
+  // Apply dynamic column count only on lg+ screens, let Tailwind handle smaller breakpoints
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const apply = () => {
+      el.style.gridTemplateColumns = mq.matches ? `repeat(${cols}, 1fr)` : '';
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [cols]);
+
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div
+      ref={gridRef}
+      className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+    >
       {sorted.map(([clusterKey, stats], rankIdx) => {
         const c = parseInt(clusterKey);
         // Use AI-generated category when available, otherwise fall back to rank-based label

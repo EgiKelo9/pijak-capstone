@@ -83,7 +83,7 @@ export function FilledStateView({
       </div>
 
       {/* ── Right: Config & Status Cards ─────────────────────────────────── */}
-      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 max-h-[85vh] overflow-y-auto mb-2 overflow-hidden">
+      <div className="lg:col-span-2 flex flex-col gap-3 min-w-0 min-h-0 lg:max-h-[85vh] overflow-y-auto mb-2">
 
         {/* Terminal — non-collapsible, flex-1 to fill remaining height */}
         <AnalysisCard
@@ -133,7 +133,7 @@ export function FilledStateView({
         </AnalysisCard>
 
         {/* Preferences row */}
-        <div className="flex gap-4 shrink-0">
+        <div className="flex flex-col sm:flex-row gap-4 shrink-0">
           <AnalysisCard
             title="Preferensi Forecasting"
             status={finalForecastingStatus}
